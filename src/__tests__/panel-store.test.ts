@@ -364,5 +364,55 @@ describe('panel-store', () => {
       // subdir is at index 1 in entries, plus 1 for ".." row = cursor at 2
       expect(tab.cursorIndex).toBe(2)
     })
+
+    it('full Enter→Backspace flow with Windows-style paths', async () => {
+      // Step 1: navigate to D:\Work (initial)
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: [
+          makeEntry({ id: 'D:\\Work\\Alpha', name: 'Alpha', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\Flemanager', name: 'Flemanager', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\Zeta', name: 'Zeta', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\readme.txt', name: 'readme.txt' })
+        ],
+        location: 'D:\\Work',
+        parentId: 'D:\\'
+      })
+      await usePanelStore.getState().navigate('left', 'D:\\Work')
+
+      // Step 2: navigate INTO Flemanager (like pressing Enter on that entry)
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: [
+          makeEntry({ id: 'D:\\Work\\Flemanager\\src', name: 'src', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\Flemanager\\package.json', name: 'package.json' })
+        ],
+        location: 'D:\\Work\\Flemanager',
+        parentId: 'D:\\Work'
+      })
+      await usePanelStore.getState().navigate('left', 'D:\\Work\\Flemanager')
+
+      // Verify we're in Flemanager
+      let tab = usePanelStore.getState().getActiveTab('left')
+      expect(tab.locationId).toBe('D:\\Work\\Flemanager')
+
+      // Step 3: go back up with Backspace (navigate to parentId)
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: [
+          makeEntry({ id: 'D:\\Work\\Alpha', name: 'Alpha', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\Flemanager', name: 'Flemanager', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\Zeta', name: 'Zeta', isContainer: true }),
+          makeEntry({ id: 'D:\\Work\\readme.txt', name: 'readme.txt' })
+        ],
+        location: 'D:\\Work',
+        parentId: 'D:\\'
+      })
+      await usePanelStore.getState().navigate('left', 'D:\\Work')
+
+      tab = usePanelStore.getState().getActiveTab('left')
+      // Flemanager is at index 1 (after sorting: Alpha=0, Flemanager=1, Zeta=2, readme.txt=3)
+      // Plus 1 for ".." row = cursor at 2
+      expect(tab.cursorIndex).toBe(2)
+      // Verify the entry at the cursor position (accounting for ".." offset)
+      expect(tab.entries[1].name).toBe('Flemanager')
+    })
   })
 })

@@ -173,7 +173,12 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       if (previousLocationId) {
         const hasParentRow = result.parentId !== null
         const offset = hasParentRow ? 1 : 0 // account for ".." row
-        const prevIdx = entries.findIndex((e) => e.id === previousLocationId)
+        // Try exact match first, then case-insensitive match (Windows paths)
+        let prevIdx = entries.findIndex((e) => e.id === previousLocationId)
+        if (prevIdx < 0) {
+          const prevLower = previousLocationId.toLowerCase()
+          prevIdx = entries.findIndex((e) => e.id.toLowerCase() === prevLower)
+        }
         if (prevIdx >= 0) {
           cursorIndex = prevIdx + offset
         }
