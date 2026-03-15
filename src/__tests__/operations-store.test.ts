@@ -25,7 +25,7 @@ describe('operations-store', () => {
     expect(useOperationsStore.getState().operations).toHaveLength(0)
   })
 
-  it('enqueue adds an enumerating operation and shows dialog', () => {
+  it('enqueue adds a queued operation and shows dialog', () => {
     const id = useOperationsStore.getState().enqueue({
       type: 'copy',
       sourceEntries: [makeEntry('a.txt'), makeEntry('b.txt')],
@@ -38,7 +38,7 @@ describe('operations-store', () => {
     const state = useOperationsStore.getState()
     expect(state.operations).toHaveLength(1)
     expect(state.operations[0].id).toBe(id)
-    expect(state.operations[0].status).toBe('enumerating')
+    expect(state.operations[0].status).toBe('queued')
     expect(state.operations[0].fileList).toEqual([])
     expect(state.showDialog).toBe(true)
   })
@@ -113,7 +113,7 @@ describe('operations-store', () => {
 
     const current = useOperationsStore.getState().getCurrentOperation()
     expect(current).toBeDefined()
-    expect(current?.status).toBe('enumerating')
+    expect(current?.status).toBe('queued')
   })
 
   it('clearCompleted keeps running and queued ops', () => {

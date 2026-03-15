@@ -186,24 +186,23 @@ async function executeOperation(opId: string): Promise<void> {
 export function useFileOperations() {
   const isProcessing = useRef(false)
 
-  // Queue processor
+  // Queue processor — picks up queued ops and runs them sequentially
   useEffect(() => {
     const interval = setInterval(() => {
       if (isProcessing.current) return
       const store = useOperationsStore.getState()
-      const running = store.operations.find((op) => op.status === 'running' || op.status === 'enumerating')
-      if (running) return // Already running one
+      // Don't start another if one is already running or enumerating
+      const active = store.operations.find((op) => op.status === 'running' || op.status === 'enumerating')
+      if (active) return
 
-      const queued = store.operations.find((op) => op.status === 'queued')
-      const enumerating = store.operations.find((op) => op.status === 'enumerating')
-      const next = enumerating || queued
-      if (next && !running) {
+      const next = store.operations.find((op) => op.status === 'queued')
+      if (next) {
         isProcessing.current = true
         executeOperation(next.id).finally(() => {
           isProcessing.current = false
         })
       }
-    }, 200)
+    }, 100)
     return () => clearInterval(interval)
   }, [])
 

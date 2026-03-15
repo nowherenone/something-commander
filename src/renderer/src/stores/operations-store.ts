@@ -69,7 +69,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
     const operation: FileOperation = {
       ...op,
       id,
-      status: 'enumerating',
+      status: 'queued',
       fileList: [],
       currentFile: '',
       currentFileIndex: 0,
