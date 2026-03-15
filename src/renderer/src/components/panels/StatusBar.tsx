@@ -52,7 +52,7 @@ export function StatusBar({ entries, selectedIds, locationId }: StatusBarProps):
           <span className={styles.diskBar}>
             <span className={styles.diskBarFill} style={{ width: `${usedPct}%` }} />
           </span>
-          <span>{formatSize(diskSpace.free)} free / {formatSize(diskSpace.total)}</span>
+          <span>{formatSize(diskSpace.free)} / {formatSize(diskSpace.total)}</span>
         </span>
       )}
     </div>

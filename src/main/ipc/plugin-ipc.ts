@@ -177,9 +177,30 @@ export function registerPluginIPC(): void {
   // Get disk free/total space for a path
   ipcMain.handle(IPC_CHANNELS.GET_DISK_SPACE, async (_event, dirPath: string) => {
     try {
+      if (process.platform === 'win32') {
+        // On Windows, use PowerShell to get accurate disk space
+        const driveLetter = dirPath.charAt(0).toUpperCase()
+        return new Promise<{ free: number; total: number }>((resolve) => {
+          exec(
+            `powershell -Command "(Get-PSDrive ${driveLetter}).Free,(Get-PSDrive ${driveLetter}).Used"`,
+            { timeout: 5000 },
+            (err, stdout) => {
+              if (err) {
+                resolve({ free: 0, total: 0 })
+                return
+              }
+              const lines = stdout.trim().split(/\r?\n/).map(s => parseInt(s.trim(), 10))
+              const free = lines[0] || 0
+              const used = lines[1] || 0
+              resolve({ free, total: free + used })
+            }
+          )
+        })
+      }
+      // On Linux/macOS, statfs works fine
       const stats = await fs.statfs(dirPath)
       return {
-        free: Number(stats.bfree) * Number(stats.bsize),
+        free: Number(stats.bavail) * Number(stats.bsize),
         total: Number(stats.blocks) * Number(stats.bsize)
       }
     } catch {
