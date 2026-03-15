@@ -40,6 +40,7 @@ export interface FileOperation {
   totalBytes: number
   processedFiles: number
   processedBytes: number
+  startTime: number
   error?: string
   overwritePrompt: OverwritePrompt | null
   overwritePolicy: OverwritePolicy
@@ -79,6 +80,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
       totalBytes: 0,
       processedFiles: 0,
       processedBytes: 0,
+      startTime: 0,
       overwritePrompt: null,
       overwritePolicy: 'ask'
     }

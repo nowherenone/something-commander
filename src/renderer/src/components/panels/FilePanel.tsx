@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import type { PanelId } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
 import { usePanelStore } from '../../stores/panel-store'
 import type { SortConfig, SortField } from '../../utils/sort'
 import { TabBar } from './TabBar'
+import { DriveBookmarkMenu } from './DriveBookmarkMenu'
 import { AddressBar } from './AddressBar'
 import { ColumnHeaders } from './ColumnHeaders'
 import { FileList } from './FileList'
@@ -30,6 +31,10 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const getActiveTab = usePanelStore((s) => s.getActiveTab)
 
   const tab = getActiveTab(panelId)
+  const driveMenuOpenPanel = useAppStore((s) => s.driveMenuOpen)
+  const openDriveMenu = useAppStore((s) => s.openDriveMenu)
+  const closeDriveMenu = useAppStore((s) => s.closeDriveMenu)
+  const driveMenuOpen = driveMenuOpenPanel === panelId
 
   // Navigate to saved location on mount only
   useEffect(() => {
@@ -144,13 +149,22 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       className={`${styles.panel} ${isActive ? styles.active : ''}`}
       onClick={() => setActivePanel(panelId)}
     >
-      <TabBar
-        tabs={tabInfos}
-        activeTabId={panel.activeTabId}
-        onSelectTab={(tabId) => switchTab(panelId, tabId)}
-        onCloseTab={(tabId) => closeTab(panelId, tabId)}
-        onNewTab={() => addTab(panelId)}
-      />
+      <div style={{ display: 'flex', height: 26, flexShrink: 0 }}>
+        <DriveBookmarkMenu
+          currentLocation={tab.locationDisplay}
+          currentPluginId={tab.pluginId}
+          onNavigate={(path) => navigate(panelId, path)}
+          isOpen={driveMenuOpen}
+          onToggle={(open) => open ? openDriveMenu(panelId) : closeDriveMenu()}
+        />
+        <TabBar
+          tabs={tabInfos}
+          activeTabId={panel.activeTabId}
+          onSelectTab={(tabId) => switchTab(panelId, tabId)}
+          onCloseTab={(tabId) => closeTab(panelId, tabId)}
+          onNewTab={() => addTab(panelId)}
+        />
+      </div>
       <AddressBar
         location={tab.locationDisplay}
         onNavigate={handleNavigateAddress}

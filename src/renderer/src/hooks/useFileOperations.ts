@@ -68,6 +68,7 @@ async function executeOperation(opId: string): Promise<void> {
     fileList,
     totalFiles,
     totalBytes,
+    startTime: Date.now(),
     currentFile: '',
     processedFiles: 0,
     processedBytes: 0
@@ -184,6 +185,8 @@ async function executeOperation(opId: string): Promise<void> {
   const finalOp = store().operations.find((o) => o.id === opId)
   if (finalOp?.status === 'running') {
     store().updateOperation(opId, { status: 'done', currentFile: '' })
+    // Auto-dismiss successful operations
+    store().removeOperation(opId)
   }
 
   usePanelStore.getState().refresh('left')

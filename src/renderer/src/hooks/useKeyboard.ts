@@ -181,7 +181,12 @@ export function useKeyboard(actions: KeyboardActions): void {
                 break
               case 'd':
                 e.preventDefault()
-                deselectAll(activePanel)
+                if (e.shiftKey) {
+                  deselectAll(activePanel)
+                } else {
+                  // Ctrl+D = open drive/bookmark menu
+                  useAppStore.getState().openDriveMenu(activePanel)
+                }
                 break
               case 'i':
                 e.preventDefault()
