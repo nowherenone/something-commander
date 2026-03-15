@@ -13,6 +13,14 @@ export interface OverwritePrompt {
   destDate: number
 }
 
+export interface FileItem {
+  sourcePath: string
+  destPath: string
+  size: number
+  isDirectory: boolean
+  relativePath: string
+}
+
 export interface FileOperation {
   id: string
   type: 'copy' | 'move' | 'delete'
@@ -21,12 +29,17 @@ export interface FileOperation {
   destinationDisplay: string
   destinationLocationId: string
   destinationPluginId: string
-  status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'
+  status: 'enumerating' | 'queued' | 'running' | 'done' | 'error' | 'cancelled'
+  // File tree (populated after enumeration)
+  fileList: FileItem[]
   currentFile: string
-  processedFiles: number
+  currentFileIndex: number
+  currentFileSize: number
+  currentFileCopied: number // not used yet but reserved for per-byte tracking
   totalFiles: number
-  processedBytes: number
   totalBytes: number
+  processedFiles: number
+  processedBytes: number
   error?: string
   overwritePrompt: OverwritePrompt | null
   overwritePolicy: OverwritePolicy
@@ -43,7 +56,6 @@ interface OperationsState {
   clearCompleted: () => void
   setShowDialog: (show: boolean) => void
   getCurrentOperation: () => FileOperation | undefined
-  resolveOverwrite: (action: 'overwrite' | 'skip' | 'overwrite-all' | 'skip-all') => void
 }
 
 let opCounter = 0
@@ -54,21 +66,19 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
 
   enqueue: (op) => {
     const id = `op-${++opCounter}-${Date.now()}`
-    // Calculate total bytes
-    let totalBytes = 0
-    for (const e of op.sourceEntries) {
-      if (e.size > 0) totalBytes += e.size
-    }
-
     const operation: FileOperation = {
       ...op,
       id,
-      status: 'queued',
+      status: 'enumerating',
+      fileList: [],
       currentFile: '',
+      currentFileIndex: 0,
+      currentFileSize: 0,
+      currentFileCopied: 0,
+      totalFiles: 0,
+      totalBytes: 0,
       processedFiles: 0,
-      totalFiles: op.sourceEntries.length,
       processedBytes: 0,
-      totalBytes,
       overwritePrompt: null,
       overwritePolicy: 'ask'
     }
@@ -97,14 +107,16 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
   cancelOperation: (id) => {
     set((s) => ({
       operations: s.operations.map((op) =>
-        op.id === id ? { ...op, status: 'cancelled' as const } : op
+        op.id === id && (op.status === 'running' || op.status === 'enumerating' || op.status === 'queued')
+          ? { ...op, status: 'cancelled' as const }
+          : op
       )
     }))
   },
 
   clearCompleted: () => {
     set((s) => ({
-      operations: s.operations.filter((op) => op.status === 'running' || op.status === 'queued')
+      operations: s.operations.filter((op) => op.status === 'running' || op.status === 'queued' || op.status === 'enumerating')
     }))
   },
 
@@ -112,11 +124,10 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
 
   getCurrentOperation: () => {
     const ops = get().operations
-    return ops.find((op) => op.status === 'running') || ops.find((op) => op.status === 'queued')
-  },
-
-  resolveOverwrite: (_action) => {
-    // This is handled by the operation executor via polling
-    // The action is stored and the executor reads it
+    return ops.find((op) => op.status === 'running')
+      || ops.find((op) => op.status === 'enumerating')
+      || ops.find((op) => op.status === 'queued')
+      || ops.find((op) => op.status === 'error')
+      || ops[ops.length - 1]
   }
 }))

@@ -48,6 +48,10 @@ interface UtilAPI {
   checkExists(filePath: string): Promise<boolean>
   getFileInfo(filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null>
   isArchive(filePath: string): Promise<boolean>
+  enumerateFiles(
+    sourcePaths: string[],
+    destDir: string
+  ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>>
 }
 
 interface FlemanagerAPI {

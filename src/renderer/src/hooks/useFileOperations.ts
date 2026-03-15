@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '../stores/app-store'
 import { usePanelStore } from '../stores/panel-store'
-import { useOperationsStore, type OverwritePolicy } from '../stores/operations-store'
+import { useOperationsStore, type OverwritePolicy, type FileItem } from '../stores/operations-store'
 import type { Entry } from '@shared/types'
-import { formatSize } from '../utils/format'
 
-// Shared state for overwrite resolution
+// Overwrite resolution via promise
 let overwriteResolve: ((action: 'overwrite' | 'skip') => void) | null = null
 
 export function resolveOverwriteAction(action: 'overwrite' | 'skip' | 'overwrite-all' | 'skip-all'): void {
@@ -32,95 +31,147 @@ function waitForOverwriteDecision(): Promise<'overwrite' | 'skip'> {
   })
 }
 
+function isCancelled(opId: string): boolean {
+  const op = useOperationsStore.getState().operations.find((o) => o.id === opId)
+  return !op || op.status === 'cancelled'
+}
+
 async function executeOperation(opId: string): Promise<void> {
   const store = useOperationsStore.getState
   const op = store().operations.find((o) => o.id === opId)
   if (!op) return
 
-  store().updateOperation(opId, { status: 'running' })
+  // Phase 1: Enumerate files
+  store().updateOperation(opId, { status: 'enumerating', currentFile: 'Scanning files...' })
 
-  const entries = op.sourceEntries
-  let processed = 0
+  let fileList: FileItem[] = []
+
+  if (op.type === 'delete') {
+    // For delete, enumerate source paths (we just need the flat list)
+    const sourcePaths = op.sourceEntries.map((e) => e.id)
+    fileList = await window.api.util.enumerateFiles(sourcePaths, '')
+    // For delete, reverse so we delete files before their parent directories
+    fileList = fileList.reverse()
+  } else {
+    // For copy/move, enumerate with destination
+    const sourcePaths = op.sourceEntries.map((e) => e.id)
+    fileList = await window.api.util.enumerateFiles(sourcePaths, op.destinationLocationId)
+  }
+
+  if (isCancelled(opId)) return
+
+  const totalFiles = fileList.filter((f) => !f.isDirectory).length
+  const totalBytes = fileList.reduce((sum, f) => sum + f.size, 0)
+
+  store().updateOperation(opId, {
+    status: 'running',
+    fileList,
+    totalFiles,
+    totalBytes,
+    currentFile: '',
+    processedFiles: 0,
+    processedBytes: 0
+  })
+
+  // Phase 2: Process files one by one
+  let processedFiles = 0
   let processedBytes = 0
 
-  for (const entry of entries) {
-    const currentOp = store().operations.find((o) => o.id === opId)
-    if (!currentOp || currentOp.status === 'cancelled') break
+  for (let i = 0; i < fileList.length; i++) {
+    if (isCancelled(opId)) break
+
+    const item = fileList[i]
 
     store().updateOperation(opId, {
-      currentFile: entry.name,
-      processedFiles: processed
+      currentFile: item.relativePath,
+      currentFileIndex: i,
+      currentFileSize: item.size,
+      currentFileCopied: 0
     })
 
     try {
       if (op.type === 'delete') {
-        const result = await window.api.util.deleteSingle(entry.id)
+        const result = await window.api.util.deleteSingle(item.sourcePath)
         if (!result.success) {
-          store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${result.error}` })
+          store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
           return
         }
       } else {
         // copy or move
-        const destPath = op.destinationLocationId + '\\' + entry.name
-        // Use forward slash or backslash depending on what the paths use
-        const sep = op.destinationLocationId.includes('/') ? '/' : '\\'
-        const destPathNorm = op.destinationLocationId + sep + entry.name
+        if (item.isDirectory) {
+          // Create directory at destination (mkdir is idempotent)
+          // The copySingleFile with isDirectory=true handles this
+          // But for move, we just need mkdir at dest
+          await window.api.util.copySingleFile(item.sourcePath, item.destPath, true)
+        } else {
+          // Check for overwrite
+          const exists = await window.api.util.checkExists(item.destPath)
+          if (exists) {
+            const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
 
-        // Check if destination exists
-        const exists = await window.api.util.checkExists(destPathNorm)
-        if (exists) {
-          const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
-
-          if (policy === 'skip-all') {
-            processed++
-            if (entry.size > 0) processedBytes += entry.size
-            store().updateOperation(opId, { processedBytes })
-            continue
-          }
-
-          if (policy === 'ask') {
-            // Show overwrite prompt
-            const destInfo = await window.api.util.getFileInfo(destPathNorm)
-            store().updateOperation(opId, {
-              overwritePrompt: {
-                sourcePath: entry.id,
-                sourceName: entry.name,
-                sourceSize: entry.size,
-                sourceDate: entry.modifiedAt,
-                destPath: destPathNorm,
-                destSize: destInfo?.size || 0,
-                destDate: destInfo?.modifiedAt || 0
-              }
-            })
-
-            const decision = await waitForOverwriteDecision()
-            if (decision === 'skip') {
-              processed++
-              if (entry.size > 0) processedBytes += entry.size
+            if (policy === 'skip-all') {
+              processedBytes += item.size
               store().updateOperation(opId, { processedBytes })
               continue
             }
-          }
-          // policy === 'overwrite-all' or user chose 'overwrite' — fall through to copy/move
-        }
 
-        const ipcFn = op.type === 'copy'
-          ? window.api.util.copySingleFile
-          : window.api.util.moveSingleFile
-        const result = await ipcFn(entry.id, destPathNorm, entry.isContainer)
-        if (!result.success) {
-          store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${result.error}` })
-          return
+            if (policy === 'ask') {
+              const destInfo = await window.api.util.getFileInfo(item.destPath)
+              store().updateOperation(opId, {
+                overwritePrompt: {
+                  sourcePath: item.sourcePath,
+                  sourceName: item.relativePath,
+                  sourceSize: item.size,
+                  sourceDate: 0, // TODO: pass from enumerate
+                  destPath: item.destPath,
+                  destSize: destInfo?.size || 0,
+                  destDate: destInfo?.modifiedAt || 0
+                }
+              })
+              const decision = await waitForOverwriteDecision()
+              if (isCancelled(opId)) break
+              if (decision === 'skip') {
+                processedBytes += item.size
+                store().updateOperation(opId, { processedBytes })
+                continue
+              }
+            }
+          }
+
+          const ipcFn = op.type === 'copy'
+            ? window.api.util.copySingleFile
+            : window.api.util.moveSingleFile
+
+          const result = await ipcFn(item.sourcePath, item.destPath, false)
+          if (!result.success) {
+            store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
+            return
+          }
         }
       }
     } catch (err) {
-      store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${String(err)}` })
+      store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${String(err)}` })
       return
     }
 
-    processed++
-    if (entry.size > 0) processedBytes += entry.size
-    store().updateOperation(opId, { processedFiles: processed, processedBytes })
+    if (!item.isDirectory) {
+      processedFiles++
+      processedBytes += item.size
+    }
+    store().updateOperation(opId, { processedFiles, processedBytes })
+  }
+
+  // For move, delete source directories after all files are moved
+  if (op.type === 'move' && !isCancelled(opId)) {
+    const dirs = fileList.filter((f) => f.isDirectory).reverse()
+    for (const dir of dirs) {
+      if (isCancelled(opId)) break
+      try {
+        await window.api.util.deleteSingle(dir.sourcePath)
+      } catch {
+        // Ignore errors deleting source dirs (might not be empty if cancelled)
+      }
+    }
   }
 
   const finalOp = store().operations.find((o) => o.id === opId)
@@ -135,16 +186,20 @@ async function executeOperation(opId: string): Promise<void> {
 export function useFileOperations() {
   const isProcessing = useRef(false)
 
-  // Queue processor — picks up queued operations and runs them
+  // Queue processor
   useEffect(() => {
     const interval = setInterval(() => {
       if (isProcessing.current) return
       const store = useOperationsStore.getState()
+      const running = store.operations.find((op) => op.status === 'running' || op.status === 'enumerating')
+      if (running) return // Already running one
+
       const queued = store.operations.find((op) => op.status === 'queued')
-      const running = store.operations.find((op) => op.status === 'running')
-      if (queued && !running) {
+      const enumerating = store.operations.find((op) => op.status === 'enumerating')
+      const next = enumerating || queued
+      if (next && !running) {
         isProcessing.current = true
-        executeOperation(queued.id).finally(() => {
+        executeOperation(next.id).finally(() => {
           isProcessing.current = false
         })
       }

@@ -58,6 +58,59 @@ export function registerPluginIPC(): void {
     return ['.zip', '.jar'].includes(ext)
   })
 
+  // Enumerate all files recursively for a list of source entries
+  // Returns flat list: [{sourcePath, destPath, size, isDirectory}]
+  ipcMain.handle(
+    IPC_CHANNELS.ENUMERATE_FILES,
+    async (
+      _event,
+      sourcePaths: string[],
+      destDir: string
+    ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> => {
+      const result: Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }> = []
+
+      async function walkEntry(srcPath: string, destBase: string, relBase: string): Promise<void> {
+        const stat = await fs.stat(srcPath)
+        if (stat.isDirectory()) {
+          const destPath = path.join(destBase, path.basename(srcPath))
+          result.push({
+            sourcePath: srcPath,
+            destPath,
+            size: 0,
+            isDirectory: true,
+            relativePath: relBase ? path.join(relBase, path.basename(srcPath)) : path.basename(srcPath)
+          })
+          const children = await fs.readdir(srcPath)
+          for (const child of children) {
+            await walkEntry(
+              path.join(srcPath, child),
+              destPath,
+              relBase ? path.join(relBase, path.basename(srcPath)) : path.basename(srcPath)
+            )
+          }
+        } else {
+          result.push({
+            sourcePath: srcPath,
+            destPath: path.join(destBase, path.basename(srcPath)),
+            size: stat.size,
+            isDirectory: false,
+            relativePath: relBase ? path.join(relBase, path.basename(srcPath)) : path.basename(srcPath)
+          })
+        }
+      }
+
+      for (const srcPath of sourcePaths) {
+        try {
+          await walkEntry(srcPath, destDir, '')
+        } catch {
+          // Skip entries we can't read
+        }
+      }
+
+      return result
+    }
+  )
+
   ipcMain.handle(
     IPC_CHANNELS.READ_FILE_CONTENT,
     async (_event, filePath: string, maxBytes: number = 512 * 1024) => {

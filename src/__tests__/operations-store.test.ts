@@ -25,7 +25,7 @@ describe('operations-store', () => {
     expect(useOperationsStore.getState().operations).toHaveLength(0)
   })
 
-  it('enqueue adds a queued operation and shows dialog', () => {
+  it('enqueue adds an enumerating operation and shows dialog', () => {
     const id = useOperationsStore.getState().enqueue({
       type: 'copy',
       sourceEntries: [makeEntry('a.txt'), makeEntry('b.txt')],
@@ -38,15 +38,14 @@ describe('operations-store', () => {
     const state = useOperationsStore.getState()
     expect(state.operations).toHaveLength(1)
     expect(state.operations[0].id).toBe(id)
-    expect(state.operations[0].status).toBe('queued')
-    expect(state.operations[0].totalFiles).toBe(2)
-    expect(state.operations[0].overwritePolicy).toBe('ask')
+    expect(state.operations[0].status).toBe('enumerating')
+    expect(state.operations[0].fileList).toEqual([])
     expect(state.showDialog).toBe(true)
   })
 
-  it('updateOperation updates fields', () => {
+  it('updateOperation updates fields including fileList', () => {
     const id = useOperationsStore.getState().enqueue({
-      type: 'move',
+      type: 'copy',
       sourceEntries: [makeEntry('a.txt')],
       sourcePluginId: 'local-filesystem',
       destinationDisplay: '/dest',
@@ -56,14 +55,21 @@ describe('operations-store', () => {
 
     useOperationsStore.getState().updateOperation(id, {
       status: 'running',
+      fileList: [
+        { sourcePath: '/test/a.txt', destPath: '/dest/a.txt', size: 100, isDirectory: false, relativePath: 'a.txt' }
+      ],
+      totalFiles: 1,
+      totalBytes: 100,
       currentFile: 'a.txt',
-      processedFiles: 1
+      processedFiles: 1,
+      processedBytes: 100
     })
 
     const op = useOperationsStore.getState().operations[0]
-    expect(op.currentFile).toBe('a.txt')
-    expect(op.processedFiles).toBe(1)
     expect(op.status).toBe('running')
+    expect(op.fileList).toHaveLength(1)
+    expect(op.totalFiles).toBe(1)
+    expect(op.processedFiles).toBe(1)
   })
 
   it('cancelOperation sets status to cancelled', () => {
@@ -95,7 +101,7 @@ describe('operations-store', () => {
     expect(useOperationsStore.getState().showDialog).toBe(false)
   })
 
-  it('clearCompleted removes non-active operations', () => {
+  it('getCurrentOperation returns running or enumerating first', () => {
     useOperationsStore.getState().enqueue({
       type: 'copy',
       sourceEntries: [makeEntry('a.txt')],
@@ -105,6 +111,20 @@ describe('operations-store', () => {
       destinationPluginId: 'local-filesystem'
     })
 
+    const current = useOperationsStore.getState().getCurrentOperation()
+    expect(current).toBeDefined()
+    expect(current?.status).toBe('enumerating')
+  })
+
+  it('clearCompleted keeps running and queued ops', () => {
+    const id1 = useOperationsStore.getState().enqueue({
+      type: 'copy',
+      sourceEntries: [makeEntry('a.txt')],
+      sourcePluginId: 'local-filesystem',
+      destinationDisplay: '/dest',
+      destinationLocationId: '/dest',
+      destinationPluginId: 'local-filesystem'
+    })
     const id2 = useOperationsStore.getState().enqueue({
       type: 'move',
       sourceEntries: [makeEntry('b.txt')],
@@ -114,56 +134,11 @@ describe('operations-store', () => {
       destinationPluginId: 'local-filesystem'
     })
 
-    // Mark first as running, second as done
-    const ops = useOperationsStore.getState().operations
-    useOperationsStore.getState().updateOperation(ops[0].id, { status: 'running' })
+    useOperationsStore.getState().updateOperation(id1, { status: 'running' })
     useOperationsStore.getState().updateOperation(id2, { status: 'done' })
     useOperationsStore.getState().clearCompleted()
 
-    const remaining = useOperationsStore.getState().operations
-    // running is kept, done is removed, so 1 remains
-    expect(remaining).toHaveLength(1)
-    expect(remaining[0].status).toBe('running')
-  })
-
-  it('getCurrentOperation returns running or first queued', () => {
-    useOperationsStore.getState().enqueue({
-      type: 'copy',
-      sourceEntries: [makeEntry('a.txt')],
-      sourcePluginId: 'local-filesystem',
-      destinationDisplay: '/dest',
-      destinationLocationId: '/dest',
-      destinationPluginId: 'local-filesystem'
-    })
-
-    useOperationsStore.getState().enqueue({
-      type: 'move',
-      sourceEntries: [makeEntry('b.txt')],
-      sourcePluginId: 'local-filesystem',
-      destinationDisplay: '/dest',
-      destinationLocationId: '/dest',
-      destinationPluginId: 'local-filesystem'
-    })
-
-    const current = useOperationsStore.getState().getCurrentOperation()
-    expect(current).toBeDefined()
-    expect(current?.status).toBe('queued')
-    expect(current?.type).toBe('copy')
-  })
-
-  it('calculates totalBytes from entry sizes', () => {
-    useOperationsStore.getState().enqueue({
-      type: 'copy',
-      sourceEntries: [
-        makeEntry('a.txt'), // size 100
-        makeEntry('b.txt')  // size 100
-      ],
-      sourcePluginId: 'local-filesystem',
-      destinationDisplay: '/dest',
-      destinationLocationId: '/dest',
-      destinationPluginId: 'local-filesystem'
-    })
-
-    expect(useOperationsStore.getState().operations[0].totalBytes).toBe(200)
+    expect(useOperationsStore.getState().operations).toHaveLength(1)
+    expect(useOperationsStore.getState().operations[0].status).toBe('running')
   })
 })
