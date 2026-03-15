@@ -55,6 +55,9 @@ interface UtilAPI {
   getFileSize(filePath: string): Promise<number>
   saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
+  sftpConnect(host: string, port: number, username: string, password?: string): Promise<string>
+  sftpDisconnect(connId: string): Promise<void>
+  sftpListConnections(): Promise<string[]>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   enumerateFiles(
     sourcePaths: string[],

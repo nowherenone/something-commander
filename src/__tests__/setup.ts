@@ -41,7 +41,10 @@ const mockUtilApi = {
   readFileChunk: vi.fn().mockResolvedValue({ data: '', bytesRead: 0 }),
   getFileSize: vi.fn().mockResolvedValue(0),
   saveFile: vi.fn().mockResolvedValue({ success: true }),
-  showContextMenu: vi.fn().mockResolvedValue(null)
+  showContextMenu: vi.fn().mockResolvedValue(null),
+  sftpConnect: vi.fn().mockResolvedValue('user@host:22'),
+  sftpDisconnect: vi.fn().mockResolvedValue(undefined),
+  sftpListConnections: vi.fn().mockResolvedValue([])
 }
 
 Object.defineProperty(window, 'api', {

@@ -1,0 +1,90 @@
+.menuBar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 4px;
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.menuItem {
+  position: relative;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.menuItemActive {
+  background: var(--accent) !important;
+  color: white !important;
+}
+
+.menuDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 200;
+  padding: 4px 0;
+}
+
+.menuAction {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 4px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.menuAction:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.menuShortcut {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-left: 24px;
+}
+
+.menuAction:hover .menuShortcut {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.menuSep {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 8px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.titleText {
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 0 8px;
+}

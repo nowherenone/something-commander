@@ -104,6 +104,15 @@ const utilAPI = {
   showContextMenu: (items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_CONTEXT_MENU, items),
 
+  sftpConnect: (host: string, port: number, username: string, password?: string): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SFTP_CONNECT, host, port, username, password),
+
+  sftpDisconnect: (connId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SFTP_DISCONNECT, connId),
+
+  sftpListConnections: (): Promise<string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SFTP_LIST_CONNECTIONS),
+
   onCopyFileProgress: (callback: (bytesCopied: number) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, bytesCopied: number): void =>
       callback(bytesCopied)

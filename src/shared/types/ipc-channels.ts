@@ -26,6 +26,9 @@ export const IPC_CHANNELS = {
   GET_FILE_SIZE: 'util:getFileSize',
   SAVE_FILE: 'util:saveFile',
   SHOW_CONTEXT_MENU: 'util:showContextMenu',
+  SFTP_CONNECT: 'sftp:connect',
+  SFTP_DISCONNECT: 'sftp:disconnect',
+  SFTP_LIST_CONNECTIONS: 'sftp:listConnections',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
   // Operation progress events (main → renderer)

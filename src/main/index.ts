@@ -6,6 +6,7 @@ import { registerAllIPC } from './ipc'
 import { pluginManager } from './plugins/plugin-manager'
 import { LocalFilesystemPlugin } from './plugins/local-filesystem'
 import { ArchivePlugin } from './plugins/archive'
+import { SftpPlugin } from './plugins/sftp'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -58,6 +59,7 @@ app.whenReady().then(async () => {
   // Register plugins
   pluginManager.register(new LocalFilesystemPlugin())
   pluginManager.register(new ArchivePlugin())
+  pluginManager.register(new SftpPlugin())
   await pluginManager.initializeAll()
 
   // Register IPC handlers

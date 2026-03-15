@@ -133,6 +133,29 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                       />
                     </div>
                   </div>
+                  <div className={styles.settingsGroup}>
+                    <div className={styles.settingsGroupTitle}>Bottom bar</div>
+                    <div className={styles.settingsRow}>
+                      <span className={styles.settingsLabel}>Bottom panel</span>
+                      <select
+                        className={styles.settingsSelect}
+                        value={settings.bottomBar}
+                        onChange={(e) => update({ bottomBar: e.target.value as 'fnkeys' | 'status' | 'none' })}
+                      >
+                        <option value="fnkeys">Function keys (F1-F10)</option>
+                        <option value="status">Status bar</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                    <label className={styles.settingsCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={settings.showCommandLine}
+                        onChange={(e) => update({ showCommandLine: e.target.checked })}
+                      />
+                      <span className={styles.settingsLabel}>Show command line</span>
+                    </label>
+                  </div>
                 </>
               )}
 

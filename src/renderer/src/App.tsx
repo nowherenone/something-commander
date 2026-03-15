@@ -1,13 +1,15 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useState, useEffect } from 'react'
 import { DualPanel } from './components/panels/DualPanel'
 import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
+import { MenuBar } from './components/layout/MenuBar'
+import { BottomStatusBar } from './components/layout/BottomStatusBar'
 import { OperationDialog, QueueButton } from './components/dialogs/OperationDialog'
 import { SettingsDialog } from './components/dialogs/SettingsDialog'
-// FileViewer is now in a separate window (ViewerPage)
 import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
+import { SftpConnect } from './components/dialogs/SftpConnect'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
@@ -15,7 +17,6 @@ import { usePanelStore } from './stores/panel-store'
 import { useOperationsStore } from './stores/operations-store'
 import { useSettingsStore } from './stores/settings-store'
 import type { Entry } from '@shared/types'
-import { useEffect } from 'react'
 
 function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
@@ -25,6 +26,7 @@ function App(): React.JSX.Element {
   const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
   const [dirCompareOpen, setDirCompareOpen] = useState(false)
+  const [sftpConnectOpen, setSftpConnectOpen] = useState(false)
 
   const { handleCopy, handleMove, handleDelete } = useFileOperations()
 
@@ -118,18 +120,86 @@ function App(): React.JSX.Element {
     onCompare: handleCompare
   })
 
+  const bottomBar = useSettingsStore((s) => s.bottomBar)
+  const showCommandLine = useSettingsStore((s) => s.showCommandLine)
+
+  const handleMenuAction = useCallback((action: string) => {
+    switch (action) {
+      case 'view': handleF3(); break
+      case 'edit': handleF4(); break
+      case 'copy': handleCopy(); break
+      case 'move': handleMove(); break
+      case 'mkdir': handleF7(); break
+      case 'delete': handleDelete(); break
+      case 'multiRename': handleCtrlM(); break
+      case 'search': handleAltF7(); break
+      case 'compare': handleCompare(); break
+      case 'settings': handleF9(); break
+      case 'toggleHidden': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().toggleHidden(ap)
+        break
+      }
+      case 'refresh': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().refresh(ap)
+        break
+      }
+      case 'newTab': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().addTab(ap)
+        break
+      }
+      case 'closeTab': {
+        const ap = useAppStore.getState().activePanel
+        const tab = usePanelStore.getState().getActiveTab(ap)
+        usePanelStore.getState().closeTab(ap, tab.id)
+        break
+      }
+      case 'driveMenu': {
+        const ap = useAppStore.getState().activePanel
+        useAppStore.getState().openDriveMenu(ap)
+        break
+      }
+      case 'sftpConnect':
+        setSftpConnectOpen(true)
+        break
+      case 'sftpDisconnect': {
+        // Disconnect the SFTP connection used by active panel
+        const apanel = useAppStore.getState().activePanel
+        const atab = usePanelStore.getState().getActiveTab(apanel)
+        if (atab.pluginId === 'sftp' && atab.locationId) {
+          const cId = atab.locationId.split('::')[0]
+          window.api.util.sftpDisconnect(cId)
+          usePanelStore.getState().navigateWithPlugin(apanel, 'local-filesystem', null)
+        }
+        break
+      }
+      case 'toggleCommandLine':
+        useSettingsStore.getState().updateSettings({ showCommandLine: !showCommandLine })
+        break
+      case 'quit':
+        window.close()
+        break
+    }
+  }, [handleF3, handleF4, handleCopy, handleMove, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9, showCommandLine])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <MenuBar onAction={handleMenuAction} />
       <DualPanel />
-      <CommandLine />
-      <FunctionKeyBar
-        onF3={handleF3}
-        onF5={handleCopy}
-        onF6={handleMove}
-        onF7={handleF7}
-        onF8={handleDelete}
-        onF9={handleF9}
-      />
+      {showCommandLine && <CommandLine />}
+      {bottomBar === 'fnkeys' && (
+        <FunctionKeyBar
+          onF3={handleF3}
+          onF5={handleCopy}
+          onF6={handleMove}
+          onF7={handleF7}
+          onF8={handleDelete}
+          onF9={handleF9}
+        />
+      )}
+      {bottomBar === 'status' && <BottomStatusBar />}
 
       <OperationDialog />
       <QueueButton />
@@ -281,6 +351,17 @@ function App(): React.JSX.Element {
             setMultiRenameEntries(null)
             usePanelStore.getState().refresh('left')
             usePanelStore.getState().refresh('right')
+          }}
+        />
+      )}
+
+      {sftpConnectOpen && (
+        <SftpConnect
+          onClose={() => setSftpConnectOpen(false)}
+          onConnected={(connId) => {
+            setSftpConnectOpen(false)
+            const activePanel = useAppStore.getState().activePanel
+            usePanelStore.getState().navigateWithPlugin(activePanel, 'sftp', `${connId}::/`)
           }}
         />
       )}

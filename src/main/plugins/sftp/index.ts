@@ -1,0 +1,186 @@
+import SftpClient from 'ssh2-sftp-client'
+import * as path from 'path'
+import type {
+  BrowsePlugin,
+  PluginManifest,
+  ReadDirectoryResult,
+  Entry,
+  PluginOperation,
+  OperationRequest,
+  OperationResult
+} from '@shared/types'
+
+interface SftpConnection {
+  id: string
+  client: SftpClient
+  host: string
+  port: number
+  username: string
+}
+
+export class SftpPlugin implements BrowsePlugin {
+  readonly manifest: PluginManifest = {
+    id: 'sftp',
+    displayName: 'SFTP',
+    version: '1.0.0',
+    iconHint: 'network',
+    schemes: ['sftp']
+  }
+
+  private connections: Map<string, SftpConnection> = new Map()
+
+  async initialize(): Promise<boolean> {
+    return true
+  }
+
+  async dispose(): Promise<void> {
+    for (const conn of this.connections.values()) {
+      try {
+        await conn.client.end()
+      } catch { /* ignore */ }
+    }
+    this.connections.clear()
+  }
+
+  /**
+   * locationId format: "connId::/remote/path"
+   * connId is "user@host:port"
+   */
+  async readDirectory(locationId: string | null): Promise<ReadDirectoryResult> {
+    if (!locationId) {
+      // Show list of saved connections
+      return {
+        entries: [],
+        location: 'SFTP Connections',
+        parentId: null
+      }
+    }
+
+    const [connId, remotePath] = this.parseLocation(locationId)
+    const conn = this.connections.get(connId)
+    if (!conn) {
+      throw new Error(`Not connected to ${connId}. Use Connect first.`)
+    }
+
+    const dirPath = remotePath || '/'
+    const listing = await conn.client.list(dirPath)
+
+    const entries: Entry[] = listing.map((item) => {
+      const isDir = item.type === 'd'
+      const ext = isDir ? '' : path.extname(item.name).slice(1).toLowerCase()
+      return {
+        id: `${connId}::${dirPath === '/' ? '' : dirPath}/${item.name}`,
+        name: item.name,
+        isContainer: isDir,
+        size: isDir ? -1 : item.size,
+        modifiedAt: item.modifyTime,
+        mimeType: isDir ? 'inode/directory' : '',
+        iconHint: isDir ? 'folder' : 'file',
+        meta: { extension: ext, connId },
+        attributes: {
+          readonly: false,
+          hidden: item.name.startsWith('.'),
+          symlink: item.type === 'l'
+        }
+      }
+    })
+
+    const parentPath = dirPath === '/' ? null : path.posix.dirname(dirPath)
+    const parentId = parentPath !== null ? `${connId}::${parentPath}` : null
+
+    return {
+      entries,
+      location: `sftp://${connId}${dirPath}`,
+      parentId
+    }
+  }
+
+  async resolveLocation(input: string): Promise<string | null> {
+    // Accept sftp://user@host:port/path format
+    const match = input.match(/^sftp:\/\/([^/]+)(\/.*)?$/)
+    if (!match) return null
+    const connId = match[1]
+    const remotePath = match[2] || '/'
+    return `${connId}::${remotePath}`
+  }
+
+  getSupportedOperations(): PluginOperation[] {
+    return ['delete', 'rename', 'createDirectory']
+  }
+
+  async executeOperation(op: OperationRequest): Promise<OperationResult> {
+    try {
+      switch (op.op) {
+        case 'delete': {
+          for (const entry of op.entries) {
+            const [connId, remotePath] = this.parseLocation(entry.id)
+            const conn = this.connections.get(connId)
+            if (!conn) throw new Error('Not connected')
+            if (entry.isContainer) {
+              await conn.client.rmdir(remotePath, true)
+            } else {
+              await conn.client.delete(remotePath)
+            }
+          }
+          return { success: true }
+        }
+        case 'rename': {
+          const [connId, remotePath] = this.parseLocation(op.entry.id)
+          const conn = this.connections.get(connId)
+          if (!conn) throw new Error('Not connected')
+          const dir = path.posix.dirname(remotePath)
+          await conn.client.rename(remotePath, path.posix.join(dir, op.newName))
+          return { success: true }
+        }
+        case 'createDirectory': {
+          const [connId, parentPath] = this.parseLocation(op.parentLocationId)
+          const conn = this.connections.get(connId)
+          if (!conn) throw new Error('Not connected')
+          await conn.client.mkdir(path.posix.join(parentPath, op.name), true)
+          return { success: true }
+        }
+        default:
+          return { success: false, errors: [{ entryId: '', message: 'Unsupported operation' }] }
+      }
+    } catch (err) {
+      return { success: false, errors: [{ entryId: '', message: String(err) }] }
+    }
+  }
+
+  // Public method to connect
+  async connect(host: string, port: number, username: string, password?: string, privateKey?: string): Promise<string> {
+    const connId = `${username}@${host}:${port}`
+    const client = new SftpClient()
+
+    const connectConfig: Record<string, unknown> = {
+      host,
+      port,
+      username
+    }
+    if (password) connectConfig.password = password
+    if (privateKey) connectConfig.privateKey = privateKey
+
+    await client.connect(connectConfig as Parameters<SftpClient['connect']>[0])
+
+    this.connections.set(connId, { id: connId, client, host, port, username })
+    return connId
+  }
+
+  async disconnect(connId: string): Promise<void> {
+    const conn = this.connections.get(connId)
+    if (conn) {
+      await conn.client.end()
+      this.connections.delete(connId)
+    }
+  }
+
+  getConnections(): string[] {
+    return Array.from(this.connections.keys())
+  }
+
+  private parseLocation(locationId: string): [string, string] {
+    const sepIdx = locationId.indexOf('::')
+    if (sepIdx < 0) return [locationId, '/']
+    return [locationId.slice(0, sepIdx), locationId.slice(sepIdx + 2) || '/']
+  }
+}
