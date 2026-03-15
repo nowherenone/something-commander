@@ -7,21 +7,27 @@ interface KeyboardActions {
   onF6?: () => void
   onF7?: () => void
   onF8?: () => void
+  onF9?: () => void
 }
 
 export function useKeyboard(actions: KeyboardActions): void {
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       const activePanel = useAppStore.getState().activePanel
-      const panelState = usePanelStore.getState()[activePanel]
-      const { navigate, setCursor, toggleSelect, selectAll, deselectAll, invertSelection } =
-        usePanelStore.getState()
+      const store = usePanelStore.getState()
+      const tab = store.getActiveTab(activePanel)
+      const { navigate, setCursor, toggleSelect, spaceSelect, selectAll, deselectAll, invertSelection, addTab, closeTab, toggleHidden } = store
 
       // Don't handle keyboard when an input is focused
       if (
         document.activeElement instanceof HTMLInputElement ||
         document.activeElement instanceof HTMLTextAreaElement
       ) {
+        // But allow Escape to blur
+        if (e.key === 'Escape') {
+          ;(document.activeElement as HTMLElement).blur()
+          e.preventDefault()
+        }
         return
       }
 
@@ -34,31 +40,29 @@ export function useKeyboard(actions: KeyboardActions): void {
         case 'ArrowUp':
           e.preventDefault()
           if (e.shiftKey) {
-            // Extend selection
-            const newIdx = Math.max(0, panelState.cursorIndex - 1)
-            const entry = panelState.entries[panelState.cursorIndex]
-            if (entry) toggleSelect(activePanel, entry.id)
+            const newIdx = Math.max(0, tab.cursorIndex - 1)
+            const offset = tab.parentId !== null ? 1 : 0
+            const entryIdx = tab.cursorIndex - offset
+            if (entryIdx >= 0 && entryIdx < tab.entries.length) {
+              toggleSelect(activePanel, tab.entries[entryIdx].id)
+            }
             setCursor(activePanel, newIdx)
           } else {
-            setCursor(activePanel, panelState.cursorIndex - 1)
+            setCursor(activePanel, tab.cursorIndex - 1)
           }
           break
 
         case 'ArrowDown':
           e.preventDefault()
           if (e.shiftKey) {
-            const newIdx = Math.min(
-              panelState.entries.length - 1 + (panelState.parentId !== null ? 1 : 0),
-              panelState.cursorIndex + 1
-            )
-            const entry = panelState.entries[panelState.cursorIndex]
-            if (entry) toggleSelect(activePanel, entry.id)
-            setCursor(activePanel, newIdx)
+            const offset = tab.parentId !== null ? 1 : 0
+            const entryIdx = tab.cursorIndex - offset
+            if (entryIdx >= 0 && entryIdx < tab.entries.length) {
+              toggleSelect(activePanel, tab.entries[entryIdx].id)
+            }
+            setCursor(activePanel, tab.cursorIndex + 1)
           } else {
-            setCursor(
-              activePanel,
-              panelState.cursorIndex + 1
-            )
+            setCursor(activePanel, tab.cursorIndex + 1)
           }
           break
 
@@ -69,24 +73,28 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'End':
           e.preventDefault()
-          setCursor(
-            activePanel,
-            panelState.entries.length - 1 + (panelState.parentId !== null ? 1 : 0)
-          )
+          setCursor(activePanel, tab.entries.length - 1 + (tab.parentId !== null ? 1 : 0))
+          break
+
+        case 'PageUp':
+          e.preventDefault()
+          setCursor(activePanel, Math.max(0, tab.cursorIndex - 20))
+          break
+
+        case 'PageDown':
+          e.preventDefault()
+          setCursor(activePanel, tab.cursorIndex + 20)
           break
 
         case 'Enter': {
           e.preventDefault()
-          // Account for ".." entry offset
-          const offset = panelState.parentId !== null ? 1 : 0
-          const idx = panelState.cursorIndex - offset
-          if (panelState.cursorIndex === 0 && panelState.parentId !== null) {
-            // Go up
-            navigate(activePanel, panelState.parentId)
-          } else if (idx >= 0 && idx < panelState.entries.length) {
-            const entry = panelState.entries[idx]
-            if (entry.isContainer) {
-              navigate(activePanel, entry.id)
+          const offset = tab.parentId !== null ? 1 : 0
+          const idx = tab.cursorIndex - offset
+          if (tab.cursorIndex === 0 && tab.parentId !== null) {
+            navigate(activePanel, tab.parentId)
+          } else if (idx >= 0 && idx < tab.entries.length) {
+            if (tab.entries[idx].isContainer) {
+              navigate(activePanel, tab.entries[idx].id)
             }
           }
           break
@@ -94,8 +102,8 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'Backspace':
           e.preventDefault()
-          if (panelState.parentId !== null) {
-            navigate(activePanel, panelState.parentId)
+          if (tab.parentId !== null) {
+            navigate(activePanel, tab.parentId)
           } else {
             navigate(activePanel, null)
           }
@@ -103,12 +111,20 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'Insert': {
           e.preventDefault()
-          const offset = panelState.parentId !== null ? 1 : 0
-          const idx = panelState.cursorIndex - offset
-          if (idx >= 0 && idx < panelState.entries.length) {
-            toggleSelect(activePanel, panelState.entries[idx].id)
+          const offset = tab.parentId !== null ? 1 : 0
+          const idx = tab.cursorIndex - offset
+          if (idx >= 0 && idx < tab.entries.length) {
+            toggleSelect(activePanel, tab.entries[idx].id)
           }
-          setCursor(activePanel, panelState.cursorIndex + 1)
+          setCursor(activePanel, tab.cursorIndex + 1)
+          break
+        }
+
+        case ' ': {
+          e.preventDefault()
+          const offset = tab.parentId !== null ? 1 : 0
+          const idx = tab.cursorIndex - offset
+          spaceSelect(activePanel, idx)
           break
         }
 
@@ -133,24 +149,43 @@ export function useKeyboard(actions: KeyboardActions): void {
           actions.onF8?.()
           break
 
-        case 'a':
-          if (e.ctrlKey) {
-            e.preventDefault()
-            selectAll(activePanel)
-          }
+        case 'F9':
+          e.preventDefault()
+          actions.onF9?.()
           break
 
-        case 'd':
+        default:
           if (e.ctrlKey) {
-            e.preventDefault()
-            deselectAll(activePanel)
-          }
-          break
-
-        case 'i':
-          if (e.ctrlKey) {
-            e.preventDefault()
-            invertSelection(activePanel)
+            switch (e.key.toLowerCase()) {
+              case 'a':
+                e.preventDefault()
+                selectAll(activePanel)
+                break
+              case 'd':
+                e.preventDefault()
+                deselectAll(activePanel)
+                break
+              case 'i':
+                e.preventDefault()
+                invertSelection(activePanel)
+                break
+              case 't':
+                e.preventDefault()
+                addTab(activePanel)
+                break
+              case 'w':
+                e.preventDefault()
+                closeTab(activePanel, tab.id)
+                break
+              case 'h':
+                e.preventDefault()
+                toggleHidden(activePanel)
+                break
+              case 'r':
+                e.preventDefault()
+                store.refresh(activePanel)
+                break
+            }
           }
           break
       }

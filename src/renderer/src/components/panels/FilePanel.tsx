@@ -3,6 +3,7 @@ import type { PanelId } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
 import { usePanelStore } from '../../stores/panel-store'
 import type { SortConfig, SortField } from '../../utils/sort'
+import { TabBar } from './TabBar'
 import { AddressBar } from './AddressBar'
 import { ColumnHeaders } from './ColumnHeaders'
 import { FileList } from './FileList'
@@ -23,8 +24,14 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const setSort = usePanelStore((s) => s.setSort)
   const setCursor = usePanelStore((s) => s.setCursor)
   const toggleSelect = usePanelStore((s) => s.toggleSelect)
+  const addTab = usePanelStore((s) => s.addTab)
+  const closeTab = usePanelStore((s) => s.closeTab)
+  const switchTab = usePanelStore((s) => s.switchTab)
+  const getActiveTab = usePanelStore((s) => s.getActiveTab)
 
-  // Navigate to saved location or home on mount
+  const tab = getActiveTab(panelId)
+
+  // Navigate to saved location on mount
   useEffect(() => {
     const savedLocation = localStorage.getItem(`panel-${panelId}-location`)
     navigate(panelId, savedLocation || null)
@@ -44,21 +51,21 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       const newConfig: SortConfig = {
         field,
         direction:
-          panel.sortConfig.field === field && panel.sortConfig.direction === 'asc' ? 'desc' : 'asc'
+          tab.sortConfig.field === field && tab.sortConfig.direction === 'asc' ? 'desc' : 'asc'
       }
       setSort(panelId, newConfig)
     },
-    [panelId, panel.sortConfig, setSort]
+    [panelId, tab.sortConfig, setSort]
   )
 
   const handleNavigateAddress = useCallback(
     async (input: string) => {
-      const resolved = await window.api.plugins.resolveLocation(panel.pluginId, input)
+      const resolved = await window.api.plugins.resolveLocation(tab.pluginId, input)
       if (resolved !== null) {
         navigate(panelId, resolved)
       }
     },
-    [panelId, panel.pluginId, navigate]
+    [panelId, tab.pluginId, navigate]
   )
 
   const handleSegmentClick = useCallback(
@@ -73,16 +80,15 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   )
 
   const handleGoUp = useCallback(() => {
-    if (panel.parentId !== null) {
-      navigate(panelId, panel.parentId)
+    if (tab.parentId !== null) {
+      navigate(panelId, tab.parentId)
     } else {
       navigate(panelId, null)
     }
-  }, [panelId, panel.parentId, navigate])
+  }, [panelId, tab.parentId, navigate])
 
-  // Entries with ".." at the top if we have a parent
   const displayEntries =
-    panel.parentId !== null
+    tab.parentId !== null
       ? [
           {
             id: '__parent__',
@@ -95,9 +101,9 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
             meta: {},
             attributes: { readonly: true, hidden: false, symlink: false }
           },
-          ...panel.entries
+          ...tab.entries
         ]
-      : panel.entries
+      : tab.entries
 
   const handleEntryActivate = useCallback(
     (entry: { id: string; isContainer: boolean }) => {
@@ -110,32 +116,47 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
     [handleActivate, handleGoUp]
   )
 
+  // Tab info for the TabBar
+  const tabInfos = panel.tabs.map((t) => ({
+    id: t.id,
+    label: t.locationDisplay
+      ? t.locationDisplay.split(/[\\/]/).filter(Boolean).pop() || t.locationDisplay
+      : 'New Tab'
+  }))
+
   return (
     <div
       className={`${styles.panel} ${isActive ? styles.active : ''}`}
       onClick={() => setActivePanel(panelId)}
     >
+      <TabBar
+        tabs={tabInfos}
+        activeTabId={panel.activeTabId}
+        onSelectTab={(tabId) => switchTab(panelId, tabId)}
+        onCloseTab={(tabId) => closeTab(panelId, tabId)}
+        onNewTab={() => addTab(panelId)}
+      />
       <AddressBar
-        location={panel.locationDisplay}
+        location={tab.locationDisplay}
         onNavigate={handleNavigateAddress}
         onSegmentClick={handleSegmentClick}
       />
-      <ColumnHeaders sortConfig={panel.sortConfig} onSort={handleSort} />
-      {panel.isLoading ? (
+      <ColumnHeaders sortConfig={tab.sortConfig} onSort={handleSort} />
+      {tab.isLoading ? (
         <div className={styles.loading}>Loading...</div>
-      ) : panel.error ? (
-        <div className={styles.error}>{panel.error}</div>
+      ) : tab.error ? (
+        <div className={styles.error}>{tab.error}</div>
       ) : (
         <FileList
           entries={displayEntries}
-          cursorIndex={panel.cursorIndex}
-          selectedIds={panel.selectedEntryIds}
+          cursorIndex={tab.cursorIndex}
+          selectedIds={tab.selectedEntryIds}
           onCursorChange={(i) => setCursor(panelId, i)}
           onSelect={(id) => toggleSelect(panelId, id)}
           onActivate={handleEntryActivate}
         />
       )}
-      <StatusBar entries={panel.entries} selectedIds={panel.selectedEntryIds} />
+      <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} />
     </div>
   )
 }

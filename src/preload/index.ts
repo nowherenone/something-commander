@@ -40,8 +40,21 @@ const pluginsAPI = {
   }
 }
 
+const utilAPI = {
+  calcFolderSize: (folderPath: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CALC_FOLDER_SIZE, folderPath),
+
+  runCommand: (
+    command: string,
+    cwd: string,
+    shell?: string
+  ): Promise<{ stdout: string; stderr: string; code: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RUN_COMMAND, command, cwd, shell)
+}
+
 const api = {
-  plugins: pluginsAPI
+  plugins: pluginsAPI,
+  util: utilAPI
 }
 
 if (process.contextIsolated) {

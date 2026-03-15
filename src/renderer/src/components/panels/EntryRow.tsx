@@ -37,7 +37,11 @@ export const EntryRow = React.memo(function EntryRow({
       <div className={styles.colExt}>
         {entry.isContainer ? '<DIR>' : ((entry.meta.extension as string) || '')}
       </div>
-      <div className={styles.colSize}>{entry.isContainer ? '' : formatSize(entry.size)}</div>
+      <div className={styles.colSize}>
+        {entry.isContainer
+          ? (entry.size > 0 ? formatSize(entry.size) : '')
+          : formatSize(entry.size)}
+      </div>
       <div className={styles.colDate}>{formatDate(entry.modifiedAt)}</div>
     </div>
   )

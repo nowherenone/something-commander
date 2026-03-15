@@ -7,6 +7,10 @@ export const IPC_CHANNELS = {
   PLUGIN_EXEC_OP: 'plugin:executeOperation',
   PLUGIN_GET_CONTENT: 'plugin:getContent',
 
+  // Utility
+  CALC_FOLDER_SIZE: 'util:calcFolderSize',
+  RUN_COMMAND: 'util:runCommand',
+
   // Operation progress events (main → renderer)
   OP_PROGRESS: 'ops:progress',
   OP_COMPLETE: 'ops:complete',

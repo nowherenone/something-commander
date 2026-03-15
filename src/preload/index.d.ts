@@ -19,8 +19,18 @@ interface PluginsAPI {
   onOperationError(callback: (data: { operationId: string; error: string }) => void): () => void
 }
 
+interface UtilAPI {
+  calcFolderSize(folderPath: string): Promise<number>
+  runCommand(
+    command: string,
+    cwd: string,
+    shell?: string
+  ): Promise<{ stdout: string; stderr: string; code: number }>
+}
+
 interface FlemanagerAPI {
   plugins: PluginsAPI
+  util: UtilAPI
 }
 
 declare global {
