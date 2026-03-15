@@ -42,6 +42,11 @@ interface UtilAPI {
     contentPattern: string,
     maxResults?: number
   ): Promise<Array<{ path: string; name: string; isDirectory: boolean; size: number }>>
+  copySingleFile(sourcePath: string, destPath: string, isDirectory: boolean): Promise<{ success: boolean; error?: string }>
+  moveSingleFile(sourcePath: string, destPath: string, isDirectory: boolean): Promise<{ success: boolean; error?: string }>
+  deleteSingle(targetPath: string): Promise<{ success: boolean; error?: string }>
+  checkExists(filePath: string): Promise<boolean>
+  getFileInfo(filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null>
 }
 
 interface FlemanagerAPI {

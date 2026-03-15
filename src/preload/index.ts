@@ -63,7 +63,22 @@ const utilAPI = {
     contentPattern: string,
     maxResults?: number
   ): Promise<Array<{ path: string; name: string; isDirectory: boolean; size: number }>> =>
-    ipcRenderer.invoke(IPC_CHANNELS.SEARCH_FILES, rootPath, pattern, contentPattern, maxResults)
+    ipcRenderer.invoke(IPC_CHANNELS.SEARCH_FILES, rootPath, pattern, contentPattern, maxResults),
+
+  copySingleFile: (sourcePath: string, destPath: string, isDirectory: boolean): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.COPY_SINGLE_FILE, sourcePath, destPath, isDirectory),
+
+  moveSingleFile: (sourcePath: string, destPath: string, isDirectory: boolean): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MOVE_SINGLE_FILE, sourcePath, destPath, isDirectory),
+
+  deleteSingle: (targetPath: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DELETE_SINGLE, targetPath),
+
+  checkExists: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CHECK_EXISTS, filePath),
+
+  getFileInfo: (filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_FILE_INFO, filePath)
 }
 
 const api = {

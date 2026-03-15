@@ -170,9 +170,9 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
 
       // When going up, place cursor on the folder we came from
       let cursorIndex = 0
-      if (previousLocationId && result.parentId !== null) {
-        // Check if we're going up (the previous location should be a child entry)
-        const offset = result.parentId !== null ? 1 : 0 // account for ".." row
+      if (previousLocationId) {
+        const hasParentRow = result.parentId !== null
+        const offset = hasParentRow ? 1 : 0 // account for ".." row
         const prevIdx = entries.findIndex((e) => e.id === previousLocationId)
         if (prevIdx >= 0) {
           cursorIndex = prevIdx + offset

@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react'
 import { DualPanel } from './components/panels/DualPanel'
 import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
-import { OperationsPanel } from './components/layout/OperationsPanel'
+import { OperationDialog, QueueButton } from './components/dialogs/OperationDialog'
 import { SettingsDialog } from './components/dialogs/SettingsDialog'
 import { FileViewer } from './components/dialogs/FileViewer'
 import { SearchDialog } from './components/dialogs/SearchDialog'
@@ -103,7 +103,8 @@ function App(): React.JSX.Element {
         onF9={handleF9}
       />
 
-      <OperationsPanel />
+      <OperationDialog />
+      <QueueButton />
 
       {mkdirDialog && (
         <div

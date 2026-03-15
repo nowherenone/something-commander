@@ -26,7 +26,12 @@ const mockUtilApi = {
     totalSize: 0,
     truncated: false
   }),
-  searchFiles: vi.fn().mockResolvedValue([])
+  searchFiles: vi.fn().mockResolvedValue([]),
+  copySingleFile: vi.fn().mockResolvedValue({ success: true }),
+  moveSingleFile: vi.fn().mockResolvedValue({ success: true }),
+  deleteSingle: vi.fn().mockResolvedValue({ success: true }),
+  checkExists: vi.fn().mockResolvedValue(false),
+  getFileInfo: vi.fn().mockResolvedValue({ size: 100, modifiedAt: 1000, isDirectory: false })
 }
 
 Object.defineProperty(window, 'api', {

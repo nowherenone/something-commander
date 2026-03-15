@@ -1,108 +1,309 @@
-.operationsPanel {
+/* Overlay */
+.overlay {
   position: fixed;
-  bottom: 62px;
-  right: 8px;
-  width: 380px;
-  max-height: 300px;
-  overflow-y: auto;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.dialogContainer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  z-index: 80;
+  gap: 8px;
+  max-width: 520px;
+  width: 100%;
 }
 
-.opCard {
+/* Main operation dialog (TC-style) */
+.opDialog {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 8px 10px;
-  font-size: var(--font-size-small);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.opHeader {
+.opDialogHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  padding: 10px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
 }
 
-.opType {
+.opDialogTitle {
   font-weight: 600;
-  color: var(--accent);
-  text-transform: uppercase;
-  font-size: 10px;
-  letter-spacing: 0.5px;
+  font-size: 14px;
+  color: var(--text-primary);
 }
 
-.opCancel {
+.opDismiss {
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
-  padding: 0 4px;
-  line-height: 1;
+  font-size: 11px;
 }
 
-.opCancel:hover {
-  color: var(--danger);
+.opDismiss:hover {
+  color: var(--text-primary);
 }
 
-.opFile {
+/* Source/dest paths */
+.opPaths {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.opPathRow {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.opPathLabel {
+  color: var(--text-muted);
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.opPathValue {
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Current file being processed */
+.opCurrentFile {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Progress bar section */
+.opBarSection {
+  padding: 6px 16px;
+}
+
+.opBarLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
   margin-bottom: 4px;
 }
 
-.opProgress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .opBar {
-  flex: 1;
-  height: 4px;
+  height: 6px;
   background: var(--bg-tertiary);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .opBarFill {
   height: 100%;
   background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.2s;
+  border-radius: 3px;
+  transition: width 0.15s ease;
 }
 
 .opBarFillError {
   background: var(--danger);
 }
 
-.opCount {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  white-space: nowrap;
+.opBarFillDone {
+  background: var(--success);
 }
 
-.opDest {
-  color: var(--text-muted);
+.opBytes {
   font-size: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-muted);
+  text-align: right;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+/* Status messages */
+.opErrorMsg {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.opDoneMsg {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--success);
+}
+
+/* Footer with action buttons */
+.opDialogFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.opCancelBtn {
+  padding: 4px 20px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 12px;
+}
+
+.opCancelBtn:hover {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+.opOkBtn {
+  padding: 4px 20px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 12px;
+}
+
+.opOkBtn:hover {
+  background: var(--accent-hover);
+}
+
+/* Overwrite confirmation (inline, TC-style) */
+.overwriteBox {
+  border-top: 1px solid var(--border-color);
+  padding: 12px 16px;
+  background: rgba(205, 66, 70, 0.05);
+}
+
+.overwriteTitle {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--danger);
+  margin-bottom: 8px;
+}
+
+.overwriteCompare {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.overwriteFile {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  padding: 6px 8px;
+}
+
+.overwriteLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   margin-bottom: 2px;
 }
 
-.opDone {
-  color: var(--success);
-  font-size: 10px;
+.overwriteName {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.opError {
-  color: var(--danger);
+.overwriteMeta {
   font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.overwriteActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.owBtn {
+  padding: 4px 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 11px;
+}
+
+.owBtn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* Queue info */
+.queueInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.queueMinimize {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.queueMinimize:hover {
+  text-decoration: underline;
+}
+
+/* Floating queue button (when dialog is minimized) */
+.queueBtn {
+  position: fixed;
+  bottom: 64px;
+  right: 12px;
+  padding: 6px 14px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 12px;
+  z-index: 90;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.queueBtn:hover {
+  background: var(--accent-hover);
 }

@@ -31,11 +31,12 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
 
   const tab = getActiveTab(panelId)
 
-  // Navigate to saved location on mount
+  // Navigate to saved location on mount only
   useEffect(() => {
     const savedLocation = localStorage.getItem(`panel-${panelId}-location`)
-    navigate(panelId, savedLocation || null)
-  }, [panelId, navigate])
+    usePanelStore.getState().navigate(panelId, savedLocation || null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelId])
 
   const handleActivate = useCallback(
     (entry: { id: string; isContainer: boolean }) => {

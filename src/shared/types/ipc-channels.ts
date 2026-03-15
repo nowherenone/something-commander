@@ -12,6 +12,11 @@ export const IPC_CHANNELS = {
   RUN_COMMAND: 'util:runCommand',
   READ_FILE_CONTENT: 'util:readFileContent',
   SEARCH_FILES: 'util:searchFiles',
+  COPY_SINGLE_FILE: 'ops:copySingleFile',
+  MOVE_SINGLE_FILE: 'ops:moveSingleFile',
+  DELETE_SINGLE: 'ops:deleteSingle',
+  CHECK_EXISTS: 'ops:checkExists',
+  GET_FILE_INFO: 'ops:getFileInfo',
 
   // Operation progress events (main → renderer)
   OP_PROGRESS: 'ops:progress',
