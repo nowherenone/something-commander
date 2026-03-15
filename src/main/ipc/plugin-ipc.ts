@@ -6,6 +6,7 @@ import { exec } from 'child_process'
 import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
+import { scanPlugins, loadPlugin, unloadPlugin, ensurePluginsDir } from '../plugins/plugin-loader'
 import type { SftpPlugin } from '../plugins/sftp'
 
 async function calcFolderSize(dirPath: string): Promise<number> {
@@ -208,6 +209,18 @@ export function registerPluginIPC(): void {
     if (!sftp) return []
     return sftp.getConnections()
   })
+
+  // External plugin management
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_SCAN, () => scanPlugins())
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_LOAD, (_event, pluginDir: string) => loadPlugin(pluginDir))
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_UNLOAD, async (_event, pluginId: string) => {
+    await unloadPlugin(pluginId)
+    return { success: true }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_GET_DIR, () => ensurePluginsDir())
 
   // Enumerate all files recursively for a list of source entries
   // Returns flat list: [{sourcePath, destPath, size, isDirectory}]

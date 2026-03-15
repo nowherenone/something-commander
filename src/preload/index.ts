@@ -116,6 +116,18 @@ const utilAPI = {
   sftpListConnections: (): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.SFTP_LIST_CONNECTIONS),
 
+  pluginScan: (): Promise<Array<{ id: string; name: string; version: string; description: string; path: string; enabled: boolean; error?: string }>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_SCAN),
+
+  pluginLoad: (pluginDir: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_LOAD, pluginDir),
+
+  pluginUnload: (pluginId: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_UNLOAD, pluginId),
+
+  pluginGetDir: (): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_DIR),
+
   onCopyFileProgress: (callback: (bytesCopied: number) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, bytesCopied: number): void =>
       callback(bytesCopied)

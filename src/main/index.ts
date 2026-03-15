@@ -7,6 +7,7 @@ import { pluginManager } from './plugins/plugin-manager'
 import { LocalFilesystemPlugin } from './plugins/local-filesystem'
 import { ArchivePlugin } from './plugins/archive'
 import { SftpPlugin } from './plugins/sftp'
+import { loadAllPlugins } from './plugins/plugin-loader'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -60,10 +61,19 @@ app.whenReady().then(async () => {
   })
 
   // Register plugins
+  // Register built-in plugins
   pluginManager.register(new LocalFilesystemPlugin())
   pluginManager.register(new ArchivePlugin())
   pluginManager.register(new SftpPlugin())
   await pluginManager.initializeAll()
+
+  // Load external plugins
+  const externalPlugins = await loadAllPlugins()
+  for (const p of externalPlugins) {
+    if (p.error) {
+      console.warn(`[Plugin] Failed to load ${p.id}: ${p.error}`)
+    }
+  }
 
   // Register IPC handlers
   registerAllIPC()

@@ -12,6 +12,10 @@ export class PluginManager {
     return this.plugins.get(pluginId)
   }
 
+  unregister(pluginId: string): void {
+    this.plugins.delete(pluginId)
+  }
+
   resolveScheme(scheme: string): BrowsePlugin | undefined {
     for (const plugin of this.plugins.values()) {
       if (plugin.manifest.schemes.includes(scheme)) {

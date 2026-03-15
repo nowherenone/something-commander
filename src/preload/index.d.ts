@@ -59,6 +59,10 @@ interface UtilAPI {
   sftpConnect(host: string, port: number, username: string, password?: string): Promise<string>
   sftpDisconnect(connId: string): Promise<void>
   sftpListConnections(): Promise<string[]>
+  pluginScan(): Promise<Array<{ id: string; name: string; version: string; description: string; path: string; enabled: boolean; error?: string }>>
+  pluginLoad(pluginDir: string): Promise<{ success: boolean; error?: string }>
+  pluginUnload(pluginId: string): Promise<{ success: boolean }>
+  pluginGetDir(): Promise<string>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   enumerateFiles(
     sourcePaths: string[],

@@ -10,6 +10,7 @@ import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { SftpConnect } from './components/dialogs/SftpConnect'
+import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
@@ -27,6 +28,7 @@ function App(): React.JSX.Element {
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
   const [dirCompareOpen, setDirCompareOpen] = useState(false)
   const [sftpConnectOpen, setSftpConnectOpen] = useState(false)
+  const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
 
   const { handleCopy, handleMove, handleDelete } = useFileOperations()
 
@@ -175,6 +177,9 @@ function App(): React.JSX.Element {
         }
         break
       }
+      case 'pluginManager':
+        setPluginManagerOpen(true)
+        break
       case 'toggleCommandLine':
         useSettingsStore.getState().updateSettings({ showCommandLine: !showCommandLine })
         break
@@ -353,6 +358,10 @@ function App(): React.JSX.Element {
             usePanelStore.getState().refresh('right')
           }}
         />
+      )}
+
+      {pluginManagerOpen && (
+        <PluginManagerDialog onClose={() => setPluginManagerOpen(false)} />
       )}
 
       {sftpConnectOpen && (

@@ -45,7 +45,11 @@ const mockUtilApi = {
   getDiskSpace: vi.fn().mockResolvedValue({ free: 100000000, total: 500000000 }),
   sftpConnect: vi.fn().mockResolvedValue('user@host:22'),
   sftpDisconnect: vi.fn().mockResolvedValue(undefined),
-  sftpListConnections: vi.fn().mockResolvedValue([])
+  sftpListConnections: vi.fn().mockResolvedValue([]),
+  pluginScan: vi.fn().mockResolvedValue([]),
+  pluginLoad: vi.fn().mockResolvedValue({ success: true }),
+  pluginUnload: vi.fn().mockResolvedValue({ success: true }),
+  pluginGetDir: vi.fn().mockResolvedValue('/mock/plugins')
 }
 
 Object.defineProperty(window, 'api', {

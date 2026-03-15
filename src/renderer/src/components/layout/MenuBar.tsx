@@ -64,7 +64,9 @@ const MENUS: MenuDef[] = [
   {
     label: 'Tools',
     items: [
+      { label: 'Plugin Manager', action: 'pluginManager' },
       { label: 'Command Line', action: 'toggleCommandLine' },
+      { label: '', action: '', separator: true },
       { label: 'Settings', shortcut: 'F9', action: 'settings' }
     ]
   }

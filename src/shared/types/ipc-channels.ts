@@ -30,6 +30,12 @@ export const IPC_CHANNELS = {
   SFTP_CONNECT: 'sftp:connect',
   SFTP_DISCONNECT: 'sftp:disconnect',
   SFTP_LIST_CONNECTIONS: 'sftp:listConnections',
+
+  // External plugin management
+  PLUGIN_SCAN: 'plugin:scan',
+  PLUGIN_LOAD: 'plugin:load',
+  PLUGIN_UNLOAD: 'plugin:unload',
+  PLUGIN_GET_DIR: 'plugin:getDir',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
   // Operation progress events (main → renderer)
