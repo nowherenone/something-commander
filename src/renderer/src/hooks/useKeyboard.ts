@@ -3,11 +3,14 @@ import { useAppStore } from '../stores/app-store'
 import { usePanelStore } from '../stores/panel-store'
 
 interface KeyboardActions {
+  onF3?: () => void
   onF5?: () => void
   onF6?: () => void
   onF7?: () => void
   onF8?: () => void
   onF9?: () => void
+  onAltF7?: () => void
+  onCtrlM?: () => void
 }
 
 export function useKeyboard(actions: KeyboardActions): void {
@@ -128,6 +131,11 @@ export function useKeyboard(actions: KeyboardActions): void {
           break
         }
 
+        case 'F3':
+          e.preventDefault()
+          actions.onF3?.()
+          break
+
         case 'F5':
           e.preventDefault()
           actions.onF5?.()
@@ -140,7 +148,11 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'F7':
           e.preventDefault()
-          actions.onF7?.()
+          if (e.altKey) {
+            actions.onAltF7?.()
+          } else {
+            actions.onF7?.()
+          }
           break
 
         case 'F8':
@@ -184,6 +196,10 @@ export function useKeyboard(actions: KeyboardActions): void {
               case 'r':
                 e.preventDefault()
                 store.refresh(activePanel)
+                break
+              case 'm':
+                e.preventDefault()
+                actions.onCtrlM?.()
                 break
             }
           }

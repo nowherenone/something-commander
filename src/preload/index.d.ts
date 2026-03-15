@@ -26,6 +26,22 @@ interface UtilAPI {
     cwd: string,
     shell?: string
   ): Promise<{ stdout: string; stderr: string; code: number }>
+  readFileContent(
+    filePath: string,
+    maxBytes?: number
+  ): Promise<{
+    content: string
+    isBinary: boolean
+    totalSize: number
+    truncated: boolean
+    error?: string
+  }>
+  searchFiles(
+    rootPath: string,
+    pattern: string,
+    contentPattern: string,
+    maxResults?: number
+  ): Promise<Array<{ path: string; name: string; isDirectory: boolean; size: number }>>
 }
 
 interface FlemanagerAPI {

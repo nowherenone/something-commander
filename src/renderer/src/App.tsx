@@ -3,15 +3,23 @@ import { DualPanel } from './components/panels/DualPanel'
 import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
 import { SettingsDialog } from './components/dialogs/SettingsDialog'
+import { FileViewer } from './components/dialogs/FileViewer'
+import { SearchDialog } from './components/dialogs/SearchDialog'
+import { MultiRename } from './components/dialogs/MultiRename'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useAppStore } from './stores/app-store'
 import { usePanelStore } from './stores/panel-store'
 import { useSettingsStore } from './stores/settings-store'
+import type { Entry } from '@shared/types'
 
 function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
   const [mkdirName, setMkdirName] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [viewerFile, setViewerFile] = useState<{ path: string; name: string } | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
+  const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
   const confirmDelete = useSettingsStore((s) => s.confirmDelete)
 
   const getSelectedEntries = useCallback((includeContainers = true) => {
@@ -108,16 +116,51 @@ function App(): React.JSX.Element {
     state.refresh('right')
   }, [getSelectedEntries, confirmDelete])
 
+  const handleF3 = useCallback(() => {
+    const activePanel = useAppStore.getState().activePanel
+    const tab = usePanelStore.getState().getActiveTab(activePanel)
+    const offset = tab.parentId !== null ? 1 : 0
+    const idx = tab.cursorIndex - offset
+    if (idx >= 0 && idx < tab.entries.length) {
+      const entry = tab.entries[idx]
+      if (!entry.isContainer) {
+        setViewerFile({ path: entry.id, name: entry.name })
+      }
+    }
+  }, [])
+
   const handleF9 = useCallback(() => {
     setSettingsOpen(true)
   }, [])
 
+  const handleAltF7 = useCallback(() => {
+    setSearchOpen(true)
+  }, [])
+
+  const handleCtrlM = useCallback(() => {
+    const activePanel = useAppStore.getState().activePanel
+    const state = usePanelStore.getState()
+    const tab = state.getActiveTab(activePanel)
+    let selected = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
+    if (selected.length === 0) {
+      // Use all non-container entries if nothing selected
+      selected = tab.entries.filter((e) => !e.isContainer)
+    }
+    if (selected.length > 0) {
+      setMultiRenameEntries(selected)
+      setMultiRenamePluginId(tab.pluginId)
+    }
+  }, [])
+
   useKeyboard({
+    onF3: handleF3,
     onF5: handleF5,
     onF6: handleF6,
     onF7: handleF7,
     onF8: handleF8,
-    onF9: handleF9
+    onF9: handleF9,
+    onAltF7: handleAltF7,
+    onCtrlM: handleCtrlM
   })
 
   return (
@@ -125,10 +168,12 @@ function App(): React.JSX.Element {
       <DualPanel />
       <CommandLine />
       <FunctionKeyBar
+        onF3={handleF3}
         onF5={handleF5}
         onF6={handleF6}
         onF7={handleF7}
         onF8={handleF8}
+        onF9={handleF9}
       />
 
       {mkdirDialog && (
@@ -210,6 +255,41 @@ function App(): React.JSX.Element {
       )}
 
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+
+      {viewerFile && (
+        <FileViewer
+          filePath={viewerFile.path}
+          fileName={viewerFile.name}
+          onClose={() => setViewerFile(null)}
+        />
+      )}
+
+      {searchOpen && (
+        <SearchDialog
+          searchRoot={
+            usePanelStore.getState().getActiveTab(useAppStore.getState().activePanel)
+              .locationDisplay || ''
+          }
+          onClose={() => setSearchOpen(false)}
+          onNavigateTo={(path) => {
+            const activePanel = useAppStore.getState().activePanel
+            usePanelStore.getState().navigate(activePanel, path)
+          }}
+        />
+      )}
+
+      {multiRenameEntries && (
+        <MultiRename
+          entries={multiRenameEntries}
+          pluginId={multiRenamePluginId}
+          onClose={() => setMultiRenameEntries(null)}
+          onDone={() => {
+            setMultiRenameEntries(null)
+            usePanelStore.getState().refresh('left')
+            usePanelStore.getState().refresh('right')
+          }}
+        />
+      )}
     </div>
   )
 }

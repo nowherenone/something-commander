@@ -10,6 +10,8 @@ export const IPC_CHANNELS = {
   // Utility
   CALC_FOLDER_SIZE: 'util:calcFolderSize',
   RUN_COMMAND: 'util:runCommand',
+  READ_FILE_CONTENT: 'util:readFileContent',
+  SEARCH_FILES: 'util:searchFiles',
 
   // Operation progress events (main → renderer)
   OP_PROGRESS: 'ops:progress',

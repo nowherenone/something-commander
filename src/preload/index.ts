@@ -49,7 +49,21 @@ const utilAPI = {
     cwd: string,
     shell?: string
   ): Promise<{ stdout: string; stderr: string; code: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.RUN_COMMAND, command, cwd, shell)
+    ipcRenderer.invoke(IPC_CHANNELS.RUN_COMMAND, command, cwd, shell),
+
+  readFileContent: (
+    filePath: string,
+    maxBytes?: number
+  ): Promise<{ content: string; isBinary: boolean; totalSize: number; truncated: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.READ_FILE_CONTENT, filePath, maxBytes),
+
+  searchFiles: (
+    rootPath: string,
+    pattern: string,
+    contentPattern: string,
+    maxResults?: number
+  ): Promise<Array<{ path: string; name: string; isDirectory: boolean; size: number }>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SEARCH_FILES, rootPath, pattern, contentPattern, maxResults)
 }
 
 const api = {

@@ -54,6 +54,106 @@ export function registerPluginIPC(): void {
   })
 
   ipcMain.handle(
+    IPC_CHANNELS.READ_FILE_CONTENT,
+    async (_event, filePath: string, maxBytes: number = 512 * 1024) => {
+      try {
+        const stat = await fs.stat(filePath)
+        const isLarge = stat.size > maxBytes
+        const handle = await fs.open(filePath, 'r')
+        const buffer = Buffer.alloc(Math.min(stat.size, maxBytes))
+        await handle.read(buffer, 0, buffer.length, 0)
+        await handle.close()
+
+        // Try to detect if it's text or binary
+        let isBinary = false
+        for (let i = 0; i < Math.min(buffer.length, 8192); i++) {
+          if (buffer[i] === 0) {
+            isBinary = true
+            break
+          }
+        }
+
+        return {
+          content: isBinary ? buffer.toString('hex') : buffer.toString('utf-8'),
+          isBinary,
+          totalSize: stat.size,
+          truncated: isLarge
+        }
+      } catch (err) {
+        return { content: '', isBinary: false, totalSize: 0, truncated: false, error: String(err) }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.SEARCH_FILES,
+    async (
+      _event,
+      rootPath: string,
+      pattern: string,
+      contentPattern: string,
+      maxResults: number = 500
+    ) => {
+      const results: Array<{ path: string; name: string; isDirectory: boolean; size: number }> = []
+      const regex = new RegExp(pattern.replace(/\*/g, '.*').replace(/\?/g, '.'), 'i')
+      const contentRegex = contentPattern ? new RegExp(contentPattern, 'i') : null
+
+      async function walk(dir: string): Promise<void> {
+        if (results.length >= maxResults) return
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true })
+          for (const entry of entries) {
+            if (results.length >= maxResults) return
+            const fullPath = path.join(dir, entry.name)
+            const matches = regex.test(entry.name)
+
+            if (entry.isDirectory()) {
+              if (matches && !contentPattern) {
+                results.push({ path: fullPath, name: entry.name, isDirectory: true, size: 0 })
+              }
+              await walk(fullPath)
+            } else if (matches) {
+              if (contentRegex) {
+                try {
+                  const content = await fs.readFile(fullPath, 'utf-8')
+                  if (contentRegex.test(content)) {
+                    const stat = await fs.stat(fullPath)
+                    results.push({
+                      path: fullPath,
+                      name: entry.name,
+                      isDirectory: false,
+                      size: stat.size
+                    })
+                  }
+                } catch {
+                  // Skip files we can't read
+                }
+              } else {
+                try {
+                  const stat = await fs.stat(fullPath)
+                  results.push({
+                    path: fullPath,
+                    name: entry.name,
+                    isDirectory: false,
+                    size: stat.size
+                  })
+                } catch {
+                  // skip
+                }
+              }
+            }
+          }
+        } catch {
+          // skip dirs we can't read
+        }
+      }
+
+      await walk(rootPath)
+      return results
+    }
+  )
+
+  ipcMain.handle(
     IPC_CHANNELS.RUN_COMMAND,
     (_event, command: string, cwd: string, shell?: string) => {
       return new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
