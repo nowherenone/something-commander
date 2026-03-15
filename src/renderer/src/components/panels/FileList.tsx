@@ -8,6 +8,7 @@ interface FileListProps {
   cursorIndex: number
   selectedIds: Set<string>
   calculatingIds: Set<string>
+  errorFolderIds: Set<string>
   isActive: boolean
   onCursorChange: (index: number) => void
   onSelect: (entryId: string) => void
@@ -19,6 +20,7 @@ export function FileList({
   cursorIndex,
   selectedIds,
   calculatingIds,
+  errorFolderIds,
   isActive,
   onCursorChange,
   onSelect,
@@ -99,6 +101,7 @@ export function FileList({
           isPanelActive={isActive}
           isSelected={selectedIds.has(entry.id)}
           isCalculating={calculatingIds.has(entry.id)}
+          isError={errorFolderIds.has(entry.id)}
           onClick={() => handleClick(index)}
           onDoubleClick={() => handleDoubleClick(entry)}
           onContextMenu={(e) => {

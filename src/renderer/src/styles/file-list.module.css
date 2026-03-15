@@ -93,6 +93,16 @@
   font-weight: 600;
 }
 
+.entryRow.errorEntry {
+  color: #e57373;
+}
+
+.entryRow.errorEntry .colExt,
+.entryRow.errorEntry .colSize,
+.entryRow.errorEntry .colDate {
+  color: #e57373;
+}
+
 .colName {
   flex: 1;
   display: flex;

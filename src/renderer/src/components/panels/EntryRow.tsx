@@ -10,6 +10,7 @@ interface EntryRowProps {
   isPanelActive?: boolean
   isSelected: boolean
   isCalculating?: boolean
+  isError?: boolean
   onClick: () => void
   onDoubleClick: () => void
   onContextMenu?: (e: React.MouseEvent) => void
@@ -21,6 +22,7 @@ export const EntryRow = React.memo(function EntryRow({
   isPanelActive = true,
   isSelected,
   isCalculating,
+  isError,
   onClick,
   onDoubleClick,
   onContextMenu
@@ -29,7 +31,8 @@ export const EntryRow = React.memo(function EntryRow({
     styles.entryRow,
     isCursor ? (isPanelActive ? styles.cursor : styles.cursorInactive) : '',
     isSelected ? styles.selected : '',
-    entry.isContainer ? styles.container : ''
+    entry.isContainer ? styles.container : '',
+    isError ? styles.errorEntry : ''
   ]
     .filter(Boolean)
     .join(' ')

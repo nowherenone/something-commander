@@ -176,38 +176,20 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       <ColumnHeaders sortConfig={tab.sortConfig} onSort={handleSort} />
       {tab.isLoading ? (
         <div className={styles.loading}>Loading...</div>
-      ) : tab.error ? (
-        <div className={styles.error}>
-          <div>{tab.error}</div>
-          <button
-            onClick={handleGoUp}
-            style={{
-              marginTop: 8,
-              padding: '4px 16px',
-              background: 'var(--accent)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 3,
-              cursor: 'pointer',
-              fontSize: 12
-            }}
-          >
-            Go Back
-          </button>
-        </div>
       ) : (
         <FileList
           entries={displayEntries}
           cursorIndex={tab.cursorIndex}
           selectedIds={tab.selectedEntryIds}
           calculatingIds={tab.calculatingFolderIds}
+          errorFolderIds={tab.errorFolderIds}
           isActive={isActive}
           onCursorChange={(i) => setCursor(panelId, i)}
           onSelect={(id) => toggleSelect(panelId, id)}
           onActivate={handleEntryActivate}
         />
       )}
-      <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} />
+      <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} error={tab.error} />
     </div>
   )
 }

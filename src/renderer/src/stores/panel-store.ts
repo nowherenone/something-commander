@@ -24,6 +24,7 @@ export interface TabState {
   showHidden: boolean
   isLoading: boolean
   error: string | null
+  errorFolderIds: Set<string>
 }
 
 function createInitialTab(): TabState {
@@ -41,7 +42,8 @@ function createInitialTab(): TabState {
     sortConfig: { field: 'name', direction: 'asc' },
     showHidden: false,
     isLoading: false,
-    error: null
+    error: null,
+    errorFolderIds: new Set()
   }
 }
 
@@ -203,13 +205,29 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
 
       localStorage.setItem(`panel-${panelId}-location`, locationId || '')
     } catch (err) {
+      // Don't replace current view — stay where we are, mark the folder as error
+      const errorSet = new Set(getActiveTab(get()[panelId]).errorFolderIds)
+      if (locationId) errorSet.add(locationId)
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
           isLoading: false,
-          error: String(err)
+          error: String(err),
+          errorFolderIds: errorSet
         }))
       })
+      // Clear error message after 5 seconds (folder stays red)
+      setTimeout(() => {
+        const currentTab = getActiveTab(get()[panelId])
+        if (currentTab.error === String(err)) {
+          set({
+            [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
+              ...t,
+              error: null
+            }))
+          })
+        }
+      }, 5000)
     }
   },
 

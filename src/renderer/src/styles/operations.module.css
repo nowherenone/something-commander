@@ -41,6 +41,7 @@
   font-size: 14px;
   color: var(--text-primary);
   white-space: nowrap;
+  font-family: var(--font-mono);
 }
 
 .opDismiss {
@@ -123,6 +124,7 @@
   color: var(--text-muted);
   height: 16px;
   line-height: 16px;
+  font-family: var(--font-mono);
 }
 
 .opBar {
