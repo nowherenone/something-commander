@@ -83,6 +83,13 @@ const utilAPI = {
   isArchive: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.IS_ARCHIVE, filePath),
 
+  onCopyFileProgress: (callback: (bytesCopied: number) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, bytesCopied: number): void =>
+      callback(bytesCopied)
+    ipcRenderer.on(IPC_CHANNELS.COPY_FILE_PROGRESS, handler)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.COPY_FILE_PROGRESS, handler)
+  },
+
   enumerateFiles: (
     sourcePaths: string[],
     destDir: string

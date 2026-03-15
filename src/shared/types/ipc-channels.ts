@@ -13,6 +13,7 @@ export const IPC_CHANNELS = {
   READ_FILE_CONTENT: 'util:readFileContent',
   SEARCH_FILES: 'util:searchFiles',
   COPY_SINGLE_FILE: 'ops:copySingleFile',
+  COPY_FILE_PROGRESS: 'ops:copyFileProgress',
   MOVE_SINGLE_FILE: 'ops:moveSingleFile',
   DELETE_SINGLE: 'ops:deleteSingle',
   CHECK_EXISTS: 'ops:checkExists',

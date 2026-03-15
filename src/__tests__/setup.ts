@@ -32,6 +32,7 @@ const mockUtilApi = {
   deleteSingle: vi.fn().mockResolvedValue({ success: true }),
   checkExists: vi.fn().mockResolvedValue(false),
   getFileInfo: vi.fn().mockResolvedValue({ size: 100, modifiedAt: 1000, isDirectory: false }),
+  onCopyFileProgress: vi.fn().mockReturnValue(() => {}),
   enumerateFiles: vi.fn().mockResolvedValue([])
 }
 

@@ -48,6 +48,7 @@ interface UtilAPI {
   checkExists(filePath: string): Promise<boolean>
   getFileInfo(filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null>
   isArchive(filePath: string): Promise<boolean>
+  onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   enumerateFiles(
     sourcePaths: string[],
     destDir: string

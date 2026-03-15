@@ -138,11 +138,18 @@ async function executeOperation(opId: string): Promise<void> {
             }
           }
 
+          // Subscribe to per-byte progress for this file
+          const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
+            store().updateOperation(opId, { currentFileCopied: bytesCopied })
+          })
+
           const ipcFn = op.type === 'copy'
             ? window.api.util.copySingleFile
             : window.api.util.moveSingleFile
 
           const result = await ipcFn(item.sourcePath, item.destPath, false)
+          unsubProgress()
+
           if (!result.success) {
             store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
             return

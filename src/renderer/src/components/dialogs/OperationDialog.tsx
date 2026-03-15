@@ -108,10 +108,21 @@ function OperationCardView({ op }: { op: FileOperation }): React.JSX.Element {
         <div className={styles.opBarSection}>
           <div className={styles.opBarLabel}>
             <span>Current file</span>
-            <span>{op.currentFileSize > 0 ? formatSize(op.currentFileSize) : ''}</span>
+            <span>
+              {op.currentFileSize > 0
+                ? `${formatSize(op.currentFileCopied)} / ${formatSize(op.currentFileSize)} (${Math.round((op.currentFileCopied / op.currentFileSize) * 100)}%)`
+                : ''}
+            </span>
           </div>
           <div className={styles.opBar}>
-            <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
+            {op.currentFileSize > 0 && op.currentFileCopied > 0 ? (
+              <div
+                className={styles.opBarFill}
+                style={{ width: `${Math.min(100, Math.round((op.currentFileCopied / op.currentFileSize) * 100))}%` }}
+              />
+            ) : (
+              <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
+            )}
           </div>
         </div>
       )}
