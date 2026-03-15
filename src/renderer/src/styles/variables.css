@@ -1,0 +1,41 @@
+:root {
+  /* Base palette (BlueprintJS Dark inspired) */
+  --bg-primary: #1c2127;
+  --bg-secondary: #252a31;
+  --bg-tertiary: #2f343c;
+  --bg-panel: #1c2127;
+  --bg-header: #252a31;
+  --bg-selected: #184a90;
+  --bg-cursor: #2d72d2;
+  --bg-hover: #2f343c;
+
+  /* Text */
+  --text-primary: #f6f7f9;
+  --text-secondary: #abb3bf;
+  --text-muted: #738091;
+
+  /* Borders */
+  --border-color: #404854;
+  --border-focus: #2d72d2;
+
+  /* Accent */
+  --accent: #2d72d2;
+  --accent-hover: #3d8fff;
+  --danger: #cd4246;
+  --success: #238551;
+
+  /* Spacing */
+  --row-height: 24px;
+  --panel-padding: 4px;
+  --header-height: 28px;
+  --statusbar-height: 24px;
+  --addressbar-height: 28px;
+  --fnbar-height: 32px;
+  --splitter-width: 4px;
+
+  /* Typography */
+  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+  --font-size: 13px;
+  --font-size-small: 11px;
+}
