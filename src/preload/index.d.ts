@@ -47,6 +47,7 @@ interface UtilAPI {
   deleteSingle(targetPath: string): Promise<{ success: boolean; error?: string }>
   checkExists(filePath: string): Promise<boolean>
   getFileInfo(filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null>
+  isArchive(filePath: string): Promise<boolean>
 }
 
 interface FlemanagerAPI {

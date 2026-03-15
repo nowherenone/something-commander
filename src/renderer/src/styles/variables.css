@@ -39,3 +39,51 @@
   --font-size: 13px;
   --font-size-small: 11px;
 }
+
+/* Light theme */
+:root[data-theme='light'] {
+  --bg-primary: #f5f8fa;
+  --bg-secondary: #ebf1f5;
+  --bg-tertiary: #e1e8ed;
+  --bg-panel: #ffffff;
+  --bg-header: #ebf1f5;
+  --bg-selected: #c8ddf0;
+  --bg-cursor: #2d72d2;
+  --bg-hover: #e1e8ed;
+
+  --text-primary: #1c2127;
+  --text-secondary: #5c7080;
+  --text-muted: #8a9ba8;
+
+  --border-color: #d8dee4;
+  --border-focus: #2d72d2;
+
+  --accent: #2d72d2;
+  --accent-hover: #215db0;
+  --danger: #cd4246;
+  --success: #238551;
+}
+
+/* Classic blue (Norton Commander style) */
+:root[data-theme='classic'] {
+  --bg-primary: #0000aa;
+  --bg-secondary: #0000aa;
+  --bg-tertiary: #000088;
+  --bg-panel: #0000aa;
+  --bg-header: #000088;
+  --bg-selected: #008888;
+  --bg-cursor: #00aaaa;
+  --bg-hover: #000088;
+
+  --text-primary: #ffff55;
+  --text-secondary: #55ffff;
+  --text-muted: #aaaaaa;
+
+  --border-color: #55ffff;
+  --border-focus: #ffffff;
+
+  --accent: #55ffff;
+  --accent-hover: #ffffff;
+  --danger: #ff5555;
+  --success: #55ff55;
+}

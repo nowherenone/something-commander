@@ -80,6 +80,7 @@ interface PanelStoreState {
 
   // Navigation & data
   navigate: (panelId: 'left' | 'right', locationId: string | null) => Promise<void>
+  navigateWithPlugin: (panelId: 'left' | 'right', pluginId: string, locationId: string | null) => Promise<void>
   refresh: (panelId: 'left' | 'right') => Promise<void>
   setSort: (panelId: 'left' | 'right', config: SortConfig) => void
   toggleHidden: (panelId: 'left' | 'right') => void
@@ -201,6 +202,56 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       })
 
       localStorage.setItem(`panel-${panelId}-location`, locationId || '')
+    } catch (err) {
+      set({
+        [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
+          ...t,
+          isLoading: false,
+          error: String(err)
+        }))
+      })
+    }
+  },
+
+  navigateWithPlugin: async (panelId, pluginId, locationId) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+
+    // Switch plugin on the active tab and navigate
+    set({
+      [panelId]: updateTab(panel, tab.id, (t) => ({
+        ...t,
+        pluginId,
+        isLoading: true,
+        error: null
+      }))
+    })
+
+    try {
+      const result = await window.api.plugins.readDirectory(pluginId, locationId)
+      let entries = result.entries
+      const currentTab = getActiveTab(get()[panelId])
+      if (!currentTab.showHidden) {
+        entries = entries.filter((e) => !e.attributes.hidden)
+      }
+      entries = sortEntries(entries, currentTab.sortConfig)
+
+      set({
+        [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
+          ...t,
+          pluginId,
+          locationId,
+          locationDisplay: result.location,
+          entries,
+          parentId: result.parentId,
+          extraColumns: result.extraColumns || [],
+          selectedEntryIds: new Set(),
+          calculatingFolderIds: new Set(),
+          cursorIndex: 0,
+          isLoading: false,
+          error: null
+        }))
+      })
     } catch (err) {
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({

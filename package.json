@@ -27,6 +27,9 @@
     "@electron-toolkit/utils": "^4.0.0",
     "date-fns": "^4.0.0",
     "filesize": "^10.0.0",
+    "tar": "^7.5.11",
+    "yauzl": "^3.2.1",
+    "yazl": "^3.3.1",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -36,6 +39,9 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/tar": "^6.1.13",
+    "@types/yauzl": "^2.10.3",
+    "@types/yazl": "^3.3.0",
     "@vitejs/plugin-react": "^4.0.0",
     "electron": "^35.0.0",
     "electron-builder": "^25.0.0",

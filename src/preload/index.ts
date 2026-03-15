@@ -78,7 +78,10 @@ const utilAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.CHECK_EXISTS, filePath),
 
   getFileInfo: (filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null> =>
-    ipcRenderer.invoke(IPC_CHANNELS.GET_FILE_INFO, filePath)
+    ipcRenderer.invoke(IPC_CHANNELS.GET_FILE_INFO, filePath),
+
+  isArchive: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.IS_ARCHIVE, filePath)
 }
 
 const api = {

@@ -7,11 +7,15 @@ import { SettingsDialog } from './components/dialogs/SettingsDialog'
 import { FileViewer } from './components/dialogs/FileViewer'
 import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
+import { DirCompare } from './components/dialogs/DirCompare'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
 import { usePanelStore } from './stores/panel-store'
+import { useOperationsStore } from './stores/operations-store'
+import { useSettingsStore } from './stores/settings-store'
 import type { Entry } from '@shared/types'
+import { useEffect } from 'react'
 
 function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
@@ -21,8 +25,15 @@ function App(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false)
   const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
+  const [dirCompareOpen, setDirCompareOpen] = useState(false)
 
   const { handleCopy, handleMove, handleDelete } = useFileOperations()
+
+  // Apply saved theme on mount
+  const theme = useSettingsStore((s) => s.theme)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   const handleF7 = useCallback(() => {
     setMkdirName('')
@@ -79,6 +90,10 @@ function App(): React.JSX.Element {
     }
   }, [])
 
+  const handleCompare = useCallback(() => {
+    setDirCompareOpen(true)
+  }, [])
+
   useKeyboard({
     onF3: handleF3,
     onF5: handleCopy,
@@ -87,7 +102,8 @@ function App(): React.JSX.Element {
     onF8: handleDelete,
     onF9: handleF9,
     onAltF7: handleAltF7,
-    onCtrlM: handleCtrlM
+    onCtrlM: handleCtrlM,
+    onCompare: handleCompare
   })
 
   return (
@@ -207,6 +223,48 @@ function App(): React.JSX.Element {
           }}
         />
       )}
+
+      {dirCompareOpen && (() => {
+        const leftTab = usePanelStore.getState().getActiveTab('left')
+        const rightTab = usePanelStore.getState().getActiveTab('right')
+        return (
+          <DirCompare
+            leftPath={leftTab.locationDisplay}
+            rightPath={rightTab.locationDisplay}
+            leftEntries={leftTab.entries}
+            rightEntries={rightTab.entries}
+            onClose={() => setDirCompareOpen(false)}
+            onSyncLeftToRight={(names) => {
+              const entries = leftTab.entries.filter((e) => names.includes(e.name))
+              if (entries.length > 0 && rightTab.locationId) {
+                useOperationsStore.getState().enqueue({
+                  type: 'copy',
+                  sourceEntries: entries,
+                  sourcePluginId: leftTab.pluginId,
+                  destinationDisplay: rightTab.locationDisplay,
+                  destinationLocationId: rightTab.locationId,
+                  destinationPluginId: rightTab.pluginId
+                })
+              }
+              setDirCompareOpen(false)
+            }}
+            onSyncRightToLeft={(names) => {
+              const entries = rightTab.entries.filter((e) => names.includes(e.name))
+              if (entries.length > 0 && leftTab.locationId) {
+                useOperationsStore.getState().enqueue({
+                  type: 'copy',
+                  sourceEntries: entries,
+                  sourcePluginId: rightTab.pluginId,
+                  destinationDisplay: leftTab.locationDisplay,
+                  destinationLocationId: leftTab.locationId,
+                  destinationPluginId: leftTab.pluginId
+                })
+              }
+              setDirCompareOpen(false)
+            }}
+          />
+        )
+      })()}
 
       {multiRenameEntries && (
         <MultiRename

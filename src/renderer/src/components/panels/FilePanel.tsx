@@ -39,9 +39,15 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   }, [panelId])
 
   const handleActivate = useCallback(
-    (entry: { id: string; isContainer: boolean }) => {
+    async (entry: { id: string; isContainer: boolean; name?: string }) => {
       if (entry.isContainer) {
         navigate(panelId, entry.id)
+      } else {
+        // Check if it's an archive file — navigate into it with archive plugin
+        const isArchive = await window.api.util.isArchive(entry.id)
+        if (isArchive) {
+          usePanelStore.getState().navigateWithPlugin(panelId, 'archive', `${entry.id}::`)
+        }
       }
     },
     [panelId, navigate]
@@ -83,10 +89,18 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const handleGoUp = useCallback(() => {
     if (tab.parentId !== null) {
       navigate(panelId, tab.parentId)
+    } else if (tab.pluginId !== 'local-filesystem') {
+      // Exiting an archive — switch back to local-filesystem
+      // Extract the archive path from the locationId
+      const archivePath = tab.locationId?.split('::')[0]
+      if (archivePath) {
+        const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
+        usePanelStore.getState().navigateWithPlugin(panelId, 'local-filesystem', parentDir)
+      }
     } else {
       navigate(panelId, null)
     }
-  }, [panelId, tab.parentId, navigate])
+  }, [panelId, tab.parentId, tab.pluginId, tab.locationId, navigate])
 
   const displayEntries =
     tab.parentId !== null

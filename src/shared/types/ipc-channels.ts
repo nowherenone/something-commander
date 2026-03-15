@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   DELETE_SINGLE: 'ops:deleteSingle',
   CHECK_EXISTS: 'ops:checkExists',
   GET_FILE_INFO: 'ops:getFileInfo',
+  IS_ARCHIVE: 'util:isArchive',
 
   // Operation progress events (main → renderer)
   OP_PROGRESS: 'ops:progress',

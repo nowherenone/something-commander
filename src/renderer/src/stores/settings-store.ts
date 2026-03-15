@@ -63,6 +63,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       document.documentElement.style.setProperty('--row-height', `${newSettings.rowHeight}px`)
       document.documentElement.style.setProperty('--font-family', newSettings.fontFamily)
 
+      // Apply theme
+      document.documentElement.setAttribute('data-theme', newSettings.theme)
+
       return partial
     }),
 

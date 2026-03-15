@@ -1,0 +1,113 @@
+.compareDialog {
+  width: 80vw;
+  max-height: 80vh;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolBtn {
+  padding: 3px 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 11px;
+}
+
+.toolBtn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.toolBtnActive {
+  background: var(--accent) !important;
+  color: white !important;
+  border-color: var(--accent) !important;
+}
+
+.legend {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  margin-left: auto;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.compareTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.compareTable th {
+  text-align: left;
+  padding: 4px 8px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  background: var(--bg-header);
+  position: sticky;
+  top: 0;
+}
+
+.compareTable td {
+  padding: 3px 8px;
+}
+
+.rowEqual {
+  color: var(--text-muted);
+}
+
+.rowNewer {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.05);
+}
+
+.rowOlder {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.05);
+}
+
+.rowOnlyLeft {
+  color: #2196f3;
+  background: rgba(33, 150, 243, 0.05);
+}
+
+.rowOnlyRight {
+  color: #e91e63;
+  background: rgba(233, 30, 99, 0.05);
+}
+
+.sizeCell {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.stats {
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 16px;
+}

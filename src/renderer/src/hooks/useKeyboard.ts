@@ -11,6 +11,7 @@ interface KeyboardActions {
   onF9?: () => void
   onAltF7?: () => void
   onCtrlM?: () => void
+  onCompare?: () => void
 }
 
 export function useKeyboard(actions: KeyboardActions): void {
@@ -205,6 +206,10 @@ export function useKeyboard(actions: KeyboardActions): void {
               case 'm':
                 e.preventDefault()
                 actions.onCtrlM?.()
+                break
+              case 'c':
+                e.preventDefault()
+                actions.onCompare?.()
                 break
             }
           }

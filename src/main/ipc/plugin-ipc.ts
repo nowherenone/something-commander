@@ -53,6 +53,11 @@ export function registerPluginIPC(): void {
     return calcFolderSize(folderPath)
   })
 
+  ipcMain.handle(IPC_CHANNELS.IS_ARCHIVE, (_event, filePath: string) => {
+    const ext = path.extname(filePath).toLowerCase()
+    return ['.zip', '.jar'].includes(ext)
+  })
+
   ipcMain.handle(
     IPC_CHANNELS.READ_FILE_CONTENT,
     async (_event, filePath: string, maxBytes: number = 512 * 1024) => {

@@ -53,8 +53,9 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                         value={settings.theme}
                         onChange={(e) => update({ theme: e.target.value as 'dark' | 'light' })}
                       >
-                        <option value="dark">Dark</option>
+                        <option value="dark">Dark (BlueprintJS)</option>
                         <option value="light">Light</option>
+                        <option value="classic">Classic Blue (NC)</option>
                       </select>
                     </div>
                     <div className={styles.settingsRow}>
