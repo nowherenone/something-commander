@@ -25,6 +25,16 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // Forward renderer console messages to main process stdout
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const levels = ['DEBUG', 'INFO', 'WARN', 'ERROR']
+    console.log(`[Renderer ${levels[level] || level}] ${message} (${sourceId}:${line})`)
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    console.error(`[Renderer] Failed to load: ${errorCode} ${errorDescription}`)
+  })
+
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }

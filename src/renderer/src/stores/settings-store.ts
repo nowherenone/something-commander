@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: Settings = {
   confirmDelete: true,
   confirmOverwrite: true,
   theme: 'dark',
-  shell: process.platform === 'win32' ? 'powershell' : '/bin/bash'
+  shell: navigator.platform?.startsWith('Win') ? 'powershell' : '/bin/bash'
 }
 
 function loadSettings(): Settings {
