@@ -137,7 +137,7 @@
 
 .colSize {
   width: 90px;
-  padding: 0 8px;
+  padding: 1px 8px 0;
   text-align: right;
   font-family: var(--font-mono);
   font-size: var(--font-size-small);
