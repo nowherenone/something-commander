@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ViewerPage } from './pages/ViewerPage'
 import { EditorPage } from './pages/EditorPage'
+import { TestHarness } from './pages/TestHarness'
 import './styles/global.css'
 
 function Router(): React.JSX.Element {
@@ -13,6 +14,10 @@ function Router(): React.JSX.Element {
     const filePath = params.get('file') || ''
     const fileName = params.get('name') || 'Unknown'
     return <ViewerPage filePath={filePath} fileName={fileName} />
+  }
+
+  if (hash.startsWith('#/test-harness')) {
+    return <TestHarness />
   }
 
   if (hash.startsWith('#/editor')) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 import { useOperationsStore, type FileOperation, type OverwritePrompt } from '../../stores/operations-store'
 import { resolveOverwriteAction } from '../../hooks/useFileOperations'
 import { formatSize, formatDate } from '../../utils/format'
@@ -9,16 +9,13 @@ function formatSpeed(bytesPerSec: number): string {
   return `${formatSize(bytesPerSec)}/s`
 }
 
-function formatTimeRemaining(bytes: number, totalBytes: number, elapsedMs: number): string {
-  if (bytes <= 0 || elapsedMs <= 0) return ''
-  const bytesPerMs = bytes / elapsedMs
-  const remainingBytes = totalBytes - bytes
-  const remainingMs = remainingBytes / bytesPerMs
-  const secs = Math.round(remainingMs / 1000)
-  if (secs < 60) return `~${secs}s remaining`
-  const mins = Math.floor(secs / 60)
-  const remSecs = secs % 60
-  return `~${mins}m ${remSecs}s remaining`
+function formatEta(bytes: number, totalBytes: number, elapsedMs: number): string {
+  if (bytes <= 0 || elapsedMs <= 1000) return ''
+  const bps = bytes / elapsedMs
+  const remaining = totalBytes - bytes
+  const secs = Math.round(remaining / bps / 1000)
+  if (secs < 60) return `~${secs}s`
+  return `~${Math.floor(secs / 60)}m${secs % 60}s`
 }
 
 function OverwritePromptView({ prompt }: { prompt: OverwritePrompt }): React.JSX.Element {
@@ -27,31 +24,33 @@ function OverwritePromptView({ prompt }: { prompt: OverwritePrompt }): React.JSX
       <div className={styles.overwriteTitle}>File already exists</div>
       <div className={styles.overwriteCompare}>
         <div className={styles.overwriteFile}>
-          <div className={styles.overwriteLabel}>Source:</div>
-          <div className={styles.overwriteName}>{prompt.sourceName}</div>
-          <div className={styles.overwriteMeta}>
-            {formatSize(prompt.sourceSize)}{prompt.sourceDate > 0 ? ` | ${formatDate(prompt.sourceDate)}` : ''}
+          <div className={styles.overwriteLabel}>Source</div>
+          <div className={styles.overwriteName} data-testid="ow-source-name">{prompt.sourceName}</div>
+          <div className={styles.overwriteMeta} data-testid="ow-source-meta">
+            {formatSize(prompt.sourceSize)}
+            {prompt.sourceDate > 0 ? ` | ${formatDate(prompt.sourceDate)}` : ''}
           </div>
         </div>
         <div className={styles.overwriteFile}>
-          <div className={styles.overwriteLabel}>Existing:</div>
-          <div className={styles.overwriteName}>{prompt.sourceName}</div>
-          <div className={styles.overwriteMeta}>
-            {formatSize(prompt.destSize)}{prompt.destDate > 0 ? ` | ${formatDate(prompt.destDate)}` : ''}
+          <div className={styles.overwriteLabel}>Existing</div>
+          <div className={styles.overwriteName} data-testid="ow-dest-name">{prompt.sourceName}</div>
+          <div className={styles.overwriteMeta} data-testid="ow-dest-meta">
+            {formatSize(prompt.destSize)}
+            {prompt.destDate > 0 ? ` | ${formatDate(prompt.destDate)}` : ''}
           </div>
         </div>
       </div>
       <div className={styles.overwriteActions}>
-        <button className={styles.owBtn} onClick={() => resolveOverwriteAction('overwrite')}>Overwrite</button>
-        <button className={styles.owBtn} onClick={() => resolveOverwriteAction('skip')}>Skip</button>
-        <button className={styles.owBtn} onClick={() => resolveOverwriteAction('overwrite-all')}>Overwrite All</button>
-        <button className={styles.owBtn} onClick={() => resolveOverwriteAction('skip-all')}>Skip All</button>
+        <button className={styles.owBtn} data-testid="ow-overwrite" onClick={() => resolveOverwriteAction('overwrite')}>Overwrite</button>
+        <button className={styles.owBtn} data-testid="ow-skip" onClick={() => resolveOverwriteAction('skip')}>Skip</button>
+        <button className={styles.owBtn} data-testid="ow-overwrite-all" onClick={() => resolveOverwriteAction('overwrite-all')}>Overwrite All</button>
+        <button className={styles.owBtn} data-testid="ow-skip-all" onClick={() => resolveOverwriteAction('skip-all')}>Skip All</button>
       </div>
     </div>
   )
 }
 
-function OperationCardView({ op }: { op: FileOperation }): React.JSX.Element {
+function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const cancel = useOperationsStore((s) => s.cancelOperation)
   const remove = useOperationsStore((s) => s.removeOperation)
   const setShowDialog = useOperationsStore((s) => s.setShowDialog)
@@ -62,6 +61,10 @@ function OperationCardView({ op }: { op: FileOperation }): React.JSX.Element {
       ? Math.round((op.processedFiles / op.totalFiles) * 100)
       : 0
 
+  const filePct = op.currentFileSize > 0 && op.currentFileCopied > 0
+    ? Math.min(100, Math.round((op.currentFileCopied / op.currentFileSize) * 100))
+    : 0
+
   const isFileInProgress = op.status === 'running' && op.currentFile !== ''
   const isError = op.status === 'error'
   const isCancelled = op.status === 'cancelled'
@@ -71,117 +74,116 @@ function OperationCardView({ op }: { op: FileOperation }): React.JSX.Element {
   const isActive = isRunning || isEnumerating || isQueued
 
   const typeLabel = op.type === 'copy' ? 'Copying' : op.type === 'move' ? 'Moving' : 'Deleting'
-
-  // Speed calculation
   const elapsedMs = op.startTime > 0 ? Date.now() - op.startTime : 0
-  const bytesPerSec = elapsedMs > 0 ? (op.processedBytes / elapsedMs) * 1000 : 0
-  const speed = isRunning ? formatSpeed(bytesPerSec) : ''
-  const timeRemaining = isRunning ? formatTimeRemaining(op.processedBytes, op.totalBytes, elapsedMs) : ''
+  const speed = isRunning && elapsedMs > 1000 ? formatSpeed((op.processedBytes / elapsedMs) * 1000) : ''
+  const eta = isRunning ? formatEta(op.processedBytes, op.totalBytes, elapsedMs) : ''
 
   return (
-    <div className={styles.opDialog}>
+    <div className={styles.opDialog} data-testid="op-dialog">
+      {/* Header */}
       <div className={styles.opDialogHeader}>
-        <span className={styles.opDialogTitle}>
-          {typeLabel}{isRunning ? ` ${totalPct}%` : ''}
+        <span className={styles.opDialogTitle} data-testid="op-title">
+          {typeLabel}{isRunning && totalPct > 0 ? ` ${totalPct}%` : ''}
         </span>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
           {isActive && (
-            <button className={styles.opDismiss} onClick={() => setShowDialog(false)}>Minimize</button>
+            <button className={styles.opDismiss} data-testid="op-minimize" onClick={() => setShowDialog(false)}>Minimize</button>
           )}
           {(isError || isCancelled) && (
-            <button className={styles.opDismiss} onClick={() => remove(op.id)}>Dismiss</button>
+            <button className={styles.opDismiss} data-testid="op-dismiss" onClick={() => remove(op.id)}>Dismiss</button>
           )}
         </div>
       </div>
 
+      {/* Paths */}
       {op.type !== 'delete' && (
         <div className={styles.opPaths}>
           <div className={styles.opPathRow}>
             <span className={styles.opPathLabel}>From:</span>
-            <span className={styles.opPathValue}>
+            <span className={styles.opPathValue} data-testid="op-from">
               {op.sourceEntries[0]?.id?.replace(/[\\/][^\\/]+$/, '') || ''}
             </span>
           </div>
           <div className={styles.opPathRow}>
             <span className={styles.opPathLabel}>To:</span>
-            <span className={styles.opPathValue}>{op.destinationDisplay}</span>
+            <span className={styles.opPathValue} data-testid="op-to">{op.destinationDisplay}</span>
           </div>
         </div>
       )}
 
-      {isEnumerating && (
-        <div className={styles.opCurrentFile}>Scanning files...</div>
-      )}
+      {/* Current file */}
+      <div className={styles.opCurrentFile} data-testid="op-current-file">
+        {isEnumerating ? 'Scanning files...' :
+         isQueued ? 'Waiting in queue...' :
+         isRunning && op.currentFile ? op.currentFile :
+         isError ? '' :
+         isCancelled ? '' :
+         '\u00A0'}
+      </div>
 
-      {isQueued && (
-        <div className={styles.opCurrentFile} style={{ fontStyle: 'italic' }}>Waiting in queue...</div>
-      )}
-
-      {isRunning && op.currentFile && (
-        <div className={styles.opCurrentFile}>{op.currentFile}</div>
-      )}
-
-      {/* Current file progress bar */}
-      {isFileInProgress && (
-        <div className={styles.opBarSection}>
-          <div className={styles.opBarLabel}>
-            <span>Current file</span>
-            <span>
-              {op.currentFileSize > 0
-                ? `${formatSize(op.currentFileCopied)} / ${formatSize(op.currentFileSize)} (${Math.round((op.currentFileCopied / op.currentFileSize) * 100)}%)`
-                : ''}
-            </span>
-          </div>
-          <div className={styles.opBar}>
-            {op.currentFileSize > 0 && op.currentFileCopied > 0 ? (
-              <div
-                className={styles.opBarFill}
-                style={{ width: `${Math.min(100, Math.round((op.currentFileCopied / op.currentFileSize) * 100))}%` }}
-              />
-            ) : (
-              <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
-            )}
-          </div>
+      {/* Current file progress */}
+      <div className={styles.opBarSection} data-testid="op-file-progress">
+        <div className={styles.opBarLabel}>
+          <span>Current file</span>
+          <span data-testid="op-file-pct">
+            {isFileInProgress && filePct > 0
+              ? `${formatSize(op.currentFileCopied)} / ${formatSize(op.currentFileSize)}`
+              : '\u00A0'}
+          </span>
         </div>
-      )}
-
-      {/* Overall progress bar */}
-      {isRunning && op.totalFiles > 0 && (
-        <div className={styles.opBarSection}>
-          <div className={styles.opBarLabel}>
-            <span>File {op.processedFiles} of {op.totalFiles}</span>
-            <span>{totalPct}%</span>
-          </div>
-          <div className={styles.opBar}>
-            <div className={styles.opBarFill} style={{ width: `${totalPct}%` }} />
-          </div>
-          <div className={styles.opBytes}>
-            {op.totalBytes > 0 && `${formatSize(op.processedBytes)} / ${formatSize(op.totalBytes)}`}
-            {speed && ` \u2022 ${speed}`}
-            {timeRemaining && ` \u2022 ${timeRemaining}`}
-          </div>
-        </div>
-      )}
-
-      {isEnumerating && (
-        <div className={styles.opBarSection}>
-          <div className={styles.opBar}>
+        <div className={styles.opBar}>
+          {isFileInProgress && filePct > 0 ? (
+            <div className={styles.opBarFill} style={{ width: `${filePct}%` }} data-testid="op-file-bar" />
+          ) : isRunning || isEnumerating ? (
             <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
-          </div>
+          ) : (
+            <div className={styles.opBarFill} style={{ width: isError ? '100%' : `${totalPct}%` }}
+              data-testid="op-file-bar-static" />
+          )}
         </div>
-      )}
+      </div>
 
-      {isError && <div className={styles.opErrorMsg}>{op.error}</div>}
-      {isCancelled && <div className={styles.opErrorMsg}>Cancelled at file {op.processedFiles} of {op.totalFiles}</div>}
+      {/* Total progress */}
+      <div className={styles.opBarSection} data-testid="op-total-progress">
+        <div className={styles.opBarLabel}>
+          <span data-testid="op-file-count">
+            {op.totalFiles > 0 ? `File ${op.processedFiles} of ${op.totalFiles}` : '\u00A0'}
+          </span>
+          <span data-testid="op-total-pct">{totalPct > 0 ? `${totalPct}%` : '\u00A0'}</span>
+        </div>
+        <div className={styles.opBar}>
+          <div
+            className={`${styles.opBarFill} ${isError ? styles.opBarFillError : ''}`}
+            style={{ width: `${totalPct}%` }}
+            data-testid="op-total-bar"
+          />
+        </div>
+      </div>
 
+      {/* Info line: bytes, speed, ETA */}
+      <div className={styles.opInfo} data-testid="op-info">
+        <span data-testid="op-bytes">
+          {op.totalBytes > 0 ? `${formatSize(op.processedBytes)} / ${formatSize(op.totalBytes)}` : '\u00A0'}
+        </span>
+        <span data-testid="op-speed">
+          {speed}{speed && eta ? ` \u2022 ${eta}` : eta}{!speed && !eta ? '\u00A0' : ''}
+        </span>
+      </div>
+
+      {/* Error/cancel message */}
+      {isError && <div className={styles.opErrorMsg} data-testid="op-error">{op.error}</div>}
+      {isCancelled && <div className={styles.opErrorMsg} data-testid="op-cancelled">Cancelled at file {op.processedFiles} of {op.totalFiles}</div>}
+
+      {/* Overwrite prompt */}
       {op.overwritePrompt && <OverwritePromptView prompt={op.overwritePrompt} />}
 
+      {/* Footer */}
       <div className={styles.opDialogFooter}>
         {isActive && !op.overwritePrompt && (
-          <button className={styles.opCancelBtn} onClick={() => cancel(op.id)}>Cancel</button>
+          <button className={styles.opCancelBtn} data-testid="op-cancel" onClick={() => cancel(op.id)}>Cancel</button>
         )}
         {(isError || isCancelled) && (
-          <button className={styles.opOkBtn} onClick={() => remove(op.id)}>OK</button>
+          <button className={styles.opOkBtn} data-testid="op-ok" onClick={() => remove(op.id)}>OK</button>
         )}
       </div>
     </div>
@@ -217,11 +219,11 @@ export function OperationDialog(): React.JSX.Element | null {
   const queueCount = operations.filter((op) => op.status === 'queued').length
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} data-testid="op-overlay">
       <div className={styles.dialogContainer}>
-        <OperationCardView op={current} />
+        <OperationView op={current} />
         {queueCount > 0 && (
-          <div className={styles.queueInfo}>
+          <div className={styles.queueInfo} data-testid="op-queue-info">
             <span>{queueCount} more in queue</span>
           </div>
         )}
@@ -246,8 +248,11 @@ export function QueueButton(): React.JSX.Element | null {
     : 0
 
   return (
-    <button className={styles.queueBtn} onClick={() => setShowDialog(true)}>
+    <button className={styles.queueBtn} data-testid="queue-btn" onClick={() => setShowDialog(true)}>
       {active.length} op{active.length > 1 ? 's' : ''}{running ? ` ${pct}%` : ''}
     </button>
   )
 }
+
+// Export for Playwright test harness
+export { OperationView }
