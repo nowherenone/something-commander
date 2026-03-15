@@ -107,8 +107,14 @@ export function useKeyboard(actions: KeyboardActions): void {
             if (entry.isContainer) {
               navigate(activePanel, entry.id)
             } else {
-              // Open file with system default application
-              window.api.util.openFile(entry.id)
+              // Check if it's an archive — enter it, otherwise open with system app
+              window.api.util.isArchive(entry.id).then((isArchive) => {
+                if (isArchive) {
+                  usePanelStore.getState().navigateWithPlugin(activePanel, 'archive', `${entry.id}::`)
+                } else {
+                  window.api.util.openFile(entry.id)
+                }
+              })
             }
           }
           break
@@ -118,6 +124,13 @@ export function useKeyboard(actions: KeyboardActions): void {
           e.preventDefault()
           if (tab.parentId !== null) {
             navigate(activePanel, tab.parentId)
+          } else if (tab.pluginId !== 'local-filesystem') {
+            // Exit archive/sftp — go back to local filesystem
+            const archivePath = tab.locationId?.split('::')[0]
+            if (archivePath) {
+              const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
+              store.navigateWithPlugin(activePanel, 'local-filesystem', parentDir)
+            }
           } else {
             navigate(activePanel, null)
           }
@@ -141,6 +154,20 @@ export function useKeyboard(actions: KeyboardActions): void {
           spaceSelect(activePanel, idx)
           break
         }
+
+        case 'F1':
+          e.preventDefault()
+          if (e.altKey) {
+            useAppStore.getState().openDriveMenu('left')
+          }
+          break
+
+        case 'F2':
+          e.preventDefault()
+          if (e.altKey) {
+            useAppStore.getState().openDriveMenu('right')
+          }
+          break
 
         case 'F3':
           e.preventDefault()

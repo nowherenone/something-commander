@@ -55,6 +55,7 @@ interface UtilAPI {
   getFileSize(filePath: string): Promise<number>
   saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
+  getDiskSpace(dirPath: string): Promise<{ free: number; total: number }>
   sftpConnect(host: string, port: number, username: string, password?: string): Promise<string>
   sftpDisconnect(connId: string): Promise<void>
   sftpListConnections(): Promise<string[]>

@@ -3,7 +3,7 @@ import { DualPanel } from './components/panels/DualPanel'
 import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
 import { MenuBar } from './components/layout/MenuBar'
-import { BottomStatusBar } from './components/layout/BottomStatusBar'
+// BottomStatusBar removed — each panel has its own status bar with disk space
 import { OperationDialog, QueueButton } from './components/dialogs/OperationDialog'
 import { SettingsDialog } from './components/dialogs/SettingsDialog'
 import { SearchDialog } from './components/dialogs/SearchDialog'
@@ -199,7 +199,7 @@ function App(): React.JSX.Element {
           onF9={handleF9}
         />
       )}
-      {bottomBar === 'status' && <BottomStatusBar />}
+      {/* 'status' mode: panel-level status bars handle this */}
 
       <OperationDialog />
       <QueueButton />

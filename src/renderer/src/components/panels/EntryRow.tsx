@@ -7,6 +7,7 @@ import styles from '../../styles/file-list.module.css'
 interface EntryRowProps {
   entry: Entry
   isCursor: boolean
+  isPanelActive?: boolean
   isSelected: boolean
   isCalculating?: boolean
   onClick: () => void
@@ -17,6 +18,7 @@ interface EntryRowProps {
 export const EntryRow = React.memo(function EntryRow({
   entry,
   isCursor,
+  isPanelActive = true,
   isSelected,
   isCalculating,
   onClick,
@@ -25,7 +27,7 @@ export const EntryRow = React.memo(function EntryRow({
 }: EntryRowProps): React.JSX.Element {
   const classNames = [
     styles.entryRow,
-    isCursor ? styles.cursor : '',
+    isCursor ? (isPanelActive ? styles.cursor : styles.cursorInactive) : '',
     isSelected ? styles.selected : '',
     entry.isContainer ? styles.container : ''
   ]

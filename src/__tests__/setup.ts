@@ -42,6 +42,7 @@ const mockUtilApi = {
   getFileSize: vi.fn().mockResolvedValue(0),
   saveFile: vi.fn().mockResolvedValue({ success: true }),
   showContextMenu: vi.fn().mockResolvedValue(null),
+  getDiskSpace: vi.fn().mockResolvedValue({ free: 100000000, total: 500000000 }),
   sftpConnect: vi.fn().mockResolvedValue('user@host:22'),
   sftpDisconnect: vi.fn().mockResolvedValue(undefined),
   sftpListConnections: vi.fn().mockResolvedValue([])

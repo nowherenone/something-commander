@@ -57,6 +57,11 @@
   color: white;
 }
 
+.entryRow.cursorInactive {
+  background: #3a3f47;
+  color: var(--text-secondary);
+}
+
 .entryRow.selected {
   background: var(--bg-selected);
   color: #ffcc00;

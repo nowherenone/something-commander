@@ -173,6 +173,19 @@ export function registerPluginIPC(): void {
     }
   )
 
+  // Get disk free/total space for a path
+  ipcMain.handle(IPC_CHANNELS.GET_DISK_SPACE, async (_event, dirPath: string) => {
+    try {
+      const stats = await fs.statfs(dirPath)
+      return {
+        free: Number(stats.bfree) * Number(stats.bsize),
+        total: Number(stats.blocks) * Number(stats.bsize)
+      }
+    } catch {
+      return { free: 0, total: 0 }
+    }
+  })
+
   // SFTP connection management
   ipcMain.handle(
     IPC_CHANNELS.SFTP_CONNECT,

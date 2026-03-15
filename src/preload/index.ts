@@ -104,6 +104,9 @@ const utilAPI = {
   showContextMenu: (items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_CONTEXT_MENU, items),
 
+  getDiskSpace: (dirPath: string): Promise<{ free: number; total: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_DISK_SPACE, dirPath),
+
   sftpConnect: (host: string, port: number, username: string, password?: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.SFTP_CONNECT, host, port, username, password),
 

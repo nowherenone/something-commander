@@ -8,6 +8,7 @@ interface FileListProps {
   cursorIndex: number
   selectedIds: Set<string>
   calculatingIds: Set<string>
+  isActive: boolean
   onCursorChange: (index: number) => void
   onSelect: (entryId: string) => void
   onActivate: (entry: Entry) => void
@@ -18,6 +19,7 @@ export function FileList({
   cursorIndex,
   selectedIds,
   calculatingIds,
+  isActive,
   onCursorChange,
   onSelect,
   onActivate
@@ -94,6 +96,7 @@ export function FileList({
           key={entry.id}
           entry={entry}
           isCursor={index === cursorIndex}
+          isPanelActive={isActive}
           isSelected={selectedIds.has(entry.id)}
           isCalculating={calculatingIds.has(entry.id)}
           onClick={() => handleClick(index)}

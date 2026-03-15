@@ -12,10 +12,11 @@ export function CommandLine(): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const activePanel = useAppStore((s) => s.activePanel)
-  const getActiveTab = usePanelStore((s) => s.getActiveTab)
+  const panelSlice = usePanelStore((s) => s[activePanel])
   const refresh = usePanelStore((s) => s.refresh)
-  const tab = getActiveTab(activePanel)
-  const cwd = tab.locationDisplay || ''
+  const activeTabId = panelSlice.activeTabId
+  const tab = panelSlice.tabs.find((t) => t.id === activeTabId) || panelSlice.tabs[0]
+  const cwd = tab?.locationDisplay || ''
 
   const runCommand = useCallback(
     async (cmd: string) => {
