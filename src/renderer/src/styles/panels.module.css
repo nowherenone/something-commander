@@ -72,17 +72,18 @@
 }
 
 .diskBar {
-  width: 50px;
-  height: 4px;
-  background: var(--bg-tertiary);
+  width: 60px;
+  height: 8px;
+  background: var(--border-color);
   border-radius: 2px;
   overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
 .diskBarFill {
+  display: block;
   height: 100%;
   background: var(--accent);
-  border-radius: 2px;
 }
 
 .statusSelected {
