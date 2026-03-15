@@ -4,6 +4,7 @@ import { usePanelStore } from '../stores/panel-store'
 
 interface KeyboardActions {
   onF3?: () => void
+  onF4?: () => void
   onF5?: () => void
   onF6?: () => void
   onF7?: () => void
@@ -102,8 +103,12 @@ export function useKeyboard(actions: KeyboardActions): void {
           if (tab.cursorIndex === 0 && tab.parentId !== null) {
             navigate(activePanel, tab.parentId)
           } else if (idx >= 0 && idx < tab.entries.length) {
-            if (tab.entries[idx].isContainer) {
-              navigate(activePanel, tab.entries[idx].id)
+            const entry = tab.entries[idx]
+            if (entry.isContainer) {
+              navigate(activePanel, entry.id)
+            } else {
+              // Open file with system default application
+              window.api.util.openFile(entry.id)
             }
           }
           break
@@ -140,6 +145,11 @@ export function useKeyboard(actions: KeyboardActions): void {
         case 'F3':
           e.preventDefault()
           actions.onF3?.()
+          break
+
+        case 'F4':
+          e.preventDefault()
+          actions.onF4?.()
           break
 
         case 'F5':

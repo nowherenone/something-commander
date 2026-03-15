@@ -4,7 +4,7 @@ import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
 import { OperationDialog, QueueButton } from './components/dialogs/OperationDialog'
 import { SettingsDialog } from './components/dialogs/SettingsDialog'
-import { FileViewer } from './components/dialogs/FileViewer'
+// FileViewer is now in a separate window (ViewerPage)
 import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
@@ -21,7 +21,6 @@ function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
   const [mkdirName, setMkdirName] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [viewerFile, setViewerFile] = useState<{ path: string; name: string } | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
@@ -55,18 +54,30 @@ function App(): React.JSX.Element {
     state.refresh(activePanel)
   }, [mkdirName])
 
-  const handleF3 = useCallback(() => {
+  const getCursorEntry = useCallback(() => {
     const activePanel = useAppStore.getState().activePanel
     const tab = usePanelStore.getState().getActiveTab(activePanel)
     const offset = tab.parentId !== null ? 1 : 0
     const idx = tab.cursorIndex - offset
     if (idx >= 0 && idx < tab.entries.length) {
-      const entry = tab.entries[idx]
-      if (!entry.isContainer) {
-        setViewerFile({ path: entry.id, name: entry.name })
-      }
+      return tab.entries[idx]
     }
+    return null
   }, [])
+
+  const handleF3 = useCallback(() => {
+    const entry = getCursorEntry()
+    if (entry && !entry.isContainer) {
+      window.api.util.openViewerWindow(entry.id, entry.name)
+    }
+  }, [getCursorEntry])
+
+  const handleF4 = useCallback(() => {
+    const entry = getCursorEntry()
+    if (entry && !entry.isContainer) {
+      window.api.util.openEditorWindow(entry.id, entry.name)
+    }
+  }, [getCursorEntry])
 
   const handleF9 = useCallback(() => {
     setSettingsOpen(true)
@@ -96,6 +107,7 @@ function App(): React.JSX.Element {
 
   useKeyboard({
     onF3: handleF3,
+    onF4: handleF4,
     onF5: handleCopy,
     onF6: handleMove,
     onF7: handleF7,
@@ -202,13 +214,7 @@ function App(): React.JSX.Element {
 
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
 
-      {viewerFile && (
-        <FileViewer
-          filePath={viewerFile.path}
-          fileName={viewerFile.name}
-          onClose={() => setViewerFile(null)}
-        />
-      )}
+
 
       {searchOpen && (
         <SearchDialog

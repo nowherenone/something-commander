@@ -11,6 +11,7 @@ interface EntryRowProps {
   isCalculating?: boolean
   onClick: () => void
   onDoubleClick: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
 }
 
 export const EntryRow = React.memo(function EntryRow({
@@ -19,7 +20,8 @@ export const EntryRow = React.memo(function EntryRow({
   isSelected,
   isCalculating,
   onClick,
-  onDoubleClick
+  onDoubleClick,
+  onContextMenu
 }: EntryRowProps): React.JSX.Element {
   const classNames = [
     styles.entryRow,
@@ -41,7 +43,7 @@ export const EntryRow = React.memo(function EntryRow({
   }
 
   return (
-    <div className={classNames} onClick={onClick} onDoubleClick={onDoubleClick}>
+    <div className={classNames} onClick={onClick} onDoubleClick={onDoubleClick} onContextMenu={onContextMenu}>
       <div className={styles.colName}>
         <span className={styles.icon}>{getIconForHint(entry.iconHint)}</span>
         <span className={styles.fileName}>{entry.name}</span>

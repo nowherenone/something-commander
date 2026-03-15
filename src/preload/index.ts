@@ -83,6 +83,27 @@ const utilAPI = {
   isArchive: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.IS_ARCHIVE, filePath),
 
+  openFile: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OPEN_FILE, filePath),
+
+  openViewerWindow: (filePath: string, fileName: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OPEN_VIEWER_WINDOW, filePath, fileName),
+
+  openEditorWindow: (filePath: string, fileName: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OPEN_EDITOR_WINDOW, filePath, fileName),
+
+  readFileChunk: (filePath: string, offset: number, length: number): Promise<{ data: string; bytesRead: number; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.READ_FILE_CHUNK, filePath, offset, length),
+
+  getFileSize: (filePath: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_FILE_SIZE, filePath),
+
+  saveFile: (filePath: string, content: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SAVE_FILE, filePath, content),
+
+  showContextMenu: (items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SHOW_CONTEXT_MENU, items),
+
   onCopyFileProgress: (callback: (bytesCopied: number) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, bytesCopied: number): void =>
       callback(bytesCopied)

@@ -52,6 +52,9 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
         const isArchive = await window.api.util.isArchive(entry.id)
         if (isArchive) {
           usePanelStore.getState().navigateWithPlugin(panelId, 'archive', `${entry.id}::`)
+        } else {
+          // Open with system default application
+          window.api.util.openFile(entry.id)
         }
       }
     },

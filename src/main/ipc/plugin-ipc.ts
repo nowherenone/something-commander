@@ -1,8 +1,9 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, shell, Menu, dialog } from 'electron'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as path from 'path'
 import { exec } from 'child_process'
+import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 
@@ -58,6 +59,118 @@ export function registerPluginIPC(): void {
     const ext = path.extname(filePath).toLowerCase()
     return ['.zip', '.jar'].includes(ext)
   })
+
+  // Open file with system default application
+  ipcMain.handle(IPC_CHANNELS.OPEN_FILE, async (_event, filePath: string) => {
+    const result = await shell.openPath(filePath)
+    return result // empty string = success, otherwise error message
+  })
+
+  // Open viewer in new window
+  ipcMain.handle(IPC_CHANNELS.OPEN_VIEWER_WINDOW, (_event, filePath: string, fileName: string) => {
+    const viewerWindow = new BrowserWindow({
+      width: 900,
+      height: 700,
+      title: `View: ${fileName}`,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/index.js'),
+        sandbox: false
+      }
+    })
+
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      viewerWindow.loadURL(
+        `${process.env['ELECTRON_RENDERER_URL']}#/viewer?file=${encodeURIComponent(filePath)}&name=${encodeURIComponent(fileName)}`
+      )
+    } else {
+      viewerWindow.loadFile(path.join(__dirname, '../renderer/index.html'), {
+        hash: `/viewer?file=${encodeURIComponent(filePath)}&name=${encodeURIComponent(fileName)}`
+      })
+    }
+  })
+
+  // Open editor in new window
+  ipcMain.handle(IPC_CHANNELS.OPEN_EDITOR_WINDOW, (_event, filePath: string, fileName: string) => {
+    const editorWindow = new BrowserWindow({
+      width: 900,
+      height: 700,
+      title: `Edit: ${fileName}`,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/index.js'),
+        sandbox: false
+      }
+    })
+
+    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+      editorWindow.loadURL(
+        `${process.env['ELECTRON_RENDERER_URL']}#/editor?file=${encodeURIComponent(filePath)}&name=${encodeURIComponent(fileName)}`
+      )
+    } else {
+      editorWindow.loadFile(path.join(__dirname, '../renderer/index.html'), {
+        hash: `/editor?file=${encodeURIComponent(filePath)}&name=${encodeURIComponent(fileName)}`
+      })
+    }
+  })
+
+  // Read a chunk of a file (for virtualized viewer)
+  ipcMain.handle(
+    IPC_CHANNELS.READ_FILE_CHUNK,
+    async (_event, filePath: string, offset: number, length: number) => {
+      try {
+        const handle = await fs.open(filePath, 'r')
+        const buffer = Buffer.alloc(length)
+        const { bytesRead } = await handle.read(buffer, 0, length, offset)
+        await handle.close()
+        return { data: buffer.slice(0, bytesRead).toString('utf-8'), bytesRead }
+      } catch (err) {
+        return { data: '', bytesRead: 0, error: String(err) }
+      }
+    }
+  )
+
+  // Get file size
+  ipcMain.handle(IPC_CHANNELS.GET_FILE_SIZE, async (_event, filePath: string) => {
+    try {
+      const stat = await fs.stat(filePath)
+      return stat.size
+    } catch {
+      return 0
+    }
+  })
+
+  // Save file content
+  ipcMain.handle(IPC_CHANNELS.SAVE_FILE, async (_event, filePath: string, content: string) => {
+    try {
+      await fs.writeFile(filePath, content, 'utf-8')
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  })
+
+  // Context menu
+  ipcMain.handle(
+    IPC_CHANNELS.SHOW_CONTEXT_MENU,
+    async (event, items: Array<{ label: string; id: string; separator?: boolean }>) => {
+      return new Promise<string | null>((resolve) => {
+        const template = items.map((item) => {
+          if (item.separator) return { type: 'separator' as const }
+          return {
+            label: item.label,
+            click: () => resolve(item.id)
+          }
+        })
+        const menu = Menu.buildFromTemplate(template)
+        const win = BrowserWindow.fromWebContents(event.sender)
+        menu.popup({ window: win || undefined })
+        menu.on('menu-will-close', () => {
+          setTimeout(() => resolve(null), 100)
+        })
+      })
+    }
+  )
 
   // Enumerate all files recursively for a list of source entries
   // Returns flat list: [{sourcePath, destPath, size, isDirectory}]

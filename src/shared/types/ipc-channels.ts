@@ -19,6 +19,13 @@ export const IPC_CHANNELS = {
   CHECK_EXISTS: 'ops:checkExists',
   GET_FILE_INFO: 'ops:getFileInfo',
   IS_ARCHIVE: 'util:isArchive',
+  OPEN_FILE: 'util:openFile',
+  OPEN_VIEWER_WINDOW: 'util:openViewerWindow',
+  OPEN_EDITOR_WINDOW: 'util:openEditorWindow',
+  READ_FILE_CHUNK: 'util:readFileChunk',
+  GET_FILE_SIZE: 'util:getFileSize',
+  SAVE_FILE: 'util:saveFile',
+  SHOW_CONTEXT_MENU: 'util:showContextMenu',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
   // Operation progress events (main → renderer)

@@ -48,6 +48,13 @@ interface UtilAPI {
   checkExists(filePath: string): Promise<boolean>
   getFileInfo(filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null>
   isArchive(filePath: string): Promise<boolean>
+  openFile(filePath: string): Promise<string>
+  openViewerWindow(filePath: string, fileName: string): Promise<void>
+  openEditorWindow(filePath: string, fileName: string): Promise<void>
+  readFileChunk(filePath: string, offset: number, length: number): Promise<{ data: string; bytesRead: number; error?: string }>
+  getFileSize(filePath: string): Promise<number>
+  saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
+  showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   enumerateFiles(
     sourcePaths: string[],

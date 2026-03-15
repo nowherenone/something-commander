@@ -33,7 +33,15 @@ const mockUtilApi = {
   checkExists: vi.fn().mockResolvedValue(false),
   getFileInfo: vi.fn().mockResolvedValue({ size: 100, modifiedAt: 1000, isDirectory: false }),
   onCopyFileProgress: vi.fn().mockReturnValue(() => {}),
-  enumerateFiles: vi.fn().mockResolvedValue([])
+  enumerateFiles: vi.fn().mockResolvedValue([]),
+  isArchive: vi.fn().mockResolvedValue(false),
+  openFile: vi.fn().mockResolvedValue(''),
+  openViewerWindow: vi.fn().mockResolvedValue(undefined),
+  openEditorWindow: vi.fn().mockResolvedValue(undefined),
+  readFileChunk: vi.fn().mockResolvedValue({ data: '', bytesRead: 0 }),
+  getFileSize: vi.fn().mockResolvedValue(0),
+  saveFile: vi.fn().mockResolvedValue({ success: true }),
+  showContextMenu: vi.fn().mockResolvedValue(null)
 }
 
 Object.defineProperty(window, 'api', {
