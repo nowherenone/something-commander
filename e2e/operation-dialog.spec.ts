@@ -68,9 +68,9 @@ test.describe('Operation Dialog Visual Tests', () => {
     const title = dialog.locator('[data-testid="op-title"]')
     await expect(title).toContainText('Moving')
 
-    // File progress shows GiB values
+    // File progress shows GB values
     const filePct = dialog.locator('[data-testid="op-file-pct"]')
-    await expect(filePct).toContainText('GiB')
+    await expect(filePct).toContainText('GB')
 
     // Speed should be visible
     const speed = dialog.locator('[data-testid="op-speed"]')
@@ -93,7 +93,7 @@ test.describe('Operation Dialog Visual Tests', () => {
     await expect(dialog.locator('[data-testid="ow-dest-name"]')).toContainText('report.docx')
 
     // Source size
-    await expect(dialog.locator('[data-testid="ow-source-meta"]')).toContainText('KiB')
+    await expect(dialog.locator('[data-testid="ow-source-meta"]')).toContainText('kB')
 
     // All 4 buttons visible
     await expect(dialog.locator('[data-testid="ow-overwrite"]')).toBeVisible()

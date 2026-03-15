@@ -516,7 +516,7 @@ function copyFileWithProgress(
       bytesCopied += chunk.length
       // Throttle progress reports to avoid flooding IPC (every 100ms worth)
       const now = Date.now()
-      if (now - lastReport > 100) {
+      if (now - lastReport > 250) {
         onProgress(bytesCopied)
         lastReport = now
       }

@@ -16,12 +16,17 @@ describe('formatSize', () => {
 
   it('formats kilobytes', () => {
     const result = formatSize(2048)
-    expect(result).toContain('KiB')
+    expect(result).toContain('kB')
   })
 
   it('formats megabytes', () => {
-    const result = formatSize(5 * 1024 * 1024)
-    expect(result).toContain('MiB')
+    const result = formatSize(5 * 1000 * 1000)
+    expect(result).toContain('MB')
+  })
+
+  it('formats gigabytes', () => {
+    const result = formatSize(3.5 * 1000 * 1000 * 1000)
+    expect(result).toContain('GB')
   })
 })
 

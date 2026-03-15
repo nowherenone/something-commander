@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 export function formatSize(bytes: number): string {
   if (bytes < 0) return ''
   if (bytes === 0) return '0 B'
-  return filesize(bytes, { standard: 'iec', spacer: ' ' }) as string
+  return filesize(bytes, { standard: 'si', spacer: ' ' }) as string
 }
 
 export function formatDate(timestamp: number): string {

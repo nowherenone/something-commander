@@ -139,9 +139,14 @@ async function executeOperation(opId: string): Promise<void> {
             }
           }
 
-          // Subscribe to per-byte progress for this file
+          // Subscribe to per-byte progress for this file (throttled to 4x/sec)
+          let lastProgressUpdate = 0
           const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
-            store().updateOperation(opId, { currentFileCopied: bytesCopied })
+            const now = Date.now()
+            if (now - lastProgressUpdate >= 250) {
+              store().updateOperation(opId, { currentFileCopied: bytesCopied })
+              lastProgressUpdate = now
+            }
           })
 
           const ipcFn = op.type === 'copy'
