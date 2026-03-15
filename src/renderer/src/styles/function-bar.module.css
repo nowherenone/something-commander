@@ -1,0 +1,46 @@
+.bar {
+  display: flex;
+  height: var(--fnbar-height);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.fnButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+  padding: 0 2px;
+  border-right: 1px solid var(--border-color);
+}
+
+.fnButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.fnButton:active {
+  background: var(--accent);
+  color: white;
+}
+
+.fnButton:last-child {
+  border-right: none;
+}
+
+.fnKey {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.fnLabel {
+  color: var(--text-secondary);
+}

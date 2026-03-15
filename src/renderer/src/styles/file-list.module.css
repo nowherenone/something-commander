@@ -1,0 +1,119 @@
+.headerRow {
+  display: flex;
+  height: var(--header-height);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.headerCell {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: var(--font-size-small);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.headerCell:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.sortArrow {
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.fileList {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.entryRow {
+  display: flex;
+  height: var(--row-height);
+  align-items: center;
+  cursor: default;
+}
+
+.entryRow:hover {
+  background: var(--bg-hover);
+}
+
+.entryRow.cursor {
+  background: var(--bg-cursor);
+  color: white;
+}
+
+.entryRow.selected {
+  background: var(--bg-selected);
+}
+
+.entryRow.cursor.selected {
+  background: var(--bg-cursor);
+}
+
+.entryRow.container .fileName {
+  font-weight: 600;
+}
+
+.colName {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.colExt {
+  width: 60px;
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.colSize {
+  width: 90px;
+  padding: 0 8px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  flex-shrink: 0;
+}
+
+.colDate {
+  width: 130px;
+  padding: 0 8px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+  flex-shrink: 0;
+}
