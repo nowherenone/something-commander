@@ -59,10 +59,29 @@
 
 .entryRow.selected {
   background: var(--bg-selected);
+  color: #ffcc00;
+}
+
+.entryRow.selected .colExt,
+.entryRow.selected .colSize,
+.entryRow.selected .colDate {
+  color: #ffcc00;
 }
 
 .entryRow.cursor.selected {
   background: var(--bg-cursor);
+  color: #ffcc00;
+}
+
+.sizeLoading {
+  color: var(--accent);
+  font-style: italic;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
 .entryRow.container .fileName {

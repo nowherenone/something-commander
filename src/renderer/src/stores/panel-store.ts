@@ -18,6 +18,7 @@ export interface TabState {
   parentId: string | null
   extraColumns: ColumnDefinition[]
   selectedEntryIds: Set<string>
+  calculatingFolderIds: Set<string>
   cursorIndex: number
   sortConfig: SortConfig
   showHidden: boolean
@@ -35,6 +36,7 @@ function createInitialTab(): TabState {
     parentId: null,
     extraColumns: [],
     selectedEntryIds: new Set(),
+    calculatingFolderIds: new Set(),
     cursorIndex: 0,
     sortConfig: { field: 'name', direction: 'asc' },
     showHidden: false,
@@ -87,6 +89,7 @@ interface PanelStoreState {
   toggleSelect: (panelId: 'left' | 'right', entryId: string) => void
   spaceSelect: (panelId: 'left' | 'right', entryIndex: number) => void
   updateEntrySize: (panelId: 'left' | 'right', entryId: string, size: number) => void
+  cancelFolderCalculations: (panelId: 'left' | 'right') => void
   selectRange: (panelId: 'left' | 'right', from: number, to: number) => void
   selectAll: (panelId: 'left' | 'right') => void
   deselectAll: (panelId: 'left' | 'right') => void
@@ -151,6 +154,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
   navigate: async (panelId, locationId) => {
     const panel = get()[panelId]
     const tab = getActiveTab(panel)
+    const previousLocationId = tab.locationId
 
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, isLoading: true, error: null })) })
 
@@ -164,6 +168,17 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       }
       entries = sortEntries(entries, currentTab.sortConfig)
 
+      // When going up, place cursor on the folder we came from
+      let cursorIndex = 0
+      if (previousLocationId && result.parentId !== null) {
+        // Check if we're going up (the previous location should be a child entry)
+        const offset = result.parentId !== null ? 1 : 0 // account for ".." row
+        const prevIdx = entries.findIndex((e) => e.id === previousLocationId)
+        if (prevIdx >= 0) {
+          cursorIndex = prevIdx + offset
+        }
+      }
+
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
@@ -173,7 +188,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           parentId: result.parentId,
           extraColumns: result.extraColumns || [],
           selectedEntryIds: new Set(),
-          cursorIndex: 0,
+          calculatingFolderIds: new Set(),
+          cursorIndex,
           isLoading: false,
           error: null
         }))
@@ -246,20 +262,40 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       newSet.add(entry.id)
     }
 
-    const maxIdx = tab.entries.length - 1 + (tab.parentId !== null ? 1 : 0)
-    const newCursor = Math.min(tab.cursorIndex + 1, maxIdx)
+    // Don't advance cursor on Space
     set({
       [panelId]: updateTab(panel, tab.id, (t) => ({
         ...t,
-        selectedEntryIds: newSet,
-        cursorIndex: newCursor
+        selectedEntryIds: newSet
       }))
     })
 
     // Calculate folder size when selecting a container
     if (!wasSelected && entry.isContainer) {
+      // Mark as calculating
+      const calcSet = new Set(get()[panelId] ? getActiveTab(get()[panelId]).calculatingFolderIds : [])
+      calcSet.add(entry.id)
+      set({
+        [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
+          ...t,
+          calculatingFolderIds: new Set(calcSet)
+        }))
+      })
+
       window.api.util.calcFolderSize(entry.id).then((size) => {
-        get().updateEntrySize(panelId, entry.id, size)
+        // Only update if still calculating (not cancelled)
+        const currentTab = getActiveTab(get()[panelId])
+        if (currentTab.calculatingFolderIds.has(entry.id)) {
+          const newCalc = new Set(currentTab.calculatingFolderIds)
+          newCalc.delete(entry.id)
+          set({
+            [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
+              ...t,
+              entries: t.entries.map((e) => (e.id === entry.id ? { ...e, size } : e)),
+              calculatingFolderIds: newCalc
+            }))
+          })
+        }
       })
     }
   },
@@ -271,6 +307,17 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       [panelId]: updateTab(panel, tab.id, (t) => ({
         ...t,
         entries: t.entries.map((e) => (e.id === entryId ? { ...e, size } : e))
+      }))
+    })
+  },
+
+  cancelFolderCalculations: (panelId) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    set({
+      [panelId]: updateTab(panel, tab.id, (t) => ({
+        ...t,
+        calculatingFolderIds: new Set()
       }))
     })
   },

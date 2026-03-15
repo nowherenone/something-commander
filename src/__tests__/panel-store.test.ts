@@ -253,4 +253,116 @@ describe('panel-store', () => {
       expect(tab.entries.map((e) => e.name)).toEqual(['b', 'c', 'a'])
     })
   })
+
+  describe('spaceSelect', () => {
+    it('does NOT advance cursor', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/a', name: 'a' }),
+        makeEntry({ id: '/b', name: 'b' }),
+        makeEntry({ id: '/c', name: 'c' })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '/test',
+        parentId: null
+      })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      usePanelStore.getState().setCursor('left', 1)
+      usePanelStore.getState().spaceSelect('left', 1)
+
+      const tab = usePanelStore.getState().getActiveTab('left')
+      // Cursor should stay at 1, NOT advance to 2
+      expect(tab.cursorIndex).toBe(1)
+      expect(tab.selectedEntryIds.has('/b')).toBe(true)
+    })
+
+    it('toggles selection off when pressing space again', async () => {
+      const mockEntries: Entry[] = [makeEntry({ id: '/a', name: 'a' })]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '/test',
+        parentId: null
+      })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      usePanelStore.getState().spaceSelect('left', 0)
+      expect(usePanelStore.getState().getActiveTab('left').selectedEntryIds.has('/a')).toBe(true)
+
+      usePanelStore.getState().spaceSelect('left', 0)
+      expect(usePanelStore.getState().getActiveTab('left').selectedEntryIds.has('/a')).toBe(false)
+    })
+
+    it('marks container as calculating when selected', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/docs', name: 'docs', isContainer: true })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '/test',
+        parentId: null
+      })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      usePanelStore.getState().spaceSelect('left', 0)
+
+      const tab = usePanelStore.getState().getActiveTab('left')
+      expect(tab.calculatingFolderIds.has('/docs')).toBe(true)
+    })
+  })
+
+  describe('cancelFolderCalculations', () => {
+    it('clears all calculating folder IDs', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/a', name: 'a', isContainer: true }),
+        makeEntry({ id: '/b', name: 'b', isContainer: true })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '/test',
+        parentId: null
+      })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      usePanelStore.getState().spaceSelect('left', 0)
+      usePanelStore.getState().spaceSelect('left', 1)
+
+      expect(usePanelStore.getState().getActiveTab('left').calculatingFolderIds.size).toBe(2)
+
+      usePanelStore.getState().cancelFolderCalculations('left')
+      expect(usePanelStore.getState().getActiveTab('left').calculatingFolderIds.size).toBe(0)
+    })
+  })
+
+  describe('navigate cursor placement', () => {
+    it('places cursor on previous folder when going up', async () => {
+      // First navigate to /test/subdir
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: [makeEntry({ id: '/test/a', name: 'a', isContainer: true })],
+        location: '/test/subdir',
+        parentId: '/test'
+      })
+      await usePanelStore.getState().navigate('left', '/test/subdir')
+
+      // Now navigate up to /test — should land cursor on 'subdir'
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: [
+          makeEntry({ id: '/test/alpha', name: 'alpha', isContainer: true }),
+          makeEntry({ id: '/test/subdir', name: 'subdir', isContainer: true }),
+          makeEntry({ id: '/test/zzz', name: 'zzz', isContainer: true })
+        ],
+        location: '/test',
+        parentId: '/'
+      })
+      await usePanelStore.getState().navigate('left', '/test')
+
+      const tab = usePanelStore.getState().getActiveTab('left')
+      // subdir is at index 1 in entries, plus 1 for ".." row = cursor at 2
+      expect(tab.cursorIndex).toBe(2)
+    })
+  })
 })

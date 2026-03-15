@@ -35,6 +35,11 @@ export function useKeyboard(actions: KeyboardActions): void {
       }
 
       switch (e.key) {
+        case 'Escape':
+          e.preventDefault()
+          store.cancelFolderCalculations(activePanel)
+          break
+
         case 'Tab':
           e.preventDefault()
           useAppStore.getState().toggleActivePanel()

@@ -2,14 +2,15 @@ import React, { useCallback, useState } from 'react'
 import { DualPanel } from './components/panels/DualPanel'
 import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
+import { OperationsPanel } from './components/layout/OperationsPanel'
 import { SettingsDialog } from './components/dialogs/SettingsDialog'
 import { FileViewer } from './components/dialogs/FileViewer'
 import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { useKeyboard } from './hooks/useKeyboard'
+import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
 import { usePanelStore } from './stores/panel-store'
-import { useSettingsStore } from './stores/settings-store'
 import type { Entry } from '@shared/types'
 
 function App(): React.JSX.Element {
@@ -20,66 +21,8 @@ function App(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false)
   const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
-  const confirmDelete = useSettingsStore((s) => s.confirmDelete)
 
-  const getSelectedEntries = useCallback((includeContainers = true) => {
-    const activePanel = useAppStore.getState().activePanel
-    const state = usePanelStore.getState()
-    const tab = state.getActiveTab(activePanel)
-
-    let selected = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
-    if (selected.length === 0) {
-      const offset = tab.parentId !== null ? 1 : 0
-      const idx = tab.cursorIndex - offset
-      if (idx >= 0 && idx < tab.entries.length) {
-        const entry = tab.entries[idx]
-        if (includeContainers || !entry.isContainer) {
-          selected = [entry]
-        }
-      }
-    }
-    return { selected, tab, activePanel }
-  }, [])
-
-  const handleF5 = useCallback(async () => {
-    const { selected, tab, activePanel } = getSelectedEntries()
-    if (selected.length === 0) return
-
-    const otherPanel = activePanel === 'left' ? 'right' : 'left'
-    const state = usePanelStore.getState()
-    const destTab = state.getActiveTab(otherPanel)
-
-    if (!confirm(`Copy ${selected.length} item(s) to ${destTab.locationDisplay}?`)) return
-
-    await window.api.plugins.executeOperation(tab.pluginId, {
-      op: 'copy',
-      sourceEntries: selected,
-      destinationLocationId: destTab.locationId!,
-      destinationPluginId: destTab.pluginId
-    })
-    state.refresh('left')
-    state.refresh('right')
-  }, [getSelectedEntries])
-
-  const handleF6 = useCallback(async () => {
-    const { selected, tab, activePanel } = getSelectedEntries()
-    if (selected.length === 0) return
-
-    const otherPanel = activePanel === 'left' ? 'right' : 'left'
-    const state = usePanelStore.getState()
-    const destTab = state.getActiveTab(otherPanel)
-
-    if (!confirm(`Move ${selected.length} item(s) to ${destTab.locationDisplay}?`)) return
-
-    await window.api.plugins.executeOperation(tab.pluginId, {
-      op: 'move',
-      sourceEntries: selected,
-      destinationLocationId: destTab.locationId!,
-      destinationPluginId: destTab.pluginId
-    })
-    state.refresh('left')
-    state.refresh('right')
-  }, [getSelectedEntries])
+  const { handleCopy, handleMove, handleDelete } = useFileOperations()
 
   const handleF7 = useCallback(() => {
     setMkdirName('')
@@ -100,21 +43,6 @@ function App(): React.JSX.Element {
     setMkdirDialog(false)
     state.refresh(activePanel)
   }, [mkdirName])
-
-  const handleF8 = useCallback(async () => {
-    const { selected, tab } = getSelectedEntries()
-    if (selected.length === 0) return
-
-    if (confirmDelete && !confirm(`Delete ${selected.length} item(s)?`)) return
-
-    await window.api.plugins.executeOperation(tab.pluginId, {
-      op: 'delete',
-      entries: selected
-    })
-    const state = usePanelStore.getState()
-    state.refresh('left')
-    state.refresh('right')
-  }, [getSelectedEntries, confirmDelete])
 
   const handleF3 = useCallback(() => {
     const activePanel = useAppStore.getState().activePanel
@@ -143,7 +71,6 @@ function App(): React.JSX.Element {
     const tab = state.getActiveTab(activePanel)
     let selected = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
     if (selected.length === 0) {
-      // Use all non-container entries if nothing selected
       selected = tab.entries.filter((e) => !e.isContainer)
     }
     if (selected.length > 0) {
@@ -154,10 +81,10 @@ function App(): React.JSX.Element {
 
   useKeyboard({
     onF3: handleF3,
-    onF5: handleF5,
-    onF6: handleF6,
+    onF5: handleCopy,
+    onF6: handleMove,
     onF7: handleF7,
-    onF8: handleF8,
+    onF8: handleDelete,
     onF9: handleF9,
     onAltF7: handleAltF7,
     onCtrlM: handleCtrlM
@@ -169,12 +96,14 @@ function App(): React.JSX.Element {
       <CommandLine />
       <FunctionKeyBar
         onF3={handleF3}
-        onF5={handleF5}
-        onF6={handleF6}
+        onF5={handleCopy}
+        onF6={handleMove}
         onF7={handleF7}
-        onF8={handleF8}
+        onF8={handleDelete}
         onF9={handleF9}
       />
+
+      <OperationsPanel />
 
       {mkdirDialog && (
         <div

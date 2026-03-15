@@ -8,6 +8,7 @@ interface EntryRowProps {
   entry: Entry
   isCursor: boolean
   isSelected: boolean
+  isCalculating?: boolean
   onClick: () => void
   onDoubleClick: () => void
 }
@@ -16,6 +17,7 @@ export const EntryRow = React.memo(function EntryRow({
   entry,
   isCursor,
   isSelected,
+  isCalculating,
   onClick,
   onDoubleClick
 }: EntryRowProps): React.JSX.Element {
@@ -28,6 +30,16 @@ export const EntryRow = React.memo(function EntryRow({
     .filter(Boolean)
     .join(' ')
 
+  const renderSize = (): React.ReactNode => {
+    if (entry.isContainer) {
+      if (isCalculating) {
+        return <span className={styles.sizeLoading}>...</span>
+      }
+      return entry.size > 0 ? formatSize(entry.size) : ''
+    }
+    return formatSize(entry.size)
+  }
+
   return (
     <div className={classNames} onClick={onClick} onDoubleClick={onDoubleClick}>
       <div className={styles.colName}>
@@ -37,11 +49,7 @@ export const EntryRow = React.memo(function EntryRow({
       <div className={styles.colExt}>
         {entry.isContainer ? '<DIR>' : ((entry.meta.extension as string) || '')}
       </div>
-      <div className={styles.colSize}>
-        {entry.isContainer
-          ? (entry.size > 0 ? formatSize(entry.size) : '')
-          : formatSize(entry.size)}
-      </div>
+      <div className={styles.colSize}>{renderSize()}</div>
       <div className={styles.colDate}>{formatDate(entry.modifiedAt)}</div>
     </div>
   )

@@ -151,6 +151,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
           entries={displayEntries}
           cursorIndex={tab.cursorIndex}
           selectedIds={tab.selectedEntryIds}
+          calculatingIds={tab.calculatingFolderIds}
           onCursorChange={(i) => setCursor(panelId, i)}
           onSelect={(id) => toggleSelect(panelId, id)}
           onActivate={handleEntryActivate}
