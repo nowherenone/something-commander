@@ -36,6 +36,7 @@ export const IPC_CHANNELS = {
   PLUGIN_LOAD: 'plugin:load',
   PLUGIN_UNLOAD: 'plugin:unload',
   PLUGIN_GET_DIR: 'plugin:getDir',
+  EXTRACT_FROM_ARCHIVE: 'ops:extractFromArchive',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
   // Operation progress events (main → renderer)

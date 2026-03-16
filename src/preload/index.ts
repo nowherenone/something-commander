@@ -128,6 +128,9 @@ const utilAPI = {
   pluginGetDir: (): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_DIR),
 
+  extractFromArchive: (archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.EXTRACT_FROM_ARCHIVE, archivePath, internalPath, destDir),
+
   onCopyFileProgress: (callback: (bytesCopied: number) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, bytesCopied: number): void =>
       callback(bytesCopied)

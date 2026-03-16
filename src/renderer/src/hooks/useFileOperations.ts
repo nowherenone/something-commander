@@ -41,19 +41,53 @@ async function executeOperation(opId: string): Promise<void> {
   const op = store().operations.find((o) => o.id === opId)
   if (!op) return
 
+  // Check if source is an archive plugin
+  const isArchiveSource = op.sourcePluginId === 'archive'
+
+  // For archive sources, use extraction instead of file-by-file copy
+  if (isArchiveSource && op.type !== 'delete') {
+    store().updateOperation(opId, { status: 'running', currentFile: 'Extracting...' })
+
+    for (const entry of op.sourceEntries) {
+      if (isCancelled(opId)) break
+      // entry.id format: "D:\file.zip::internal/path"
+      const [archivePath, internalPath] = entry.id.includes('::')
+        ? [entry.id.split('::')[0], entry.id.split('::')[1]]
+        : [entry.id, '']
+
+      store().updateOperation(opId, { currentFile: entry.name })
+
+      const result = await window.api.util.extractFromArchive(
+        archivePath,
+        internalPath,
+        op.destinationLocationId
+      )
+
+      if (!result.success) {
+        store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${result.error}` })
+        return
+      }
+    }
+
+    const finalOp = store().operations.find((o) => o.id === opId)
+    if (finalOp?.status === 'running') {
+      store().removeOperation(opId)
+    }
+    usePanelStore.getState().refresh('left')
+    usePanelStore.getState().refresh('right')
+    return
+  }
+
   // Phase 1: Enumerate files
   store().updateOperation(opId, { status: 'enumerating', currentFile: 'Scanning files...' })
 
   let fileList: FileItem[] = []
 
   if (op.type === 'delete') {
-    // For delete, enumerate source paths (we just need the flat list)
     const sourcePaths = op.sourceEntries.map((e) => e.id)
     fileList = await window.api.util.enumerateFiles(sourcePaths, '')
-    // For delete, reverse so we delete files before their parent directories
     fileList = fileList.reverse()
   } else {
-    // For copy/move, enumerate with destination
     const sourcePaths = op.sourceEntries.map((e) => e.id)
     fileList = await window.api.util.enumerateFiles(sourcePaths, op.destinationLocationId)
   }

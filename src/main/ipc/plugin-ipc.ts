@@ -7,6 +7,7 @@ import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 import { scanPlugins, loadPlugin, unloadPlugin, ensurePluginsDir } from '../plugins/plugin-loader'
+import { extractFromZip } from '../plugins/archive'
 import type { SftpPlugin } from '../plugins/sftp'
 
 async function calcFolderSize(dirPath: string): Promise<number> {
@@ -242,6 +243,14 @@ export function registerPluginIPC(): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.PLUGIN_GET_DIR, () => ensurePluginsDir())
+
+  // Extract files from archive to local filesystem
+  ipcMain.handle(
+    IPC_CHANNELS.EXTRACT_FROM_ARCHIVE,
+    async (_event, archivePath: string, internalPath: string, destDir: string) => {
+      return extractFromZip(archivePath, internalPath, destDir)
+    }
+  )
 
   // Enumerate all files recursively for a list of source entries
   // Returns flat list: [{sourcePath, destPath, size, isDirectory}]

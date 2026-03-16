@@ -1,5 +1,6 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
+import * as fsSync from 'fs'
 import * as yauzl from 'yauzl'
 import type {
   BrowsePlugin,
@@ -35,6 +36,82 @@ async function readZipEntries(archivePath: string): Promise<ZipEntry[]> {
       })
       zipfile.on('end', () => resolve(entries))
       zipfile.on('error', reject)
+    })
+  })
+}
+
+/**
+ * Extract a single file from a ZIP archive to a destination path.
+ * If internalPath is a directory prefix, extracts all files under it.
+ */
+export async function extractFromZip(
+  archivePath: string,
+  internalPath: string,
+  destDir: string
+): Promise<{ success: boolean; error?: string; extractedCount: number }> {
+  return new Promise((resolve) => {
+    yauzl.open(archivePath, { lazyEntries: true }, (err, zipfile) => {
+      if (err || !zipfile) {
+        resolve({ success: false, error: String(err), extractedCount: 0 })
+        return
+      }
+
+      let extractedCount = 0
+      const prefix = internalPath || ''
+
+      zipfile.readEntry()
+      zipfile.on('entry', async (entry) => {
+        const fileName = entry.fileName
+        if (!fileName.startsWith(prefix)) {
+          zipfile.readEntry()
+          return
+        }
+
+        const relative = fileName.slice(prefix.length)
+        if (!relative) {
+          zipfile.readEntry()
+          return
+        }
+
+        const destPath = path.join(destDir, relative)
+
+        if (fileName.endsWith('/')) {
+          // Directory
+          try {
+            await fs.mkdir(destPath, { recursive: true })
+          } catch { /* ignore */ }
+          zipfile.readEntry()
+        } else {
+          // File — extract
+          try {
+            await fs.mkdir(path.dirname(destPath), { recursive: true })
+            zipfile.openReadStream(entry, (streamErr, readStream) => {
+              if (streamErr || !readStream) {
+                zipfile.readEntry()
+                return
+              }
+              const writeStream = fsSync.createWriteStream(destPath)
+              readStream.pipe(writeStream)
+              writeStream.on('finish', () => {
+                extractedCount++
+                zipfile.readEntry()
+              })
+              writeStream.on('error', () => {
+                zipfile.readEntry()
+              })
+            })
+          } catch {
+            zipfile.readEntry()
+          }
+        }
+      })
+
+      zipfile.on('end', () => {
+        resolve({ success: true, extractedCount })
+      })
+      zipfile.on('error', (e) => {
+        resolve({ success: false, error: String(e), extractedCount })
+      })
     })
   })
 }

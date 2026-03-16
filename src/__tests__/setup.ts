@@ -49,7 +49,8 @@ const mockUtilApi = {
   pluginScan: vi.fn().mockResolvedValue([]),
   pluginLoad: vi.fn().mockResolvedValue({ success: true }),
   pluginUnload: vi.fn().mockResolvedValue({ success: true }),
-  pluginGetDir: vi.fn().mockResolvedValue('/mock/plugins')
+  pluginGetDir: vi.fn().mockResolvedValue('/mock/plugins'),
+  extractFromArchive: vi.fn().mockResolvedValue({ success: true, extractedCount: 1 })
 }
 
 Object.defineProperty(window, 'api', {
