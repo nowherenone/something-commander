@@ -85,12 +85,13 @@ async function executeOperation(opId: string): Promise<void> {
       processed++
     }
 
+    await usePanelStore.getState().refresh('left')
+    await usePanelStore.getState().refresh('right')
+
     const finalOp = store().operations.find((o) => o.id === opId)
     if (finalOp?.status === 'running') {
       store().removeOperation(opId)
     }
-    usePanelStore.getState().refresh('left')
-    usePanelStore.getState().refresh('right')
     return
   }
 
@@ -237,15 +238,14 @@ async function executeOperation(opId: string): Promise<void> {
     }
   }
 
+  // Refresh panels first, then dismiss the operation
+  await usePanelStore.getState().refresh('left')
+  await usePanelStore.getState().refresh('right')
+
   const finalOp = store().operations.find((o) => o.id === opId)
   if (finalOp?.status === 'running') {
-    store().updateOperation(opId, { status: 'done', currentFile: '' })
-    // Auto-dismiss successful operations
     store().removeOperation(opId)
   }
-
-  usePanelStore.getState().refresh('left')
-  usePanelStore.getState().refresh('right')
 }
 
 export function useFileOperations() {
