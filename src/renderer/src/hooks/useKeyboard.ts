@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../stores/app-store'
-import { usePanelStore } from '../stores/panel-store'
+import { usePanelStore, parentOffset } from '../stores/panel-store'
 
 interface KeyboardActions {
   onF3?: () => void
@@ -51,7 +51,7 @@ export function useKeyboard(actions: KeyboardActions): void {
           e.preventDefault()
           if (e.shiftKey) {
             const newIdx = Math.max(0, tab.cursorIndex - 1)
-            const offset = tab.parentId !== null ? 1 : 0
+            const offset = parentOffset(tab)
             const entryIdx = tab.cursorIndex - offset
             if (entryIdx >= 0 && entryIdx < tab.entries.length) {
               toggleSelect(activePanel, tab.entries[entryIdx].id)
@@ -65,7 +65,7 @@ export function useKeyboard(actions: KeyboardActions): void {
         case 'ArrowDown':
           e.preventDefault()
           if (e.shiftKey) {
-            const offset = tab.parentId !== null ? 1 : 0
+            const offset = parentOffset(tab)
             const entryIdx = tab.cursorIndex - offset
             if (entryIdx >= 0 && entryIdx < tab.entries.length) {
               toggleSelect(activePanel, tab.entries[entryIdx].id)
@@ -83,7 +83,7 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'End':
           e.preventDefault()
-          setCursor(activePanel, tab.entries.length - 1 + (tab.parentId !== null ? 1 : 0))
+          setCursor(activePanel, tab.entries.length - 1 + (parentOffset(tab)))
           break
 
         case 'PageUp':
@@ -98,7 +98,7 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'Enter': {
           e.preventDefault()
-          const offset = tab.parentId !== null ? 1 : 0
+          const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
           if (tab.cursorIndex === 0 && tab.parentId !== null) {
             navigate(activePanel, tab.parentId)
@@ -138,7 +138,7 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'Insert': {
           e.preventDefault()
-          const offset = tab.parentId !== null ? 1 : 0
+          const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
           if (idx >= 0 && idx < tab.entries.length) {
             toggleSelect(activePanel, tab.entries[idx].id)
@@ -149,7 +149,7 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case ' ': {
           e.preventDefault()
-          const offset = tab.parentId !== null ? 1 : 0
+          const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
           spaceSelect(activePanel, idx)
           break

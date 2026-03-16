@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import type { PanelId } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
-import { usePanelStore } from '../../stores/panel-store'
+import { usePanelStore, hasParentEntry } from '../../stores/panel-store'
 import type { SortConfig, SortField } from '../../utils/sort'
 import { TabBar } from './TabBar'
 import { DriveBookmarkMenu } from './DriveBookmarkMenu'
@@ -110,8 +110,10 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
     }
   }, [panelId, tab.parentId, tab.pluginId, tab.locationId, navigate])
 
+  const showParentEntry = hasParentEntry(tab)
+
   const displayEntries =
-    tab.parentId !== null
+    showParentEntry
       ? [
           {
             id: '__parent__',

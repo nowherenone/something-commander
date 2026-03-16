@@ -14,7 +14,7 @@ import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
-import { usePanelStore } from './stores/panel-store'
+import { usePanelStore, parentOffset } from './stores/panel-store'
 import { useOperationsStore } from './stores/operations-store'
 import { useSettingsStore } from './stores/settings-store'
 import type { Entry } from '@shared/types'
@@ -61,7 +61,7 @@ function App(): React.JSX.Element {
   const getCursorEntry = useCallback(() => {
     const activePanel = useAppStore.getState().activePanel
     const tab = usePanelStore.getState().getActiveTab(activePanel)
-    const offset = tab.parentId !== null ? 1 : 0
+    const offset = parentOffset(tab)
     const idx = tab.cursorIndex - offset
     if (idx >= 0 && idx < tab.entries.length) {
       return tab.entries[idx]

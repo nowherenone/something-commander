@@ -4,6 +4,16 @@ import { sortEntries, type SortConfig } from '../utils/sort'
 
 const DEFAULT_PLUGIN = 'local-filesystem'
 
+/** Whether a ".." entry is shown for this tab (has parent or is in non-local plugin) */
+export function hasParentEntry(tab: TabState): boolean {
+  return tab.parentId !== null || tab.pluginId !== DEFAULT_PLUGIN
+}
+
+/** Offset for cursor index: 1 if ".." row exists, 0 otherwise */
+export function parentOffset(tab: TabState): number {
+  return hasParentEntry(tab) ? 1 : 0
+}
+
 let tabIdCounter = 0
 function nextTabId(): string {
   return `tab-${++tabIdCounter}`
@@ -305,7 +315,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
   setCursor: (panelId, index) => {
     const panel = get()[panelId]
     const tab = getActiveTab(panel)
-    const maxIdx = tab.entries.length - 1 + (tab.parentId !== null ? 1 : 0)
+    const maxIdx = tab.entries.length - 1 + parentOffset(tab)
     const clamped = Math.max(0, Math.min(index, maxIdx))
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, cursorIndex: clamped })) })
   },

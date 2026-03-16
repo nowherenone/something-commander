@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '../stores/app-store'
-import { usePanelStore } from '../stores/panel-store'
+import { usePanelStore, parentOffset } from '../stores/panel-store'
 import { useOperationsStore, type OverwritePolicy, type FileItem } from '../stores/operations-store'
 import type { Entry } from '@shared/types'
 
@@ -226,7 +226,7 @@ export function useFileOperations() {
     const tab = usePanelStore.getState().getActiveTab(activePanel)
     let selected = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
     if (selected.length === 0) {
-      const offset = tab.parentId !== null ? 1 : 0
+      const offset = parentOffset(tab)
       const idx = tab.cursorIndex - offset
       if (idx >= 0 && idx < tab.entries.length) {
         selected = [tab.entries[idx]]
