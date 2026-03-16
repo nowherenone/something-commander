@@ -139,10 +139,11 @@ const utilAPI = {
   },
 
   enumerateFiles: (
-    sourcePaths: string[],
+    pluginId: string,
+    entryIds: string[],
     destDir: string
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ENUMERATE_FILES, sourcePaths, destDir)
+    ipcRenderer.invoke(IPC_CHANNELS.ENUMERATE_FILES, pluginId, entryIds, destDir)
 }
 
 const api = {

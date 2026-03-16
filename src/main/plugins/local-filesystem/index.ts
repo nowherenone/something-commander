@@ -70,6 +70,51 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
     return ['copy', 'move', 'delete', 'rename', 'createDirectory']
   }
 
+  async enumerateFiles(
+    entryIds: string[],
+    destDir: string
+  ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> {
+    const result: Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }> = []
+
+    const walk = async (srcPath: string, destBase: string, relBase: string): Promise<void> => {
+      const stat = await fs.stat(srcPath)
+      if (stat.isDirectory()) {
+        const destPath = path.join(destBase, path.basename(srcPath))
+        result.push({
+          sourcePath: srcPath,
+          destPath,
+          size: 0,
+          isDirectory: true,
+          relativePath: relBase ? path.join(relBase, path.basename(srcPath)) : path.basename(srcPath)
+        })
+        const children = await fs.readdir(srcPath)
+        for (const child of children) {
+          await walk(
+            path.join(srcPath, child),
+            destPath,
+            relBase ? path.join(relBase, path.basename(srcPath)) : path.basename(srcPath)
+          )
+        }
+      } else {
+        result.push({
+          sourcePath: srcPath,
+          destPath: path.join(destBase, path.basename(srcPath)),
+          size: stat.size,
+          isDirectory: false,
+          relativePath: relBase ? path.join(relBase, path.basename(srcPath)) : path.basename(srcPath)
+        })
+      }
+    }
+
+    for (const srcPath of entryIds) {
+      try {
+        await walk(srcPath, destDir, '')
+      } catch { /* skip unreadable */ }
+    }
+
+    return result
+  }
+
   async executeOperation(op: OperationRequest): Promise<OperationResult> {
     try {
       switch (op.op) {

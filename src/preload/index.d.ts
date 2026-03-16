@@ -66,7 +66,8 @@ interface UtilAPI {
   extractFromArchive(archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   enumerateFiles(
-    sourcePaths: string[],
+    pluginId: string,
+    entryIds: string[],
     destDir: string
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>>
 }

@@ -64,6 +64,15 @@ export interface BrowsePlugin {
   /** Execute a file operation. */
   executeOperation(op: OperationRequest): Promise<OperationResult>
 
+  /** Enumerate all files recursively under given entries for progress tracking. */
+  enumerateFiles?(entryIds: string[], destDir: string): Promise<Array<{
+    sourcePath: string
+    destPath: string
+    size: number
+    isDirectory: boolean
+    relativePath: string
+  }>>
+
   /** Optional: provide file content for viewing. */
   getContent?(entryId: string): Promise<Buffer | null>
 

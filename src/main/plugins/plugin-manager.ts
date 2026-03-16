@@ -67,6 +67,19 @@ export class PluginManager {
     if (!plugin) throw new Error(`Unknown plugin: ${pluginId}`)
     return plugin.executeOperation(op)
   }
+
+  async enumerateFiles(
+    pluginId: string,
+    entryIds: string[],
+    destDir: string
+  ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> {
+    const plugin = this.get(pluginId)
+    if (!plugin) throw new Error(`Unknown plugin: ${pluginId}`)
+    if (!plugin.enumerateFiles) {
+      throw new Error(`Plugin ${pluginId} does not support file enumeration`)
+    }
+    return plugin.enumerateFiles(entryIds, destDir)
+  }
 }
 
 export const pluginManager = new PluginManager()

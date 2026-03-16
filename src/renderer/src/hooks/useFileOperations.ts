@@ -101,11 +101,11 @@ async function executeOperation(opId: string): Promise<void> {
 
   if (op.type === 'delete') {
     const sourcePaths = op.sourceEntries.map((e) => e.id)
-    fileList = await window.api.util.enumerateFiles(sourcePaths, '')
+    fileList = await window.api.util.enumerateFiles(op.sourcePluginId, sourcePaths, '')
     fileList = fileList.reverse()
   } else {
     const sourcePaths = op.sourceEntries.map((e) => e.id)
-    fileList = await window.api.util.enumerateFiles(sourcePaths, op.destinationLocationId)
+    fileList = await window.api.util.enumerateFiles(op.sourcePluginId, sourcePaths, op.destinationLocationId)
   }
 
   if (isCancelled(opId)) return
