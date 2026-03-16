@@ -14,25 +14,57 @@ files:
   - '!{vitest.config.ts,vite.test.config.ts,playwright.config.ts}'
 asarUnpack:
   - resources/**
+
+# Windows
 win:
   executableName: flemanager
   signAndEditExecutable: false
+  icon: build/icon.ico
   target:
+    - target: nsis
+      arch:
+        - x64
     - target: dir
       arch:
         - x64
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Flemanager-${version}-setup.${ext}
+  shortcutName: Flemanager
+  uninstallDisplayName: Flemanager
   createDesktopShortcut: always
+  createStartMenuShortcut: true
+
+# macOS
 mac:
+  icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
-linux:
   target:
-    - AppImage
-    - deb
-  maintainer: flemanager
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+dmg:
+  artifactName: Flemanager-${version}.${ext}
+
+# Linux
+linux:
+  icon: build/icon.png
+  target:
+    - target: deb
+      arch:
+        - x64
+    - target: AppImage
+      arch:
+        - x64
+  maintainer: Flemanager Contributors
   category: Utility
+  description: A modern orthodox two-panel file manager
+deb:
+  artifactName: flemanager-${version}.${ext}
+appImage:
+  artifactName: Flemanager-${version}.${ext}
+
 npmRebuild: false
