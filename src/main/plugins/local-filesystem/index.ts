@@ -1,6 +1,7 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
+import { exec } from 'child_process'
 import type {
   BrowsePlugin,
   PluginManifest,
@@ -191,7 +192,8 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
 
   private async listWindowsDrives(): Promise<ReadDirectoryResult> {
     const entries: Entry[] = []
-    // Check common drive letters
+
+    // Windows drive letters
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     for (const letter of letters) {
       const drivePath = `${letter}:\\`
@@ -212,11 +214,46 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
         // Drive doesn't exist or isn't accessible
       }
     }
+
+    // WSL distributions
+    const wslDistros = await this.listWslDistros()
+    for (const distro of wslDistros) {
+      entries.push({
+        id: `//wsl.localhost/${distro}/`,
+        name: `WSL: ${distro}`,
+        isContainer: true,
+        size: -1,
+        modifiedAt: 0,
+        mimeType: 'inode/directory',
+        iconHint: 'network',
+        meta: { wsl: true, distro },
+        attributes: { readonly: false, hidden: false, symlink: false }
+      })
+    }
+
     return {
       entries,
       location: 'My Computer',
       parentId: null
     }
+  }
+
+  private listWslDistros(): Promise<string[]> {
+    return new Promise((resolve) => {
+      exec('wsl --list --quiet', { timeout: 3000 }, (err, stdout) => {
+        if (err) {
+          resolve([])
+          return
+        }
+        // wsl --list outputs UTF-16 with extra null bytes, clean it up
+        const cleaned = stdout.replace(/\0/g, '').trim()
+        const distros = cleaned
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+        resolve(distros)
+      })
+    })
   }
 
   private async copyDir(src: string, dest: string): Promise<void> {
