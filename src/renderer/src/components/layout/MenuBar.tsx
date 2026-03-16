@@ -30,8 +30,6 @@ const MENUS: MenuDef[] = [
       { label: 'New Folder', shortcut: 'F7', action: 'mkdir' },
       { label: 'Delete', shortcut: 'F8', action: 'delete' },
       { label: '', action: '', separator: true },
-      { label: 'Multi-Rename', shortcut: 'Ctrl+M', action: 'multiRename' },
-      { label: '', action: '', separator: true },
       { label: 'Quit', shortcut: 'Alt+F4', action: 'quit' }
     ]
   },
@@ -39,35 +37,36 @@ const MENUS: MenuDef[] = [
     label: 'View',
     items: [
       { label: 'Refresh', shortcut: 'Ctrl+R', action: 'refresh' },
-      { label: 'Toggle Hidden', shortcut: 'Ctrl+H', action: 'toggleHidden' },
+      { label: 'Toggle Hidden Files', shortcut: 'Ctrl+H', action: 'toggleHidden' },
       { label: '', action: '', separator: true },
-      { label: 'Compare Directories', shortcut: 'Ctrl+C', action: 'compare' },
-      { label: 'Search', shortcut: 'Alt+F7', action: 'search' },
+      { label: 'Command Line', action: 'toggleCommandLine' },
+      { label: 'Function Key Bar', action: 'setBottomFnkeys' },
+      { label: 'Status Bar', action: 'setBottomStatus' },
+      { label: 'Hide Bottom Bar', action: 'setBottomNone' },
+      { label: '', action: '', separator: true },
+      { label: 'New Tab', shortcut: 'Ctrl+T', action: 'newTab' },
+      { label: 'Close Tab', shortcut: 'Ctrl+W', action: 'closeTab' },
       { label: '', action: '', separator: true },
       { label: 'Drives & Bookmarks', shortcut: 'Ctrl+D', action: 'driveMenu' }
     ]
   },
   {
-    label: 'Tabs',
-    items: [
-      { label: 'New Tab', shortcut: 'Ctrl+T', action: 'newTab' },
-      { label: 'Close Tab', shortcut: 'Ctrl+W', action: 'closeTab' }
-    ]
-  },
-  {
-    label: 'Net',
-    items: [
-      { label: 'Connect SFTP...', action: 'sftpConnect' },
-      { label: 'Disconnect SFTP', action: 'sftpDisconnect' }
-    ]
-  },
-  {
     label: 'Tools',
     items: [
-      { label: 'Plugin Manager', action: 'pluginManager' },
-      { label: 'Command Line', action: 'toggleCommandLine' },
+      { label: 'Search', shortcut: 'Alt+F7', action: 'search' },
+      { label: 'Compare Directories', shortcut: 'Ctrl+C', action: 'compare' },
+      { label: 'Multi-Rename', shortcut: 'Ctrl+M', action: 'multiRename' },
       { label: '', action: '', separator: true },
-      { label: 'Settings', shortcut: 'F9', action: 'settings' }
+      { label: 'Connect SFTP...', action: 'sftpConnect' },
+      { label: 'Disconnect SFTP', action: 'sftpDisconnect' },
+      { label: '', action: '', separator: true },
+      { label: 'Plugin Manager', action: 'pluginManager' }
+    ]
+  },
+  {
+    label: 'Settings',
+    items: [
+      { label: 'Configuration', shortcut: 'F9', action: 'settings' }
     ]
   }
 ]

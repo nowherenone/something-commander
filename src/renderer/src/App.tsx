@@ -183,6 +183,15 @@ function App(): React.JSX.Element {
       case 'toggleCommandLine':
         useSettingsStore.getState().updateSettings({ showCommandLine: !showCommandLine })
         break
+      case 'setBottomFnkeys':
+        useSettingsStore.getState().updateSettings({ bottomBar: 'fnkeys' })
+        break
+      case 'setBottomStatus':
+        useSettingsStore.getState().updateSettings({ bottomBar: 'status' })
+        break
+      case 'setBottomNone':
+        useSettingsStore.getState().updateSettings({ bottomBar: 'none' })
+        break
       case 'quit':
         window.close()
         break
