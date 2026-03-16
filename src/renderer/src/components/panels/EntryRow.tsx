@@ -16,11 +16,8 @@ function DriveSizeBar({ driveId }: { driveId: string }): React.JSX.Element | nul
   const usedPct = Math.round(((space.total - space.free) / space.total) * 100)
 
   return (
-    <span className={styles.driveSize}>
-      <span className={styles.driveBar}>
-        <span className={styles.driveBarFill} style={{ width: `${usedPct}%`, display: 'block', height: '100%' }} />
-      </span>
-      <span className={styles.driveText}>{formatSize(space.free)} / {formatSize(space.total)}</span>
+    <span className={styles.driveBar}>
+      <span className={styles.driveBarFill} style={{ width: `${usedPct}%`, display: 'block', height: '100%' }} />
     </span>
   )
 }
