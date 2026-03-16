@@ -70,16 +70,18 @@ export function DriveBookmarkMenu({
     if (!isOpen) return
 
     const handler = (e: KeyboardEvent): void => {
-      e.stopPropagation()
-      e.preventDefault()
-
       if (addingBookmark) {
-        // Let input handle its own keys except Escape
+        // Let the input handle all keys except Escape
         if (e.key === 'Escape') {
+          e.stopPropagation()
+          e.preventDefault()
           setAddingBookmark(false)
         }
         return
       }
+
+      e.stopPropagation()
+      e.preventDefault()
 
       switch (e.key) {
         case 'ArrowDown':
