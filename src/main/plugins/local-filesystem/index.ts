@@ -284,26 +284,21 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
   private async listWindowsDrives(): Promise<ReadDirectoryResult> {
     const entries: Entry[] = []
 
-    // Windows drive letters
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    for (const letter of letters) {
-      const drivePath = `${letter}:\\`
-      try {
-        await fs.access(drivePath)
-        entries.push({
-          id: drivePath,
-          name: `${letter}:`,
-          isContainer: true,
-          size: -1,
-          modifiedAt: 0,
-          mimeType: 'inode/directory',
-          iconHint: 'drive',
-          meta: {},
-          attributes: { readonly: false, hidden: false, symlink: false }
-        })
-      } catch {
-        // Drive doesn't exist or isn't accessible
-      }
+    // Get drive letters with labels via PowerShell
+    const driveInfo = await this.getWindowsDriveInfo()
+    for (const drive of driveInfo) {
+      const label = drive.label ? ` [${drive.label}]` : ''
+      entries.push({
+        id: `${drive.letter}:\\`,
+        name: `${drive.letter}:${label}`,
+        isContainer: true,
+        size: -1,
+        modifiedAt: 0,
+        mimeType: 'inode/directory',
+        iconHint: 'drive',
+        meta: { driveLabel: drive.label },
+        attributes: { readonly: false, hidden: false, symlink: false }
+      })
     }
 
     // WSL distributions
@@ -327,6 +322,48 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
       location: 'My Computer',
       parentId: null
     }
+  }
+
+  private getWindowsDriveInfo(): Promise<Array<{ letter: string; label: string }>> {
+    return new Promise((resolve) => {
+      exec(
+        'powershell -Command "Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter,FileSystemLabel | ConvertTo-Json"',
+        { timeout: 5000 },
+        (err, stdout) => {
+          if (err) {
+            // Fallback: scan drive letters without labels
+            resolve(this.scanDriveLettersFallback())
+            return
+          }
+          try {
+            let data = JSON.parse(stdout.trim())
+            if (!Array.isArray(data)) data = [data]
+            const drives = data
+              .filter((d: { DriveLetter: string | null }) => d.DriveLetter)
+              .map((d: { DriveLetter: string; FileSystemLabel: string }) => ({
+                letter: d.DriveLetter,
+                label: d.FileSystemLabel || ''
+              }))
+              .sort((a: { letter: string }, b: { letter: string }) => a.letter.localeCompare(b.letter))
+            resolve(drives)
+          } catch {
+            resolve(this.scanDriveLettersFallback())
+          }
+        }
+      )
+    })
+  }
+
+  private async scanDriveLettersFallback(): Promise<Array<{ letter: string; label: string }>> {
+    const drives: Array<{ letter: string; label: string }> = []
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    for (const letter of letters) {
+      try {
+        await fs.access(`${letter}:\\`)
+        drives.push({ letter, label: '' })
+      } catch { /* skip */ }
+    }
+    return drives
   }
 
   private listWslDistros(): Promise<string[]> {
