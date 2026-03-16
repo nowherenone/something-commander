@@ -5,8 +5,8 @@ const ICON_MAP: Record<string, string> = {
   archive: '\uD83D\uDCE6',
   code: '\uD83D\uDCDD',
   document: '\uD83D\uDCC3',
-  drive: '\uD83D\uDCBE',
-  'hard-drive': '\uD83D\uDDB4',
+  drive: '\uD83D\uDDA5\uFE0F',
+  'hard-drive': '\uD83D\uDDA5\uFE0F',
   network: '\uD83C\uDF10'
 }
 
