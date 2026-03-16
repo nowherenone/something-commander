@@ -60,9 +60,9 @@ async function executeOperation(opId: string): Promise<void> {
     for (const entry of op.sourceEntries) {
       if (isCancelled(opId)) break
       // entry.id format: "D:\file.zip::internal/path"
-      const [archivePath, internalPath] = entry.id.includes('::')
-        ? [entry.id.split('::')[0], entry.id.split('::')[1]]
-        : [entry.id, '']
+      const sepIdx = entry.id.indexOf('::')
+      const archivePath = sepIdx >= 0 ? entry.id.slice(0, sepIdx) : entry.id
+      const internalPath = sepIdx >= 0 ? entry.id.slice(sepIdx + 2) : ''
 
       store().updateOperation(opId, { currentFile: entry.name })
 

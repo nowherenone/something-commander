@@ -28,28 +28,27 @@ export function ConfirmOperation({
 
   const typeLabel = type === 'copy' ? 'Copy' : type === 'move' ? 'Move' : 'Delete'
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        onConfirm(editDest)
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onCancel()
-      }
-    },
-    [editDest, onConfirm, onCancel]
-  )
-
-  // Capture all keyboard events while dialog is open
+  // Capture keyboard: Enter confirms, Escape cancels, block everything else from panels
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
-      e.stopPropagation()
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        e.stopPropagation()
+        onConfirm(editDest)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onCancel()
+      } else {
+        // Block panel shortcuts but let typing work in inputs
+        if (!(document.activeElement instanceof HTMLInputElement)) {
+          e.stopPropagation()
+        }
+      }
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [])
+  }, [editDest, onConfirm, onCancel])
 
   return (
     <div className={styles.overlay} onClick={onCancel}>
@@ -110,7 +109,6 @@ export function ConfirmOperation({
                 autoFocus
                 value={editDest}
                 onChange={(e) => setEditDest(e.target.value)}
-                onKeyDown={handleKeyDown}
                 style={{
                   width: '100%',
                   padding: '4px 8px',
