@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../stores/app-store'
 import { usePanelStore, parentOffset } from '../stores/panel-store'
 import { useOperationsStore, type OverwritePolicy, type FileItem } from '../stores/operations-store'
 import type { Entry } from '@shared/types'
+
+export interface PendingOperation {
+  type: 'copy' | 'move' | 'delete'
+  entries: Entry[]
+  sourceDir: string
+  sourcePluginId: string
+  destDir: string
+  destPluginId: string
+}
 
 // Overwrite resolution via promise
 let overwriteResolve: ((action: 'overwrite' | 'skip') => void) | null = null
@@ -269,6 +278,8 @@ export function useFileOperations() {
     return { selected, tab, activePanel }
   }, [])
 
+  const [pendingOp, setPendingOp] = useState<PendingOperation | null>(null)
+
   const handleCopy = useCallback(() => {
     const { selected, tab, activePanel } = getSelectedEntries()
     if (selected.length === 0) return
@@ -276,13 +287,13 @@ export function useFileOperations() {
     const destTab = usePanelStore.getState().getActiveTab(otherPanel)
     if (!destTab.locationId) return
 
-    useOperationsStore.getState().enqueue({
+    setPendingOp({
       type: 'copy',
-      sourceEntries: selected,
+      entries: selected,
+      sourceDir: tab.locationDisplay,
       sourcePluginId: tab.pluginId,
-      destinationDisplay: destTab.locationDisplay,
-      destinationLocationId: destTab.locationId,
-      destinationPluginId: destTab.pluginId
+      destDir: destTab.locationId,
+      destPluginId: destTab.pluginId
     })
   }, [getSelectedEntries])
 
@@ -293,13 +304,13 @@ export function useFileOperations() {
     const destTab = usePanelStore.getState().getActiveTab(otherPanel)
     if (!destTab.locationId) return
 
-    useOperationsStore.getState().enqueue({
+    setPendingOp({
       type: 'move',
-      sourceEntries: selected,
+      entries: selected,
+      sourceDir: tab.locationDisplay,
       sourcePluginId: tab.pluginId,
-      destinationDisplay: destTab.locationDisplay,
-      destinationLocationId: destTab.locationId,
-      destinationPluginId: destTab.pluginId
+      destDir: destTab.locationId,
+      destPluginId: destTab.pluginId
     })
   }, [getSelectedEntries])
 
@@ -307,15 +318,33 @@ export function useFileOperations() {
     const { selected, tab } = getSelectedEntries()
     if (selected.length === 0) return
 
-    useOperationsStore.getState().enqueue({
+    setPendingOp({
       type: 'delete',
-      sourceEntries: selected,
+      entries: selected,
+      sourceDir: tab.locationDisplay,
       sourcePluginId: tab.pluginId,
-      destinationDisplay: 'Trash',
-      destinationLocationId: '',
-      destinationPluginId: tab.pluginId
+      destDir: '',
+      destPluginId: tab.pluginId
     })
   }, [getSelectedEntries])
 
-  return { handleCopy, handleMove, handleDelete, getSelectedEntries }
+  const confirmOperation = useCallback((destDir: string) => {
+    if (!pendingOp) return
+    setPendingOp(null)
+
+    useOperationsStore.getState().enqueue({
+      type: pendingOp.type,
+      sourceEntries: pendingOp.entries,
+      sourcePluginId: pendingOp.sourcePluginId,
+      destinationDisplay: destDir,
+      destinationLocationId: destDir,
+      destinationPluginId: pendingOp.destPluginId
+    })
+  }, [pendingOp])
+
+  const cancelOperation = useCallback(() => {
+    setPendingOp(null)
+  }, [])
+
+  return { handleCopy, handleMove, handleDelete, pendingOp, confirmOperation, cancelOperation, getSelectedEntries }
 }

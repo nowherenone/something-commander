@@ -9,6 +9,7 @@ import { SettingsDialog } from './components/dialogs/SettingsDialog'
 import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
+import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
 import { SftpConnect } from './components/dialogs/SftpConnect'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { useKeyboard } from './hooks/useKeyboard'
@@ -30,7 +31,7 @@ function App(): React.JSX.Element {
   const [sftpConnectOpen, setSftpConnectOpen] = useState(false)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
 
-  const { handleCopy, handleMove, handleDelete } = useFileOperations()
+  const { handleCopy, handleMove, handleDelete, pendingOp, confirmOperation, cancelOperation } = useFileOperations()
 
   // Apply saved theme on mount
   const theme = useSettingsStore((s) => s.theme)
@@ -217,6 +218,17 @@ function App(): React.JSX.Element {
 
       <OperationDialog />
       <QueueButton />
+
+      {pendingOp && (
+        <ConfirmOperation
+          type={pendingOp.type}
+          entries={pendingOp.entries}
+          sourceDir={pendingOp.sourceDir}
+          destDir={pendingOp.destDir}
+          onConfirm={confirmOperation}
+          onCancel={cancelOperation}
+        />
+      )}
 
       {mkdirDialog && (
         <div

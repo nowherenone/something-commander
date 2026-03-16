@@ -169,6 +169,11 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     const tab = getActiveTab(panel)
     const previousLocationId = tab.locationId
 
+    // Auto-detect archive paths and redirect to navigateWithPlugin
+    if (locationId && locationId.includes('::') && tab.pluginId !== 'archive') {
+      return get().navigateWithPlugin(panelId, 'archive', locationId)
+    }
+
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, isLoading: true, error: null })) })
 
     try {
