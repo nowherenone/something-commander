@@ -59,21 +59,35 @@ export async function extractFromZip(
       let extractedCount = 0
       const prefix = internalPath || ''
 
+      // Determine if we're extracting a single file (exact match) or a directory (prefix match)
+      const isExactFile = prefix !== '' && !prefix.endsWith('/')
+
       zipfile.readEntry()
       zipfile.on('entry', async (entry) => {
         const fileName = entry.fileName
-        if (!fileName.startsWith(prefix)) {
-          zipfile.readEntry()
-          return
-        }
 
-        const relative = fileName.slice(prefix.length)
-        if (!relative) {
-          zipfile.readEntry()
-          return
-        }
+        let destPath: string
 
-        const destPath = path.join(destDir, relative)
+        if (isExactFile) {
+          // Single file extraction: match exactly
+          if (fileName !== prefix) {
+            zipfile.readEntry()
+            return
+          }
+          destPath = path.join(destDir, path.basename(fileName))
+        } else {
+          // Directory extraction: match by prefix
+          if (prefix && !fileName.startsWith(prefix)) {
+            zipfile.readEntry()
+            return
+          }
+          const relative = prefix ? fileName.slice(prefix.length) : fileName
+          if (!relative) {
+            zipfile.readEntry()
+            return
+          }
+          destPath = path.join(destDir, relative)
+        }
 
         if (fileName.endsWith('/')) {
           // Directory
