@@ -244,6 +244,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
   navigateWithPlugin: async (panelId, pluginId, locationId) => {
     const panel = get()[panelId]
     const tab = getActiveTab(panel)
+    const previousLocationId = tab.locationId
 
     // Switch plugin on the active tab and navigate
     set({
@@ -264,6 +265,26 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       }
       entries = sortEntries(entries, currentTab.sortConfig)
 
+      // Try to place cursor on the item we came from
+      let cursorIndex = 0
+      if (previousLocationId) {
+        // When exiting archive, previousLocationId is "D:\path\file.zip::"
+        // Strip the "::" part to match the archive file in the parent listing
+        const searchId = previousLocationId.includes('::')
+          ? previousLocationId.split('::')[0]
+          : previousLocationId
+        const hasParent = result.parentId !== null || pluginId !== 'local-filesystem'
+        const offset = hasParent ? 1 : 0
+        let prevIdx = entries.findIndex((e) => e.id === searchId)
+        if (prevIdx < 0) {
+          const searchLower = searchId.toLowerCase()
+          prevIdx = entries.findIndex((e) => e.id.toLowerCase() === searchLower)
+        }
+        if (prevIdx >= 0) {
+          cursorIndex = prevIdx + offset
+        }
+      }
+
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
@@ -275,7 +296,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           extraColumns: result.extraColumns || [],
           selectedEntryIds: new Set(),
           calculatingFolderIds: new Set(),
-          cursorIndex: 0,
+          cursorIndex,
           isLoading: false,
           error: null
         }))
