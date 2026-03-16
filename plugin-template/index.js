@@ -1,9 +1,9 @@
 const os = require('os')
 
 /**
- * Example Flemanager plugin that shows system information as a virtual directory.
+ * Example Somewhat Commander plugin that shows system information as a virtual directory.
  *
- * To install: copy this folder to ~/.flemanager/plugins/example-plugin/
+ * To install: copy this folder to ~/.somewhat-commander/plugins/example-plugin/
  * Then open Tools > Plugin Manager > Refresh
  */
 class ExamplePlugin {

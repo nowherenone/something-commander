@@ -1,9 +1,9 @@
 {
-  "name": "flemanager",
+  "name": "somewhat-commander",
   "version": "0.1.0",
   "description": "A modern orthodox two-panel file manager",
   "main": "./out/main/index.js",
-  "author": "Flemanager Contributors",
+  "author": "Somewhat Commander Contributors",
   "license": "MIT",
   "scripts": {
     "format": "prettier --write .",

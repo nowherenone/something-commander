@@ -47,7 +47,7 @@ export function AddressBar({ location, onNavigate, onSegmentClick }: AddressBarP
     <div className={styles.addressBar} onDoubleClick={startEdit}>
       {segments.map((seg, i) => (
         <React.Fragment key={i}>
-          {i > 0 && <span className={styles.addressSep}>{' > '}</span>}
+          {i > 0 && <span className={styles.addressSep}>{navigator.platform.startsWith('Win') ? ' \\ ' : ' / '}</span>}
           <span
             className={styles.addressSegment}
             onClick={() => onSegmentClick(seg.path)}

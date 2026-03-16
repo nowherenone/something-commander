@@ -11,8 +11,8 @@
 
   /* Text */
   --text-primary: #f6f7f9;
-  --text-secondary: #abb3bf;
-  --text-muted: #738091;
+  --text-secondary: #c5cbd3;
+  --text-muted: #9aa5b4;
 
   /* Borders */
   --border-color: #404854;
@@ -61,8 +61,8 @@
   --bg-hover: #e1e8ed;
 
   --text-primary: #1c2127;
-  --text-secondary: #5c7080;
-  --text-muted: #8a9ba8;
+  --text-secondary: #4a6070;
+  --text-muted: #6a7d8a;
 
   --border-color: #d8dee4;
   --border-focus: #2d72d2;

@@ -53,8 +53,14 @@
 }
 
 .entryRow.cursor {
-  background: var(--bg-cursor);
+  background: color-mix(in srgb, var(--bg-cursor) 60%, transparent);
   color: white;
+}
+
+.entryRow.cursor .colExt,
+.entryRow.cursor .colSize,
+.entryRow.cursor .colDate {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .entryRow.cursorInactive {
@@ -137,7 +143,7 @@
 
 .colSize {
   width: 90px;
-  padding: 1px 8px 0;
+  padding: 2px 8px 0;
   text-align: right;
   font-family: var(--font-mono);
   font-size: var(--font-size-small);
@@ -147,6 +153,7 @@
 
 /* Drive size bar in home view */
 .driveBar {
+  display: inline-block;
   width: 74px;
   height: var(--bar-height);
   background: var(--bar-bg);

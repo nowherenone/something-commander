@@ -1,5 +1,5 @@
-appId: com.flemanager.app
-productName: Flemanager
+appId: com.somewhat-commander.app
+productName: Somewhat Commander
 directories:
   buildResources: build
 files:
@@ -17,7 +17,7 @@ asarUnpack:
 
 # Windows
 win:
-  executableName: flemanager
+  executableName: somewhat-commander
   signAndEditExecutable: false
   icon: build/icon.ico
   target:
@@ -30,9 +30,9 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  artifactName: Flemanager-${version}-setup.${ext}
-  shortcutName: Flemanager
-  uninstallDisplayName: Flemanager
+  artifactName: Somewhat-Commander-${version}-setup.${ext}
+  shortcutName: Somewhat Commander
+  uninstallDisplayName: Somewhat Commander
   createDesktopShortcut: always
   createStartMenuShortcut: true
 
@@ -47,7 +47,7 @@ mac:
         - x64
         - arm64
 dmg:
-  artifactName: Flemanager-${version}.${ext}
+  artifactName: Somewhat-Commander-${version}.${ext}
 
 # Linux
 linux:
@@ -59,12 +59,12 @@ linux:
     - target: AppImage
       arch:
         - x64
-  maintainer: Flemanager Contributors
+  maintainer: Somewhat Commander Contributors
   category: Utility
   description: A modern orthodox two-panel file manager
 deb:
-  artifactName: flemanager-${version}.${ext}
+  artifactName: somewhat-commander-${version}.${ext}
 appImage:
-  artifactName: Flemanager-${version}.${ext}
+  artifactName: Somewhat-Commander-${version}.${ext}
 
 npmRebuild: false

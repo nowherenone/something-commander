@@ -1,8 +1,8 @@
 {
-  "name": "flemanager-example-plugin",
+  "name": "somewhat-commander-example-plugin",
   "displayName": "Example Plugin",
   "version": "1.0.0",
-  "description": "An example Flemanager plugin that shows system information",
+  "description": "An example Somewhat Commander plugin that shows system information",
   "main": "index.js",
-  "keywords": ["flemanager-plugin"]
+  "keywords": ["somewhat-commander-plugin"]
 }

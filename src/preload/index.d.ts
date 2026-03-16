@@ -81,7 +81,7 @@ interface UtilAPI {
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>>
 }
 
-interface FlemanagerAPI {
+interface SomewhatCommanderAPI {
   plugins: PluginsAPI
   util: UtilAPI
 }
@@ -89,6 +89,6 @@ interface FlemanagerAPI {
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: FlemanagerAPI
+    api: SomewhatCommanderAPI
   }
 }

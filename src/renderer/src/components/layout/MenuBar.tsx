@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import styles from '../../styles/menubar.module.css'
 
+declare const __APP_VERSION__: string
+
 interface MenuAction {
   label: string
   shortcut?: string
@@ -66,13 +68,9 @@ const MENUS: MenuDef[] = [
       { label: 'Disconnect SFTP', action: 'sftpDisconnect' },
       { label: 'Connect S3...', action: 's3Connect' },
       { label: '', action: '', separator: true },
-      { label: 'Plugin Manager', action: 'pluginManager' }
-    ]
-  },
-  {
-    label: 'Settings',
-    items: [
-      { label: 'Configuration', shortcut: 'F9', action: 'settings' }
+      { label: 'Plugin Manager', action: 'pluginManager' },
+      { label: '', action: '', separator: true },
+      { label: 'Settings', shortcut: 'F9', action: 'settings' }
     ]
   }
 ]
@@ -149,7 +147,7 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
         </div>
       ))}
       <div className={styles.spacer} />
-      <span className={styles.titleText}>Flemanager</span>
+      <span className={styles.titleText}>v{__APP_VERSION__}</span>
     </div>
   )
 }

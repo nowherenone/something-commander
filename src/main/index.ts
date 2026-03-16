@@ -18,7 +18,7 @@ function createWindow(): void {
     minHeight: 500,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
@@ -52,7 +52,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  electronApp.setAppUserModelId('com.flemanager')
+  electronApp.setAppUserModelId('com.somewhat-commander')
 
   // Remove default Electron menu to prevent Alt+key conflicts
   Menu.setApplicationMenu(null)
