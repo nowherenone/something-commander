@@ -4,9 +4,9 @@ import { sortEntries, type SortConfig } from '../utils/sort'
 
 const DEFAULT_PLUGIN = 'local-filesystem'
 
-/** Whether a ".." entry is shown for this tab (has parent or is in non-local plugin) */
+/** Whether a ".." entry is shown — always true except at home (locationId === null) */
 export function hasParentEntry(tab: TabState): boolean {
-  return tab.parentId !== null || tab.pluginId !== DEFAULT_PLUGIN
+  return tab.locationId !== null
 }
 
 /** Offset for cursor index: 1 if ".." row exists, 0 otherwise */

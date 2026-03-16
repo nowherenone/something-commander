@@ -228,7 +228,8 @@ describe('panel-store', () => {
       expect(usePanelStore.getState().getActiveTab('left').cursorIndex).toBe(0)
 
       usePanelStore.getState().setCursor('left', 100)
-      expect(usePanelStore.getState().getActiveTab('left').cursorIndex).toBe(2)
+      // 3 entries + ".." row (locationId is '/test', not null) = max index 3
+      expect(usePanelStore.getState().getActiveTab('left').cursorIndex).toBe(3)
     })
   })
 

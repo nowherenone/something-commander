@@ -12,6 +12,7 @@ import { StatusBar } from './StatusBar'
 import { TreeView } from './TreeView'
 import { InfoView } from './InfoView'
 import { QuickView } from './QuickView'
+import { useBookmarksStore } from '../../stores/bookmarks-store'
 import styles from '../../styles/panels.module.css'
 
 /** Reactive bridge: subscribes to opposite panel's cursor for QuickView */
@@ -128,6 +129,21 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   }, [panelId, tab.parentId, tab.pluginId, tab.locationId, navigate])
 
   const showParentEntry = hasParentEntry(tab)
+  const bookmarks = useBookmarksStore((s) => s.bookmarks)
+  const isHome = tab.locationId === null
+
+  // At home view, append bookmarks as navigable entries
+  const homeBookmarkEntries = isHome ? bookmarks.map((bm) => ({
+    id: bm.path,
+    name: `\u2605 ${bm.name}`,
+    isContainer: true,
+    size: -1,
+    modifiedAt: 0,
+    mimeType: 'inode/directory',
+    iconHint: 'folder',
+    meta: { bookmark: true, pluginId: bm.pluginId },
+    attributes: { readonly: false, hidden: false, symlink: false }
+  })) : []
 
   const displayEntries =
     showParentEntry
@@ -143,9 +159,10 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
             meta: {},
             attributes: { readonly: true, hidden: false, symlink: false }
           },
-          ...tab.entries
+          ...tab.entries,
+          ...homeBookmarkEntries
         ]
-      : tab.entries
+      : [...tab.entries, ...homeBookmarkEntries]
 
   const handleEntryActivate = useCallback(
     (entry: { id: string; isContainer: boolean }) => {
