@@ -14,6 +14,19 @@ import { InfoView } from './InfoView'
 import { QuickView } from './QuickView'
 import styles from '../../styles/panels.module.css'
 
+/** Reactive bridge: subscribes to opposite panel's cursor for QuickView */
+function QuickViewBridge({ panelId }: { panelId: PanelId }): React.JSX.Element {
+  const otherPanelId = panelId === 'left' ? 'right' : 'left'
+  const otherPanel = usePanelStore((s) => s[otherPanelId])
+  const otherTab = otherPanel.tabs.find((t) => t.id === otherPanel.activeTabId) || otherPanel.tabs[0]
+
+  const offset = (otherTab?.parentId !== null || otherTab?.pluginId !== 'local-filesystem') ? 1 : 0
+  const idx = (otherTab?.cursorIndex || 0) - offset
+  const cursorEntry = otherTab && idx >= 0 && idx < otherTab.entries.length ? otherTab.entries[idx] : null
+
+  return <QuickView entry={cursorEntry} />
+}
+
 interface FilePanelProps {
   panelId: PanelId
 }
@@ -214,15 +227,9 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
           locationDisplay={tab.locationDisplay}
         />
       )}
-      {viewMode === 'quickview' && (() => {
-        // Get the entry under cursor in the OPPOSITE panel
-        const otherPanelId = panelId === 'left' ? 'right' : 'left'
-        const otherTab = usePanelStore.getState().getActiveTab(otherPanelId)
-        const offset = otherTab.parentId !== null ? 1 : 0
-        const idx = otherTab.cursorIndex - offset
-        const cursorEntry = idx >= 0 && idx < otherTab.entries.length ? otherTab.entries[idx] : null
-        return <QuickView entry={cursorEntry} />
-      })()}
+      {viewMode === 'quickview' && (
+        <QuickViewBridge panelId={panelId} />
+      )}
     </div>
   )
 }
