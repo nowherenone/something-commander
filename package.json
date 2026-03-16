@@ -1,6 +1,6 @@
 {
   "name": "somewhat-commander",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A modern orthodox two-panel file manager",
   "main": "./out/main/index.js",
   "author": "Somewhat Commander Contributors",
