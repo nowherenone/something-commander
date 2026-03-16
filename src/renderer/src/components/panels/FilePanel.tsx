@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import type { PanelId } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
 import { usePanelStore, hasParentEntry } from '../../stores/panel-store'

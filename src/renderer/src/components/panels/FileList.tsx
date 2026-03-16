@@ -23,7 +23,7 @@ export function FileList({
   errorFolderIds,
   isActive,
   onCursorChange,
-  onSelect,
+  onSelect: _onSelect,
   onActivate
 }: FileListProps): React.JSX.Element {
   const listRef = useRef<HTMLDivElement>(null)

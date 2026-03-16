@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell, Menu, dialog } from 'electron'
+import { ipcMain, BrowserWindow, shell, Menu } from 'electron'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as path from 'path'
@@ -541,7 +541,7 @@ function copyFileWithProgress(
     let bytesCopied = 0
     let lastReport = 0
 
-    readStream.on('data', (chunk: Buffer) => {
+    readStream.on('data', (chunk: string | Buffer) => {
       bytesCopied += chunk.length
       // Throttle progress reports to avoid flooding IPC (every 100ms worth)
       const now = Date.now()

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize } from '../../utils/format'
 import styles from '../../styles/dialogs.module.css'
