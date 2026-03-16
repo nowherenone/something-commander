@@ -30,6 +30,8 @@ export const IPC_CHANNELS = {
   SFTP_CONNECT: 'sftp:connect',
   SFTP_DISCONNECT: 'sftp:disconnect',
   SFTP_LIST_CONNECTIONS: 'sftp:listConnections',
+  S3_CONNECT: 's3:connect',
+  S3_DISCONNECT: 's3:disconnect',
 
   // External plugin management
   PLUGIN_SCAN: 'plugin:scan',

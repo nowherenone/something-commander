@@ -59,6 +59,7 @@ const MENUS: MenuDef[] = [
       { label: '', action: '', separator: true },
       { label: 'Connect SFTP...', action: 'sftpConnect' },
       { label: 'Disconnect SFTP', action: 'sftpDisconnect' },
+      { label: 'Connect S3...', action: 's3Connect' },
       { label: '', action: '', separator: true },
       { label: 'Plugin Manager', action: 'pluginManager' }
     ]

@@ -9,6 +9,7 @@ import { pluginManager } from '../plugins/plugin-manager'
 import { scanPlugins, loadPlugin, unloadPlugin, ensurePluginsDir } from '../plugins/plugin-loader'
 import { extractFromZip } from '../plugins/archive'
 import type { SftpPlugin } from '../plugins/sftp'
+import type { S3Plugin } from '../plugins/s3'
 
 async function calcFolderSize(dirPath: string): Promise<number> {
   let totalSize = 0
@@ -230,6 +231,22 @@ export function registerPluginIPC(): void {
     const sftp = pluginManager.get('sftp') as SftpPlugin | undefined
     if (!sftp) return []
     return sftp.getConnections()
+  })
+
+  // S3 connection management
+  ipcMain.handle(
+    IPC_CHANNELS.S3_CONNECT,
+    async (_event, bucket: string, region: string, accessKeyId: string, secretAccessKey: string, label?: string) => {
+      const s3 = pluginManager.get('s3') as S3Plugin | undefined
+      if (!s3) throw new Error('S3 plugin not loaded')
+      return s3.connect(bucket, region, accessKeyId, secretAccessKey, label)
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.S3_DISCONNECT, (_event, connId: string) => {
+    const s3 = pluginManager.get('s3') as S3Plugin | undefined
+    if (!s3) return
+    s3.disconnect(connId)
   })
 
   // External plugin management

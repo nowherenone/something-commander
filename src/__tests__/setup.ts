@@ -50,6 +50,8 @@ const mockUtilApi = {
   pluginLoad: vi.fn().mockResolvedValue({ success: true }),
   pluginUnload: vi.fn().mockResolvedValue({ success: true }),
   pluginGetDir: vi.fn().mockResolvedValue('/mock/plugins'),
+  s3Connect: vi.fn().mockResolvedValue('s3-my-bucket'),
+  s3Disconnect: vi.fn().mockResolvedValue(undefined),
   streamCopyFile: vi.fn().mockResolvedValue({ success: true, bytesWritten: 1000 }),
   extractFromArchive: vi.fn().mockResolvedValue({ success: true, extractedCount: 1 })
 }

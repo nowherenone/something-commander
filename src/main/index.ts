@@ -7,6 +7,7 @@ import { pluginManager } from './plugins/plugin-manager'
 import { LocalFilesystemPlugin } from './plugins/local-filesystem'
 import { ArchivePlugin } from './plugins/archive'
 import { SftpPlugin } from './plugins/sftp'
+import { S3Plugin } from './plugins/s3'
 import { loadAllPlugins } from './plugins/plugin-loader'
 
 function createWindow(): void {
@@ -65,6 +66,7 @@ app.whenReady().then(async () => {
   pluginManager.register(new LocalFilesystemPlugin())
   pluginManager.register(new ArchivePlugin())
   pluginManager.register(new SftpPlugin())
+  pluginManager.register(new S3Plugin())
   await pluginManager.initializeAll()
 
   // Load external plugins

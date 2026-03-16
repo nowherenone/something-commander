@@ -11,6 +11,7 @@ import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
 import { SftpConnect } from './components/dialogs/SftpConnect'
+import { S3Connect } from './components/dialogs/S3Connect'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
@@ -29,6 +30,7 @@ function App(): React.JSX.Element {
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
   const [dirCompareOpen, setDirCompareOpen] = useState(false)
   const [sftpConnectOpen, setSftpConnectOpen] = useState(false)
+  const [s3ConnectOpen, setS3ConnectOpen] = useState(false)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
 
   const { handleCopy, handleMove, handleDelete, pendingOp, confirmOperation, cancelOperation } = useFileOperations()
@@ -166,6 +168,9 @@ function App(): React.JSX.Element {
       }
       case 'sftpConnect':
         setSftpConnectOpen(true)
+        break
+      case 's3Connect':
+        setS3ConnectOpen(true)
         break
       case 'sftpDisconnect': {
         // Disconnect the SFTP connection used by active panel
@@ -383,6 +388,17 @@ function App(): React.JSX.Element {
 
       {pluginManagerOpen && (
         <PluginManagerDialog onClose={() => setPluginManagerOpen(false)} />
+      )}
+
+      {s3ConnectOpen && (
+        <S3Connect
+          onClose={() => setS3ConnectOpen(false)}
+          onConnected={(connId) => {
+            setS3ConnectOpen(false)
+            const activePanel = useAppStore.getState().activePanel
+            usePanelStore.getState().navigateWithPlugin(activePanel, 's3', `${connId}::`)
+          }}
+        />
       )}
 
       {sftpConnectOpen && (

@@ -116,6 +116,12 @@ const utilAPI = {
   sftpListConnections: (): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.SFTP_LIST_CONNECTIONS),
 
+  s3Connect: (bucket: string, region: string, accessKeyId: string, secretAccessKey: string, label?: string): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.S3_CONNECT, bucket, region, accessKeyId, secretAccessKey, label),
+
+  s3Disconnect: (connId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.S3_DISCONNECT, connId),
+
   pluginScan: (): Promise<Array<{ id: string; name: string; version: string; description: string; path: string; enabled: boolean; error?: string }>> =>
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_SCAN),
 
