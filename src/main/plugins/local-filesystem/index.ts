@@ -327,11 +327,10 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
   private getWindowsDriveInfo(): Promise<Array<{ letter: string; label: string }>> {
     return new Promise((resolve) => {
       exec(
-        'powershell -Command "Get-Volume | Where-Object { $_.DriveLetter } | Select-Object DriveLetter,FileSystemLabel | ConvertTo-Json"',
+        'powershell -Command "Get-PSDrive -PSProvider FileSystem | Select-Object Name,Description | ConvertTo-Json"',
         { timeout: 5000 },
         (err, stdout) => {
           if (err) {
-            // Fallback: scan drive letters without labels
             resolve(this.scanDriveLettersFallback())
             return
           }
@@ -339,10 +338,10 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
             let data = JSON.parse(stdout.trim())
             if (!Array.isArray(data)) data = [data]
             const drives = data
-              .filter((d: { DriveLetter: string | null }) => d.DriveLetter)
-              .map((d: { DriveLetter: string; FileSystemLabel: string }) => ({
-                letter: d.DriveLetter,
-                label: d.FileSystemLabel || ''
+              .filter((d: { Name: string }) => d.Name && d.Name.length === 1)
+              .map((d: { Name: string; Description: string }) => ({
+                letter: d.Name,
+                label: d.Description || ''
               }))
               .sort((a: { letter: string }, b: { letter: string }) => a.letter.localeCompare(b.letter))
             resolve(drives)
