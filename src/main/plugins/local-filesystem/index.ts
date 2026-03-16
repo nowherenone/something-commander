@@ -186,8 +186,99 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
     if (process.platform === 'win32') {
       return this.listWindowsDrives()
     }
-    // On macOS/Linux, just return the root
-    return this.readDirectory('/')
+    if (process.platform === 'darwin') {
+      return this.listMacRoots()
+    }
+    return this.listLinuxRoots()
+  }
+
+  private async listLinuxRoots(): Promise<ReadDirectoryResult> {
+    const entries: Entry[] = []
+
+    const makeEntry = (id: string, name: string, icon: string): Entry => ({
+      id,
+      name,
+      isContainer: true,
+      size: -1,
+      modifiedAt: 0,
+      mimeType: 'inode/directory',
+      iconHint: icon,
+      meta: {},
+      attributes: { readonly: false, hidden: false, symlink: false }
+    })
+
+    // Root filesystem
+    entries.push(makeEntry('/', '/ (root)', 'drive'))
+
+    // Home directory
+    entries.push(makeEntry(os.homedir(), `~ (${os.userInfo().username})`, 'folder'))
+
+    // Mount points from /mnt/
+    try {
+      const mntEntries = await fs.readdir('/mnt', { withFileTypes: true })
+      for (const d of mntEntries) {
+        if (d.isDirectory()) {
+          entries.push(makeEntry(`/mnt/${d.name}`, `/mnt/${d.name}`, 'drive'))
+        }
+      }
+    } catch { /* /mnt may not exist */ }
+
+    // Media mount points from /media/$USER/
+    try {
+      const user = os.userInfo().username
+      const mediaEntries = await fs.readdir(`/media/${user}`, { withFileTypes: true })
+      for (const d of mediaEntries) {
+        if (d.isDirectory()) {
+          entries.push(makeEntry(`/media/${user}/${d.name}`, d.name, 'drive'))
+        }
+      }
+    } catch { /* /media/$USER may not exist */ }
+
+    // /run/media/$USER/ (Arch, Fedora)
+    try {
+      const user = os.userInfo().username
+      const runMediaEntries = await fs.readdir(`/run/media/${user}`, { withFileTypes: true })
+      for (const d of runMediaEntries) {
+        if (d.isDirectory()) {
+          entries.push(makeEntry(`/run/media/${user}/${d.name}`, d.name, 'drive'))
+        }
+      }
+    } catch { /* may not exist */ }
+
+    return { entries, location: 'Filesystems', parentId: null }
+  }
+
+  private async listMacRoots(): Promise<ReadDirectoryResult> {
+    const entries: Entry[] = []
+
+    const makeEntry = (id: string, name: string, icon: string): Entry => ({
+      id,
+      name,
+      isContainer: true,
+      size: -1,
+      modifiedAt: 0,
+      mimeType: 'inode/directory',
+      iconHint: icon,
+      meta: {},
+      attributes: { readonly: false, hidden: false, symlink: false }
+    })
+
+    // Root
+    entries.push(makeEntry('/', '/ (Macintosh HD)', 'drive'))
+    // Home
+    entries.push(makeEntry(os.homedir(), `~ (${os.userInfo().username})`, 'folder'))
+
+    // Volumes
+    try {
+      const volumes = await fs.readdir('/Volumes', { withFileTypes: true })
+      for (const v of volumes) {
+        if (v.isDirectory() && v.name !== 'Macintosh HD') {
+          entries.push(makeEntry(`/Volumes/${v.name}`, v.name, 'drive'))
+        }
+      }
+    } catch { /* /Volumes may not exist */ }
+
+    return { entries, location: 'Filesystems', parentId: null }
   }
 
   private async listWindowsDrives(): Promise<ReadDirectoryResult> {
