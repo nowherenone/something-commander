@@ -142,6 +142,35 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-small);
   flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Drive size bar in home view */
+.driveSize {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.driveBar {
+  width: 40px;
+  height: var(--bar-height);
+  background: var(--bar-bg);
+  border-radius: var(--bar-radius);
+  border: var(--bar-border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.driveBarFill {
+  background: var(--bar-fill);
+}
+
+.driveText {
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .colDate {

@@ -1,8 +1,29 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize, formatDate } from '../../utils/format'
 import { getIconForHint } from '../../utils/icon-map'
 import styles from '../../styles/file-list.module.css'
+
+function DriveSizeBar({ driveId }: { driveId: string }): React.JSX.Element | null {
+  const [space, setSpace] = useState<{ free: number; total: number } | null>(null)
+
+  useEffect(() => {
+    window.api.util.getDiskSpace(driveId).then(setSpace)
+  }, [driveId])
+
+  if (!space || space.total <= 0) return null
+
+  const usedPct = Math.round(((space.total - space.free) / space.total) * 100)
+
+  return (
+    <span className={styles.driveSize}>
+      <span className={styles.driveBar}>
+        <span className={styles.driveBarFill} style={{ width: `${usedPct}%`, display: 'block', height: '100%' }} />
+      </span>
+      <span className={styles.driveText}>{formatSize(space.free)} / {formatSize(space.total)}</span>
+    </span>
+  )
+}
 
 interface EntryRowProps {
   entry: Entry
@@ -37,7 +58,12 @@ export const EntryRow = React.memo(function EntryRow({
     .filter(Boolean)
     .join(' ')
 
+  const isDrive = entry.iconHint === 'drive' || entry.iconHint === 'network'
+
   const renderSize = (): React.ReactNode => {
+    if (isDrive) {
+      return <DriveSizeBar driveId={entry.id} />
+    }
     if (entry.isContainer) {
       if (isCalculating) {
         return <span className={styles.sizeLoading}>...</span>
@@ -54,7 +80,7 @@ export const EntryRow = React.memo(function EntryRow({
         <span className={styles.fileName}>{entry.name}</span>
       </div>
       <div className={styles.colExt}>
-        {entry.isContainer ? '<DIR>' : ((entry.meta.extension as string) || '')}
+        {entry.isContainer ? (isDrive ? '' : '<DIR>') : ((entry.meta.extension as string) || '')}
       </div>
       <div className={styles.colSize}>{renderSize()}</div>
       <div className={styles.colDate}>{formatDate(entry.modifiedAt)}</div>
