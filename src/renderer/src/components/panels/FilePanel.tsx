@@ -227,7 +227,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
               onActivate={handleEntryActivate}
             />
           )}
-          <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} error={tab.error} />
+          <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} />
         </>
       )}
       {viewMode === 'tree' && (

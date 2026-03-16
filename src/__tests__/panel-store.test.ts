@@ -145,7 +145,10 @@ describe('panel-store', () => {
 
       const tab = usePanelStore.getState().getActiveTab('left')
       expect(tab.isLoading).toBe(false)
-      expect(tab.error).toContain('Permission denied')
+      // Error is now shown as toast, not stored on tab
+      expect(tab.error).toBeNull()
+      // The folder should be marked as error
+      expect(tab.errorFolderIds.has('/forbidden')).toBe(true)
     })
   })
 

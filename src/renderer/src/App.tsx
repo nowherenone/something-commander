@@ -10,6 +10,7 @@ import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
+import { ToastContainer } from './components/layout/Toast'
 import { SftpConnect } from './components/dialogs/SftpConnect'
 import { S3Connect } from './components/dialogs/S3Connect'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
@@ -235,6 +236,7 @@ function App(): React.JSX.Element {
 
       <OperationDialog />
       <QueueButton />
+      <ToastContainer />
 
       {pendingOp && (
         <ConfirmOperation

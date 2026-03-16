@@ -7,10 +7,9 @@ interface StatusBarProps {
   entries: Entry[]
   selectedIds: Set<string>
   locationId: string | null
-  error?: string | null
 }
 
-export function StatusBar({ entries, selectedIds, locationId, error }: StatusBarProps): React.JSX.Element {
+export function StatusBar({ entries, selectedIds, locationId }: StatusBarProps): React.JSX.Element {
   const [diskSpace, setDiskSpace] = useState<{ free: number; total: number } | null>(null)
 
   useEffect(() => {
@@ -40,21 +39,13 @@ export function StatusBar({ entries, selectedIds, locationId, error }: StatusBar
 
   return (
     <div className={styles.statusBar}>
-      {error ? (
-        <span style={{ color: 'var(--danger)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {error}
+      <span>
+        {fileCount} file{fileCount !== 1 ? 's' : ''}, {dirCount} dir{dirCount !== 1 ? 's' : ''}
+      </span>
+      {selectedCount > 0 && (
+        <span className={styles.statusSelected}>
+          {selectedCount} sel ({formatSize(selectedSize)})
         </span>
-      ) : (
-        <>
-          <span>
-            {fileCount} file{fileCount !== 1 ? 's' : ''}, {dirCount} dir{dirCount !== 1 ? 's' : ''}
-          </span>
-          {selectedCount > 0 && (
-            <span className={styles.statusSelected}>
-              {selectedCount} sel ({formatSize(selectedSize)})
-            </span>
-          )}
-        </>
       )}
       {diskSpace && diskSpace.total > 0 && (
         <span className={styles.diskSpace}>

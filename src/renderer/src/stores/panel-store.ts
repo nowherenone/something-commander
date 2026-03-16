@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Entry, ColumnDefinition } from '@shared/types'
 import { sortEntries, type SortConfig } from '../utils/sort'
+import { showToast } from '../components/layout/Toast'
 
 const DEFAULT_PLUGIN = 'local-filesystem'
 
@@ -227,22 +228,12 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
           isLoading: false,
-          error: String(err),
+          error: null,
           errorFolderIds: errorSet
         }))
       })
-      // Clear error message after 5 seconds (folder stays red)
-      setTimeout(() => {
-        const currentTab = getActiveTab(get()[panelId])
-        if (currentTab.error === String(err)) {
-          set({
-            [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
-              ...t,
-              error: null
-            }))
-          })
-        }
-      }, 5000)
+      // Show error as toast
+      showToast(String(err))
     }
   },
 
