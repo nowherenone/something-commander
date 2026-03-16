@@ -36,6 +36,11 @@ const MENUS: MenuDef[] = [
   {
     label: 'View',
     items: [
+      { label: 'Brief (File List)', shortcut: 'Ctrl+1', action: 'viewBrief' },
+      { label: 'Tree', shortcut: 'Ctrl+2', action: 'viewTree' },
+      { label: 'Info', shortcut: 'Ctrl+3', action: 'viewInfo' },
+      { label: 'Quick View', shortcut: 'Ctrl+Q', action: 'viewQuickview' },
+      { label: '', action: '', separator: true },
       { label: 'Refresh', shortcut: 'Ctrl+R', action: 'refresh' },
       { label: 'Toggle Hidden Files', shortcut: 'Ctrl+H', action: 'toggleHidden' },
       { label: '', action: '', separator: true },

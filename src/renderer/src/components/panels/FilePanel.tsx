@@ -9,6 +9,9 @@ import { AddressBar } from './AddressBar'
 import { ColumnHeaders } from './ColumnHeaders'
 import { FileList } from './FileList'
 import { StatusBar } from './StatusBar'
+import { TreeView } from './TreeView'
+import { InfoView } from './InfoView'
+import { QuickView } from './QuickView'
 import styles from '../../styles/panels.module.css'
 
 interface FilePanelProps {
@@ -19,6 +22,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const activePanel = useAppStore((s) => s.activePanel)
   const setActivePanel = useAppStore((s) => s.setActivePanel)
   const isActive = activePanel === panelId
+  const viewMode = useAppStore((s) => panelId === 'left' ? s.leftViewMode : s.rightViewMode)
 
   const panel = usePanelStore((s) => s[panelId])
   const navigate = usePanelStore((s) => s.navigate)
@@ -175,23 +179,50 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
         onNavigate={handleNavigateAddress}
         onSegmentClick={handleSegmentClick}
       />
-      <ColumnHeaders sortConfig={tab.sortConfig} onSort={handleSort} />
-      {tab.isLoading ? (
-        <div className={styles.loading}>Loading...</div>
-      ) : (
-        <FileList
-          entries={displayEntries}
-          cursorIndex={tab.cursorIndex}
-          selectedIds={tab.selectedEntryIds}
-          calculatingIds={tab.calculatingFolderIds}
-          errorFolderIds={tab.errorFolderIds}
-          isActive={isActive}
-          onCursorChange={(i) => setCursor(panelId, i)}
-          onSelect={(id) => toggleSelect(panelId, id)}
-          onActivate={handleEntryActivate}
+      {viewMode === 'brief' && (
+        <>
+          <ColumnHeaders sortConfig={tab.sortConfig} onSort={handleSort} />
+          {tab.isLoading ? (
+            <div className={styles.loading}>Loading...</div>
+          ) : (
+            <FileList
+              entries={displayEntries}
+              cursorIndex={tab.cursorIndex}
+              selectedIds={tab.selectedEntryIds}
+              calculatingIds={tab.calculatingFolderIds}
+              errorFolderIds={tab.errorFolderIds}
+              isActive={isActive}
+              onCursorChange={(i) => setCursor(panelId, i)}
+              onSelect={(id) => toggleSelect(panelId, id)}
+              onActivate={handleEntryActivate}
+            />
+          )}
+          <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} error={tab.error} />
+        </>
+      )}
+      {viewMode === 'tree' && (
+        <TreeView
+          pluginId={tab.pluginId}
+          locationId={tab.locationId}
+          onNavigate={(loc) => navigate(panelId, loc)}
         />
       )}
-      <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} error={tab.error} />
+      {viewMode === 'info' && (
+        <InfoView
+          pluginId={tab.pluginId}
+          locationId={tab.locationId}
+          locationDisplay={tab.locationDisplay}
+        />
+      )}
+      {viewMode === 'quickview' && (() => {
+        // Get the entry under cursor in the OPPOSITE panel
+        const otherPanelId = panelId === 'left' ? 'right' : 'left'
+        const otherTab = usePanelStore.getState().getActiveTab(otherPanelId)
+        const offset = otherTab.parentId !== null ? 1 : 0
+        const idx = otherTab.cursorIndex - offset
+        const cursorEntry = idx >= 0 && idx < otherTab.entries.length ? otherTab.entries[idx] : null
+        return <QuickView entry={cursorEntry} />
+      })()}
     </div>
   )
 }

@@ -186,6 +186,18 @@ function App(): React.JSX.Element {
       case 'pluginManager':
         setPluginManagerOpen(true)
         break
+      case 'viewBrief':
+        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'brief')
+        break
+      case 'viewTree':
+        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'tree')
+        break
+      case 'viewInfo':
+        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'info')
+        break
+      case 'viewQuickview':
+        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'quickview')
+        break
       case 'toggleCommandLine':
         useSettingsStore.getState().updateSettings({ showCommandLine: !showCommandLine })
         break

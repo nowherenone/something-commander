@@ -256,6 +256,22 @@ export function useKeyboard(actions: KeyboardActions): void {
                 e.preventDefault()
                 store.refresh(activePanel)
                 break
+              case '1':
+                e.preventDefault()
+                useAppStore.getState().setViewMode(activePanel, 'brief')
+                break
+              case '2':
+                e.preventDefault()
+                useAppStore.getState().setViewMode(activePanel, 'tree')
+                break
+              case '3':
+                e.preventDefault()
+                useAppStore.getState().setViewMode(activePanel, 'info')
+                break
+              case 'q':
+                e.preventDefault()
+                useAppStore.getState().setViewMode(activePanel, 'quickview')
+                break
               case 'm':
                 e.preventDefault()
                 actions.onCtrlM?.()
