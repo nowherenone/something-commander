@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises'
+import * as fsSync from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import { exec } from 'child_process'
@@ -439,6 +440,56 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
       } else {
         await fs.copyFile(srcPath, destPath)
       }
+    }
+  }
+
+  async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
+    try {
+      await fs.access(entryId)
+      return fsSync.createReadStream(entryId, { highWaterMark: 256 * 1024 })
+    } catch {
+      return null
+    }
+  }
+
+  async writeFromStream(
+    destLocationId: string,
+    fileName: string,
+    stream: NodeJS.ReadableStream
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
+    const destPath = path.join(destLocationId, fileName)
+    try {
+      await fs.mkdir(path.dirname(destPath), { recursive: true })
+      return new Promise((resolve) => {
+        let bytesWritten = 0
+        const writeStream = fsSync.createWriteStream(destPath)
+        stream.on('data', (chunk: Buffer) => {
+          bytesWritten += chunk.length
+        })
+        stream.pipe(writeStream)
+        writeStream.on('finish', () => resolve({ success: true, bytesWritten }))
+        writeStream.on('error', (err) => resolve({ success: false, bytesWritten, error: String(err) }))
+      })
+    } catch (err) {
+      return { success: false, bytesWritten: 0, error: String(err) }
+    }
+  }
+
+  async createDirectory(locationId: string, name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await fs.mkdir(path.join(locationId, name), { recursive: true })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  }
+
+  async deleteSingle(entryId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await fs.rm(entryId, { recursive: true })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
     }
   }
 

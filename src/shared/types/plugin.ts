@@ -73,6 +73,18 @@ export interface BrowsePlugin {
     relativePath: string
   }>>
 
+  /** Create a readable stream for a file entry. Used for cross-plugin copy. */
+  createReadStream?(entryId: string): Promise<NodeJS.ReadableStream | null>
+
+  /** Write a file from a readable stream. Returns bytes written. */
+  writeFromStream?(destLocationId: string, fileName: string, stream: NodeJS.ReadableStream): Promise<{ success: boolean; bytesWritten: number; error?: string }>
+
+  /** Create a directory at the given location. */
+  createDirectory?(locationId: string, name: string): Promise<{ success: boolean; error?: string }>
+
+  /** Delete a single entry. */
+  deleteSingle?(entryId: string): Promise<{ success: boolean; error?: string }>
+
   /** Optional: provide file content for viewing. */
   getContent?(entryId: string): Promise<Buffer | null>
 

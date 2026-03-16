@@ -50,6 +50,7 @@ const mockUtilApi = {
   pluginLoad: vi.fn().mockResolvedValue({ success: true }),
   pluginUnload: vi.fn().mockResolvedValue({ success: true }),
   pluginGetDir: vi.fn().mockResolvedValue('/mock/plugins'),
+  streamCopyFile: vi.fn().mockResolvedValue({ success: true, bytesWritten: 1000 }),
   extractFromArchive: vi.fn().mockResolvedValue({ success: true, extractedCount: 1 })
 }
 

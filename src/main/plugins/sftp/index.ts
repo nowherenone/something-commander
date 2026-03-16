@@ -147,6 +147,52 @@ export class SftpPlugin implements BrowsePlugin {
     }
   }
 
+  async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
+    const [connId, remotePath] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn) return null
+    try {
+      return conn.client.createReadStream(remotePath) as unknown as NodeJS.ReadableStream
+    } catch {
+      return null
+    }
+  }
+
+  async writeFromStream(
+    destLocationId: string,
+    fileName: string,
+    stream: NodeJS.ReadableStream
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
+    const [connId, destPath] = this.parseLocation(destLocationId)
+    const conn = this.connections.get(connId)
+    if (!conn) return { success: false, bytesWritten: 0, error: 'Not connected' }
+    try {
+      const remotePath = path.posix.join(destPath, fileName)
+      const writeStream = conn.client.createWriteStream(remotePath) as unknown as NodeJS.WritableStream
+      return new Promise((resolve) => {
+        let bytesWritten = 0
+        stream.on('data', (chunk: Buffer) => { bytesWritten += chunk.length })
+        stream.pipe(writeStream)
+        writeStream.on('finish', () => resolve({ success: true, bytesWritten }))
+        writeStream.on('error', (err: Error) => resolve({ success: false, bytesWritten, error: String(err) }))
+      })
+    } catch (err) {
+      return { success: false, bytesWritten: 0, error: String(err) }
+    }
+  }
+
+  async deleteSingle(entryId: string): Promise<{ success: boolean; error?: string }> {
+    const [connId, remotePath] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn) return { success: false, error: 'Not connected' }
+    try {
+      await conn.client.delete(remotePath)
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: String(err) }
+    }
+  }
+
   // Public method to connect
   async connect(host: string, port: number, username: string, password?: string, privateKey?: string): Promise<string> {
     const connId = `${username}@${host}:${port}`

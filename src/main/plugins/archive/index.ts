@@ -283,6 +283,32 @@ export class ArchivePlugin implements BrowsePlugin {
     return { success: false, errors: [{ entryId: '', message: `Operation "${op.op}" not supported on archives` }] }
   }
 
+  async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
+    const sepIdx = entryId.indexOf('::')
+    if (sepIdx < 0) return null
+    const archivePath = entryId.slice(0, sepIdx)
+    const internalPath = entryId.slice(sepIdx + 2)
+    if (!internalPath || internalPath.endsWith('/')) return null
+
+    return new Promise((resolve) => {
+      yauzl.open(archivePath, { lazyEntries: true }, (err, zipfile) => {
+        if (err || !zipfile) { resolve(null); return }
+        zipfile.readEntry()
+        zipfile.on('entry', (entry) => {
+          if (entry.fileName === internalPath) {
+            zipfile.openReadStream(entry, (streamErr, readStream) => {
+              if (streamErr || !readStream) { resolve(null); return }
+              resolve(readStream)
+            })
+          } else {
+            zipfile.readEntry()
+          }
+        })
+        zipfile.on('end', () => resolve(null))
+      })
+    })
+  }
+
   private parseLocation(locationId: string): [string, string] {
     const sepIdx = locationId.indexOf('::')
     if (sepIdx < 0) return [locationId, '']

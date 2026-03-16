@@ -63,6 +63,13 @@ interface UtilAPI {
   pluginLoad(pluginDir: string): Promise<{ success: boolean; error?: string }>
   pluginUnload(pluginId: string): Promise<{ success: boolean }>
   pluginGetDir(): Promise<string>
+  streamCopyFile(
+    sourcePluginId: string,
+    sourceEntryId: string,
+    destPluginId: string,
+    destLocationId: string,
+    destFileName: string
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }>
   extractFromArchive(archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   enumerateFiles(

@@ -128,6 +128,15 @@ const utilAPI = {
   pluginGetDir: (): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_DIR),
 
+  streamCopyFile: (
+    sourcePluginId: string,
+    sourceEntryId: string,
+    destPluginId: string,
+    destLocationId: string,
+    destFileName: string
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.STREAM_COPY_FILE, sourcePluginId, sourceEntryId, destPluginId, destLocationId, destFileName),
+
   extractFromArchive: (archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }> =>
     ipcRenderer.invoke(IPC_CHANNELS.EXTRACT_FROM_ARCHIVE, archivePath, internalPath, destDir),
 

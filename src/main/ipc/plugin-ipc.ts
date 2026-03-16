@@ -252,6 +252,33 @@ export function registerPluginIPC(): void {
     }
   )
 
+  // Stream copy a single file between any two plugins
+  ipcMain.handle(
+    IPC_CHANNELS.STREAM_COPY_FILE,
+    async (
+      event,
+      sourcePluginId: string,
+      sourceEntryId: string,
+      destPluginId: string,
+      destLocationId: string,
+      destFileName: string
+    ) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      return pluginManager.streamCopyFile(
+        sourcePluginId,
+        sourceEntryId,
+        destPluginId,
+        destLocationId,
+        destFileName,
+        (bytesCopied) => {
+          if (win) {
+            win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, bytesCopied)
+          }
+        }
+      )
+    }
+  )
+
   // Enumerate files through the plugin system
   ipcMain.handle(
     IPC_CHANNELS.ENUMERATE_FILES,

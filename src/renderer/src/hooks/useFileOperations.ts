@@ -151,10 +151,14 @@ async function executeOperation(opId: string): Promise<void> {
       } else {
         // copy or move
         if (item.isDirectory) {
-          // Create directory at destination (mkdir is idempotent)
-          // The copySingleFile with isDirectory=true handles this
-          // But for move, we just need mkdir at dest
-          await window.api.util.copySingleFile(item.sourcePath, item.destPath, true)
+          // Create directory at destination via dest plugin
+          const dirName = item.destPath.split(/[\\/]/).pop() || ''
+          const parentDir = item.destPath.replace(/[\\/][^\\/]+$/, '') || item.destPath
+          await window.api.plugins.executeOperation(op.destinationPluginId, {
+            op: 'createDirectory',
+            parentLocationId: parentDir,
+            name: dirName
+          })
         } else {
           // Check for overwrite
           const exists = await window.api.util.checkExists(item.destPath)
@@ -190,7 +194,7 @@ async function executeOperation(opId: string): Promise<void> {
             }
           }
 
-          // Subscribe to per-byte progress for this file (throttled to 4x/sec)
+          // Stream copy through plugin system — works across any plugin combination
           let lastProgressUpdate = 0
           const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
             const now = Date.now()
@@ -200,16 +204,41 @@ async function executeOperation(opId: string): Promise<void> {
             }
           })
 
-          const ipcFn = op.type === 'copy'
-            ? window.api.util.copySingleFile
-            : window.api.util.moveSingleFile
+          const destDir = item.destPath.replace(/[\\/][^\\/]+$/, '') || item.destPath
+          const destFileName = item.destPath.split(/[\\/]/).pop() || item.relativePath
 
-          const result = await ipcFn(item.sourcePath, item.destPath, false)
+          const result = await window.api.util.streamCopyFile(
+            op.sourcePluginId,
+            item.sourcePath,
+            op.destinationPluginId,
+            destDir,
+            destFileName
+          )
           unsubProgress()
 
           if (!result.success) {
             store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
             return
+          }
+
+          // For move, delete source after copy
+          if (op.type === 'move') {
+            // Source plugin deletes its own entry
+            const srcPlugin = op.sourcePluginId
+            await window.api.plugins.executeOperation(srcPlugin, {
+              op: 'delete',
+              entries: [{
+                id: item.sourcePath,
+                name: destFileName,
+                isContainer: false,
+                size: item.size,
+                modifiedAt: 0,
+                mimeType: '',
+                iconHint: 'file',
+                meta: {},
+                attributes: { readonly: false, hidden: false, symlink: false }
+              }]
+            })
           }
         }
       }
@@ -231,9 +260,22 @@ async function executeOperation(opId: string): Promise<void> {
     for (const dir of dirs) {
       if (isCancelled(opId)) break
       try {
-        await window.api.util.deleteSingle(dir.sourcePath)
+        await window.api.plugins.executeOperation(op.sourcePluginId, {
+          op: 'delete',
+          entries: [{
+            id: dir.sourcePath,
+            name: dir.relativePath,
+            isContainer: true,
+            size: 0,
+            modifiedAt: 0,
+            mimeType: '',
+            iconHint: 'folder',
+            meta: {},
+            attributes: { readonly: false, hidden: false, symlink: false }
+          }]
+        })
       } catch {
-        // Ignore errors deleting source dirs (might not be empty if cancelled)
+        // Ignore errors deleting source dirs
       }
     }
   }

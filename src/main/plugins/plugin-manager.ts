@@ -80,6 +80,45 @@ export class PluginManager {
     }
     return plugin.enumerateFiles(entryIds, destDir)
   }
+
+  /**
+   * Stream-copy a single file between any two plugins.
+   * Returns bytes written. Sends progress via onProgress callback.
+   */
+  async streamCopyFile(
+    sourcePluginId: string,
+    sourceEntryId: string,
+    destPluginId: string,
+    destLocationId: string,
+    destFileName: string,
+    onProgress?: (bytesCopied: number) => void
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
+    const sourcePlugin = this.get(sourcePluginId)
+    const destPlugin = this.get(destPluginId)
+    if (!sourcePlugin) return { success: false, bytesWritten: 0, error: `Unknown source plugin: ${sourcePluginId}` }
+    if (!destPlugin) return { success: false, bytesWritten: 0, error: `Unknown dest plugin: ${destPluginId}` }
+    if (!sourcePlugin.createReadStream) return { success: false, bytesWritten: 0, error: `Source plugin ${sourcePluginId} does not support streaming` }
+    if (!destPlugin.writeFromStream) return { success: false, bytesWritten: 0, error: `Dest plugin ${destPluginId} does not support streaming` }
+
+    const readStream = await sourcePlugin.createReadStream(sourceEntryId)
+    if (!readStream) return { success: false, bytesWritten: 0, error: `Could not open read stream for ${sourceEntryId}` }
+
+    // Track progress
+    let bytesCopied = 0
+    let lastReport = 0
+    readStream.on('data', (chunk: Buffer) => {
+      bytesCopied += chunk.length
+      const now = Date.now()
+      if (onProgress && now - lastReport >= 250) {
+        onProgress(bytesCopied)
+        lastReport = now
+      }
+    })
+
+    const result = await destPlugin.writeFromStream(destLocationId, destFileName, readStream)
+    if (onProgress) onProgress(result.bytesWritten)
+    return result
+  }
 }
 
 export const pluginManager = new PluginManager()
