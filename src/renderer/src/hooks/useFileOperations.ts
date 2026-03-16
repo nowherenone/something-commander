@@ -50,32 +50,39 @@ async function executeOperation(opId: string): Promise<void> {
   const op = store().operations.find((o) => o.id === opId)
   if (!op) return
 
-  // Check if source is an archive plugin
-  const isArchiveSource = op.sourcePluginId === 'archive'
+  // Non-local-filesystem sources (archive, sftp): use plugin's executeOperation directly
+  const isNonLocalSource = op.sourcePluginId !== 'local-filesystem'
 
-  // For archive sources, use extraction instead of file-by-file copy
-  if (isArchiveSource && op.type !== 'delete') {
-    store().updateOperation(opId, { status: 'running', currentFile: 'Extracting...' })
+  if (isNonLocalSource && op.type !== 'delete') {
+    store().updateOperation(opId, {
+      status: 'running',
+      currentFile: 'Processing...',
+      totalFiles: op.sourceEntries.length,
+      processedFiles: 0
+    })
 
+    let processed = 0
     for (const entry of op.sourceEntries) {
       if (isCancelled(opId)) break
-      // entry.id format: "D:\file.zip::internal/path"
-      const sepIdx = entry.id.indexOf('::')
-      const archivePath = sepIdx >= 0 ? entry.id.slice(0, sepIdx) : entry.id
-      const internalPath = sepIdx >= 0 ? entry.id.slice(sepIdx + 2) : ''
+      store().updateOperation(opId, { currentFile: entry.name, processedFiles: processed })
 
-      store().updateOperation(opId, { currentFile: entry.name })
+      const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
+        op: op.type,
+        sourceEntries: [entry],
+        destinationLocationId: op.destinationLocationId,
+        destinationPluginId: op.destinationPluginId
+      })
 
-      const result = await window.api.util.extractFromArchive(
-        archivePath,
-        internalPath,
-        op.destinationLocationId
-      )
-
-      if (!result.success) {
-        store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${result.error}` })
+      if (!result.success && result.errors?.length) {
+        store().updateOperation(opId, {
+          status: 'error',
+          error: result.errors.map((e) => e.message).join('; ')
+        })
+        usePanelStore.getState().refresh('left')
+        usePanelStore.getState().refresh('right')
         return
       }
+      processed++
     }
 
     const finalOp = store().operations.find((o) => o.id === opId)

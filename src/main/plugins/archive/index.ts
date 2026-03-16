@@ -238,12 +238,35 @@ export class ArchivePlugin implements BrowsePlugin {
   }
 
   getSupportedOperations(): PluginOperation[] {
-    // Archives are read-only for now
-    return []
+    return ['copy'] // Extract from archive
   }
 
-  async executeOperation(_op: OperationRequest): Promise<OperationResult> {
-    return { success: false, errors: [{ entryId: '', message: 'Archives are read-only' }] }
+  async executeOperation(op: OperationRequest): Promise<OperationResult> {
+    if (op.op === 'copy') {
+      // Extract files from archive to destination
+      const errors: Array<{ entryId: string; message: string }> = []
+      for (const entry of op.sourceEntries) {
+        const sepIdx = entry.id.indexOf('::')
+        if (sepIdx < 0) {
+          errors.push({ entryId: entry.id, message: 'Invalid archive entry ID' })
+          continue
+        }
+        const archivePath = entry.id.slice(0, sepIdx)
+        const internalPath = entry.id.slice(sepIdx + 2)
+
+        try {
+          const result = await extractFromZip(archivePath, internalPath, op.destinationLocationId)
+          if (!result.success) {
+            errors.push({ entryId: entry.id, message: result.error || 'Extraction failed' })
+          }
+        } catch (err) {
+          errors.push({ entryId: entry.id, message: String(err) })
+        }
+      }
+      return { success: errors.length === 0, errors: errors.length > 0 ? errors : undefined }
+    }
+
+    return { success: false, errors: [{ entryId: '', message: `Operation "${op.op}" not supported on archives` }] }
   }
 
   private parseLocation(locationId: string): [string, string] {
