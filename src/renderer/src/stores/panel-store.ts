@@ -318,8 +318,51 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
   },
 
   refresh: async (panelId) => {
-    const tab = getActiveTab(get()[panelId])
-    await get().navigate(panelId, tab.locationId)
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    const oldCursorIndex = tab.cursorIndex
+    const offset = parentOffset(tab)
+    const oldEntryIndex = oldCursorIndex - offset
+    const oldEntryName = oldEntryIndex >= 0 && oldEntryIndex < tab.entries.length
+      ? tab.entries[oldEntryIndex].name
+      : null
+
+    try {
+      const result = await window.api.plugins.readDirectory(tab.pluginId, tab.locationId)
+      let entries = result.entries
+      const currentTab = getActiveTab(get()[panelId])
+      if (!currentTab.showHidden) {
+        entries = entries.filter((e) => !e.attributes.hidden)
+      }
+      entries = sortEntries(entries, currentTab.sortConfig)
+
+      // Restore cursor: try to find the same entry by name, else clamp to bounds
+      const newOffset = (result.parentId !== null || tab.pluginId !== 'local-filesystem') ? 1 : 0
+      let newCursor = oldCursorIndex
+      if (oldEntryName) {
+        const idx = entries.findIndex((e) => e.name === oldEntryName)
+        if (idx >= 0) {
+          newCursor = idx + newOffset
+        }
+      }
+      // If the old entry was deleted, try the same index position
+      const maxIdx = entries.length - 1 + newOffset
+      newCursor = Math.max(0, Math.min(newCursor, maxIdx))
+
+      set({
+        [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
+          ...t,
+          entries,
+          parentId: result.parentId,
+          extraColumns: result.extraColumns || [],
+          cursorIndex: newCursor,
+          isLoading: false,
+          error: null
+        }))
+      })
+    } catch {
+      // Silently fail on refresh errors
+    }
   },
 
   setSort: (panelId, config) => {
