@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../stores/app-store'
-import { usePanelStore, parentOffset } from '../stores/panel-store'
+import { usePanelStore, parentOffset, hasParentEntry } from '../stores/panel-store'
 
 interface KeyboardActions {
   onF3?: () => void
@@ -100,8 +100,19 @@ export function useKeyboard(actions: KeyboardActions): void {
           e.preventDefault()
           const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
-          if (tab.cursorIndex === 0 && tab.parentId !== null) {
-            navigate(activePanel, tab.parentId)
+          if (tab.cursorIndex === 0 && hasParentEntry(tab)) {
+            // Go up — either to parent dir or exit archive/sftp
+            if (tab.parentId !== null) {
+              navigate(activePanel, tab.parentId)
+            } else if (tab.pluginId !== 'local-filesystem') {
+              const archivePath = tab.locationId?.split('::')[0]
+              if (archivePath) {
+                const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
+                store.navigateWithPlugin(activePanel, 'local-filesystem', parentDir)
+              }
+            } else {
+              navigate(activePanel, null)
+            }
           } else if (idx >= 0 && idx < tab.entries.length) {
             const entry = tab.entries[idx]
             if (entry.isContainer) {
