@@ -33,6 +33,15 @@
   --fnbar-height: 32px;
   --splitter-width: 4px;
 
+  /* Progress bars */
+  --bar-height: 9px;
+  --bar-bg: var(--border-color);
+  --bar-radius: 2px;
+  --bar-border: 1px solid var(--border-color);
+  --bar-fill: var(--accent);
+  --bar-fill-error: var(--danger);
+  --bar-fill-success: var(--success);
+
   /* Typography */
   --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;

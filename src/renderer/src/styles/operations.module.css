@@ -128,27 +128,28 @@
 }
 
 .opBar {
-  height: 6px;
-  background: var(--bg-tertiary);
-  border-radius: 3px;
+  height: var(--bar-height);
+  background: var(--bar-bg);
+  border-radius: var(--bar-radius);
+  border: var(--bar-border);
   overflow: hidden;
   margin-top: 4px;
 }
 
 .opBarFill {
+  display: block;
   height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
+  background: var(--bar-fill);
   transition: width 0.15s ease;
   min-width: 0;
 }
 
 .opBarFillError {
-  background: var(--danger);
+  background: var(--bar-fill-error);
 }
 
 .opBarFillDone {
-  background: var(--success);
+  background: var(--bar-fill-success);
 }
 
 .opBarFillAnimated {

@@ -40,8 +40,8 @@ export function InfoView({ pluginId, locationId, locationDisplay }: InfoViewProp
           <Row label="Total" value={formatSize(diskSpace.total)} />
           <Row label="Free" value={formatSize(diskSpace.free)} />
           <Row label="Used" value={`${formatSize(diskSpace.total - diskSpace.free)} (${usedPct}%)`} />
-          <div style={{ marginTop: 8, height: 12, background: 'var(--border-color)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${usedPct}%`, background: usedPct > 90 ? 'var(--danger)' : 'var(--accent)', display: 'block' }} />
+          <div style={{ marginTop: 8, height: 'var(--bar-height)', background: 'var(--bar-bg)', borderRadius: 'var(--bar-radius)', border: 'var(--bar-border)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${usedPct}%`, background: usedPct > 90 ? 'var(--bar-fill-error)' : 'var(--bar-fill)', display: 'block' }} />
           </div>
         </Section>
       )}
