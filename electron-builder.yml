@@ -42,10 +42,13 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
   target:
-    - target: zip
+    - target: dmg
       arch:
         - x64
         - arm64
+dmg:
+  artifactName: Something-Commander-${version}.${ext}
+  format: UDBZ
 
 # Linux
 linux:
