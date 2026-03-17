@@ -14,28 +14,20 @@ interface BookmarksState {
   reorderBookmarks: (fromIndex: number, toIndex: number) => void
 }
 
-function loadBookmarks(): Bookmark[] {
-  try {
-    const saved = localStorage.getItem('flemanager-bookmarks')
-    if (saved) return JSON.parse(saved)
-  } catch { /* ignore */ }
-  return []
-}
-
-function saveBookmarks(bookmarks: Bookmark[]): void {
-  localStorage.setItem('flemanager-bookmarks', JSON.stringify(bookmarks))
-}
-
 let bmCounter = 0
 
+function persist(bookmarks: Bookmark[]): void {
+  window.api.store.set('bookmarks', bookmarks)
+}
+
 export const useBookmarksStore = create<BookmarksState>((set) => ({
-  bookmarks: loadBookmarks(),
+  bookmarks: [],
 
   addBookmark: (name, path, pluginId) => {
     set((s) => {
       const bookmark: Bookmark = { id: `bm-${++bmCounter}-${Date.now()}`, name, path, pluginId }
       const newBookmarks = [...s.bookmarks, bookmark]
-      saveBookmarks(newBookmarks)
+      persist(newBookmarks)
       return { bookmarks: newBookmarks }
     })
   },
@@ -43,7 +35,7 @@ export const useBookmarksStore = create<BookmarksState>((set) => ({
   removeBookmark: (id) => {
     set((s) => {
       const newBookmarks = s.bookmarks.filter((b) => b.id !== id)
-      saveBookmarks(newBookmarks)
+      persist(newBookmarks)
       return { bookmarks: newBookmarks }
     })
   },
@@ -53,8 +45,29 @@ export const useBookmarksStore = create<BookmarksState>((set) => ({
       const newBookmarks = [...s.bookmarks]
       const [item] = newBookmarks.splice(fromIndex, 1)
       newBookmarks.splice(toIndex, 0, item)
-      saveBookmarks(newBookmarks)
+      persist(newBookmarks)
       return { bookmarks: newBookmarks }
     })
   }
 }))
+
+/** Called once on app startup. Loads from disk; migrates localStorage data if no disk file yet. */
+export async function loadBookmarks(): Promise<void> {
+  const diskData = await window.api.store.get('bookmarks') as Bookmark[] | null
+  if (diskData && Array.isArray(diskData) && diskData.length > 0) {
+    useBookmarksStore.setState({ bookmarks: diskData })
+    return
+  }
+  // One-time migration from localStorage
+  try {
+    const lsRaw = localStorage.getItem('flemanager-bookmarks')
+    if (lsRaw) {
+      const parsed = JSON.parse(lsRaw) as Bookmark[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        useBookmarksStore.setState({ bookmarks: parsed })
+        await window.api.store.set('bookmarks', parsed)
+        localStorage.removeItem('flemanager-bookmarks')
+      }
+    }
+  } catch { /* ignore */ }
+}

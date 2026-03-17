@@ -219,7 +219,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         }))
       })
 
-      localStorage.setItem(`panel-${panelId}-location`, locationId || '')
+      window.api.store.set(`panel-${panelId}-location`, locationId || '')
     } catch (err) {
       // Don't replace current view — stay where we are, mark the folder as error
       const errorSet = new Set(getActiveTab(get()[panelId]).errorFolderIds)

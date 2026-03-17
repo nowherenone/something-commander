@@ -39,39 +39,23 @@ const DEFAULT_SETTINGS: Settings = {
   shell: navigator.platform?.startsWith('Win') ? 'powershell' : '/bin/bash'
 }
 
-function loadSettings(): Settings {
-  try {
-    const saved = localStorage.getItem('flemanager-settings')
-    if (saved) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
-    }
-  } catch {
-    // ignore
-  }
-  return { ...DEFAULT_SETTINGS }
-}
-
 interface SettingsState extends Settings {
   updateSettings: (partial: Partial<Settings>) => void
   resetSettings: () => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  ...loadSettings(),
+  ...DEFAULT_SETTINGS,
 
   updateSettings: (partial) =>
     set((state) => {
       const newSettings = { ...state, ...partial }
-      // Persist
       const { updateSettings: _, resetSettings: __, ...toSave } = newSettings
-      localStorage.setItem('flemanager-settings', JSON.stringify(toSave))
+      window.api.store.set('settings', toSave)
 
-      // Apply CSS variable overrides
       document.documentElement.style.setProperty('--font-size', `${newSettings.fontSize}px`)
       document.documentElement.style.setProperty('--row-height', `${newSettings.rowHeight}px`)
       document.documentElement.style.setProperty('--font-family', newSettings.fontFamily)
-
-      // Apply theme
       document.documentElement.setAttribute('data-theme', newSettings.theme)
 
       return partial
@@ -79,7 +63,33 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
   resetSettings: () =>
     set(() => {
-      localStorage.removeItem('flemanager-settings')
+      window.api.store.set('settings', DEFAULT_SETTINGS)
       return { ...DEFAULT_SETTINGS }
     })
 }))
+
+/** Called once on app startup. Loads from disk; migrates localStorage data if no disk file yet. */
+export async function loadSettings(): Promise<void> {
+  const diskData = await window.api.store.get('settings') as Partial<Settings> | null
+  if (diskData && typeof diskData === 'object') {
+    const merged = { ...DEFAULT_SETTINGS, ...diskData }
+    useSettingsStore.setState(merged)
+    // Re-apply CSS/theme from loaded settings
+    document.documentElement.style.setProperty('--font-size', `${merged.fontSize}px`)
+    document.documentElement.style.setProperty('--row-height', `${merged.rowHeight}px`)
+    document.documentElement.style.setProperty('--font-family', merged.fontFamily)
+    document.documentElement.setAttribute('data-theme', merged.theme)
+    return
+  }
+  // One-time migration from localStorage
+  try {
+    const lsRaw = localStorage.getItem('flemanager-settings')
+    if (lsRaw) {
+      const parsed = JSON.parse(lsRaw) as Partial<Settings>
+      const merged = { ...DEFAULT_SETTINGS, ...parsed }
+      useSettingsStore.setState(merged)
+      await window.api.store.set('settings', merged)
+      localStorage.removeItem('flemanager-settings')
+    }
+  } catch { /* ignore */ }
+}

@@ -19,7 +19,8 @@ import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
 import { usePanelStore, parentOffset } from './stores/panel-store'
 import { useOperationsStore } from './stores/operations-store'
-import { useSettingsStore } from './stores/settings-store'
+import { useSettingsStore, loadSettings } from './stores/settings-store'
+import { loadBookmarks } from './stores/bookmarks-store'
 import type { Entry } from '@shared/types'
 
 function App(): React.JSX.Element {
@@ -34,7 +35,13 @@ function App(): React.JSX.Element {
   const [s3ConnectOpen, setS3ConnectOpen] = useState(false)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
 
-  const { handleCopy, handleMove, handleDelete, pendingOp, confirmOperation, cancelOperation } = useFileOperations()
+  const { handleCopy, handleMove, handleDelete, handlePack, handleUnpack, pendingOp, confirmOperation, cancelOperation } = useFileOperations()
+
+  // Load persisted user data from disk on first mount
+  useEffect(() => {
+    loadSettings()
+    loadBookmarks()
+  }, [])
 
   // Apply saved theme on mount
   const theme = useSettingsStore((s) => s.theme)
@@ -121,7 +128,9 @@ function App(): React.JSX.Element {
     onF7: handleF7,
     onF8: handleDelete,
     onF9: handleF9,
+    onAltF5: handlePack,
     onAltF7: handleAltF7,
+    onAltF9: handleUnpack,
     onCtrlM: handleCtrlM,
     onCompare: handleCompare
   })
@@ -135,6 +144,8 @@ function App(): React.JSX.Element {
       case 'edit': handleF4(); break
       case 'copy': handleCopy(); break
       case 'move': handleMove(); break
+      case 'pack': handlePack(); break
+      case 'unpack': handleUnpack(); break
       case 'mkdir': handleF7(); break
       case 'delete': handleDelete(); break
       case 'multiRename': handleCtrlM(); break
@@ -215,7 +226,7 @@ function App(): React.JSX.Element {
         window.close()
         break
     }
-  }, [handleF3, handleF4, handleCopy, handleMove, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9, showCommandLine])
+  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9, showCommandLine])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>

@@ -10,7 +10,9 @@ interface KeyboardActions {
   onF7?: () => void
   onF8?: () => void
   onF9?: () => void
+  onAltF5?: () => void
   onAltF7?: () => void
+  onAltF9?: () => void
   onCtrlM?: () => void
   onCompare?: () => void
 }
@@ -192,7 +194,11 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'F5':
           e.preventDefault()
-          actions.onF5?.()
+          if (e.altKey) {
+            actions.onAltF5?.()
+          } else {
+            actions.onF5?.()
+          }
           break
 
         case 'F6':
@@ -217,7 +223,11 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'F9':
           e.preventDefault()
-          actions.onF9?.()
+          if (e.altKey) {
+            actions.onAltF9?.()
+          } else {
+            actions.onF9?.()
+          }
           break
 
         default:

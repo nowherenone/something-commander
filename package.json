@@ -1,9 +1,9 @@
 {
-  "name": "somewhat-commander",
-  "version": "0.1.1",
+  "name": "something-commander",
+  "version": "0.1.2",
   "description": "A modern orthodox two-panel file manager",
   "main": "./out/main/index.js",
-  "author": "Somewhat Commander Contributors",
+  "author": "Something Commander Contributors",
   "license": "MIT",
   "scripts": {
     "format": "prettier --write .",

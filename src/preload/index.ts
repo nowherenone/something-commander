@@ -161,9 +161,18 @@ const utilAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.ENUMERATE_FILES, pluginId, entryIds, destDir)
 }
 
+const storeAPI = {
+  get: (key: string): Promise<unknown> =>
+    ipcRenderer.invoke(IPC_CHANNELS.STORE_GET, key),
+
+  set: (key: string, value: unknown): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.STORE_SET, key, value)
+}
+
 const api = {
   plugins: pluginsAPI,
-  util: utilAPI
+  util: utilAPI,
+  store: storeAPI
 }
 
 if (process.contextIsolated) {

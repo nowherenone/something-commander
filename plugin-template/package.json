@@ -1,8 +1,8 @@
 {
-  "name": "somewhat-commander-example-plugin",
+  "name": "something-commander-example-plugin",
   "displayName": "Example Plugin",
   "version": "1.0.0",
-  "description": "An example Somewhat Commander plugin that shows system information",
+  "description": "An example Something Commander plugin that shows system information",
   "main": "index.js",
-  "keywords": ["somewhat-commander-plugin"]
+  "keywords": ["something-commander-plugin"]
 }

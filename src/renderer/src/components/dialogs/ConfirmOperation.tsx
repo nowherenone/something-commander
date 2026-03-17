@@ -4,7 +4,7 @@ import { formatSize } from '../../utils/format'
 import styles from '../../styles/dialogs.module.css'
 
 interface ConfirmOperationProps {
-  type: 'copy' | 'move' | 'delete'
+  type: 'copy' | 'move' | 'delete' | 'pack' | 'unpack'
   entries: Entry[]
   sourceDir: string
   destDir: string
@@ -26,7 +26,12 @@ export function ConfirmOperation({
   const fileCount = entries.filter((e) => !e.isContainer).length
   const dirCount = entries.filter((e) => e.isContainer).length
 
-  const typeLabel = type === 'copy' ? 'Copy' : type === 'move' ? 'Move' : 'Delete'
+  const typeLabel = type === 'copy' ? 'Copy'
+    : type === 'move' ? 'Move'
+    : type === 'delete' ? 'Delete'
+    : type === 'pack' ? 'Pack'
+    : 'Unpack'
+  const destLabel = type === 'pack' ? 'Archive:' : type === 'unpack' ? 'Extract to:' : 'To:'
 
   // Capture keyboard: Enter confirms, Escape cancels, block everything else from panels
   useEffect(() => {
@@ -58,7 +63,8 @@ export function ConfirmOperation({
           {/* What */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-              {typeLabel} {entries.length} item{entries.length !== 1 ? 's' : ''}
+              {type === 'pack' ? 'Pack' : type === 'unpack' ? 'Unpack' : typeLabel}{' '}
+          {entries.length} item{entries.length !== 1 ? 's' : ''}
               {fileCount > 0 && ` (${fileCount} file${fileCount !== 1 ? 's' : ''}`}
               {dirCount > 0 && `, ${dirCount} folder${dirCount !== 1 ? 's' : ''}`}
               {(fileCount > 0 || dirCount > 0) && ')'}
@@ -101,10 +107,10 @@ export function ConfirmOperation({
             </div>
           </div>
 
-          {/* To (editable for copy/move) */}
+          {/* Destination (editable for copy/move/pack/unpack) */}
           {type !== 'delete' && (
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>To:</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{destLabel}</div>
               <input
                 autoFocus
                 value={editDest}

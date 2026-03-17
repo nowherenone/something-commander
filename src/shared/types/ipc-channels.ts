@@ -42,6 +42,10 @@ export const IPC_CHANNELS = {
   STREAM_COPY_FILE: 'ops:streamCopyFile',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
+  // Persistent user data store (survives builds)
+  STORE_GET: 'store:get',
+  STORE_SET: 'store:set',
+
   // Operation progress events (main → renderer)
   OP_PROGRESS: 'ops:progress',
   OP_COMPLETE: 'ops:complete',

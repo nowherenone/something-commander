@@ -5,7 +5,7 @@ import { useOperationsStore, type OverwritePolicy, type FileItem } from '../stor
 import type { Entry } from '@shared/types'
 
 export interface PendingOperation {
-  type: 'copy' | 'move' | 'delete'
+  type: 'copy' | 'move' | 'delete' | 'pack' | 'unpack'
   entries: Entry[]
   sourceDir: string
   sourcePluginId: string
@@ -49,51 +49,6 @@ async function executeOperation(opId: string): Promise<void> {
   const store = useOperationsStore.getState
   const op = store().operations.find((o) => o.id === opId)
   if (!op) return
-
-  // Non-local-filesystem sources (archive, sftp): use plugin's executeOperation directly
-  const isNonLocalSource = op.sourcePluginId !== 'local-filesystem'
-
-  if (isNonLocalSource && op.type !== 'delete') {
-    store().updateOperation(opId, {
-      status: 'running',
-      currentFile: 'Processing...',
-      totalFiles: op.sourceEntries.length,
-      processedFiles: 0
-    })
-
-    let processed = 0
-    for (const entry of op.sourceEntries) {
-      if (isCancelled(opId)) break
-      store().updateOperation(opId, { currentFile: entry.name, processedFiles: processed })
-
-      const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
-        op: op.type,
-        sourceEntries: [entry],
-        destinationLocationId: op.destinationLocationId,
-        destinationPluginId: op.destinationPluginId
-      })
-
-      if (!result.success && result.errors?.length) {
-        store().updateOperation(opId, {
-          status: 'error',
-          error: result.errors.map((e) => e.message).join('; ')
-        })
-        usePanelStore.getState().refresh('left')
-        usePanelStore.getState().refresh('right')
-        return
-      }
-      processed++
-    }
-
-    await usePanelStore.getState().refresh('left')
-    await usePanelStore.getState().refresh('right')
-
-    const finalOp = store().operations.find((o) => o.id === opId)
-    if (finalOp?.status === 'running') {
-      store().removeOperation(opId)
-    }
-    return
-  }
 
   // Phase 1: Enumerate files
   store().updateOperation(opId, { status: 'enumerating', currentFile: 'Scanning files...' })
@@ -143,25 +98,49 @@ async function executeOperation(opId: string): Promise<void> {
 
     try {
       if (op.type === 'delete') {
-        const result = await window.api.util.deleteSingle(item.sourcePath)
-        if (!result.success) {
-          store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
-          return
+        if (item.sourcePath.includes('::')) {
+          // Archive entry — route through plugin
+          const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
+            op: 'delete',
+            entries: [{
+              id: item.sourcePath,
+              name: item.relativePath.split('/').pop() || item.relativePath,
+              isContainer: item.isDirectory,
+              size: item.size,
+              modifiedAt: 0,
+              mimeType: '',
+              iconHint: item.isDirectory ? 'folder' : 'file',
+              meta: {},
+              attributes: { readonly: false, hidden: false, symlink: false }
+            }]
+          })
+          if (!result.success) {
+            store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.errors?.[0]?.message || 'Delete failed'}` })
+            return
+          }
+        } else {
+          const result = await window.api.util.deleteSingle(item.sourcePath)
+          if (!result.success) {
+            store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
+            return
+          }
         }
       } else {
         // copy or move
         if (item.isDirectory) {
-          // Create directory at destination via dest plugin
-          const dirName = item.destPath.split(/[\\/]/).pop() || ''
-          const parentDir = item.destPath.replace(/[\\/][^\\/]+$/, '') || item.destPath
-          await window.api.plugins.executeOperation(op.destinationPluginId, {
-            op: 'createDirectory',
-            parentLocationId: parentDir,
-            name: dirName
-          })
+          // Archives create directories implicitly when files are written into them
+          if (!item.destPath.includes('::')) {
+            const dirName = item.destPath.split(/[\\/]/).pop() || ''
+            const parentDir = item.destPath.replace(/[\\/][^\\/]+$/, '') || item.destPath
+            await window.api.plugins.executeOperation(op.destinationPluginId, {
+              op: 'createDirectory',
+              parentLocationId: parentDir,
+              name: dirName
+            })
+          }
         } else {
-          // Check for overwrite
-          const exists = await window.api.util.checkExists(item.destPath)
+          // Check for overwrite (only meaningful for local filesystem destinations)
+          const exists = !item.destPath.includes('::') && await window.api.util.checkExists(item.destPath)
           if (exists) {
             const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
 
@@ -204,8 +183,26 @@ async function executeOperation(opId: string): Promise<void> {
             }
           })
 
-          const destDir = item.destPath.replace(/[\\/][^\\/]+$/, '') || item.destPath
-          const destFileName = item.destPath.split(/[\\/]/).pop() || item.relativePath
+          // Archive paths use :: as separator and / for internal paths — handle separately
+          let destDir: string
+          let destFileName: string
+          if (item.destPath.includes('::')) {
+            const sepIdx = item.destPath.indexOf('::')
+            const archivePart = item.destPath.slice(0, sepIdx)
+            // Normalize: local fs uses backslashes on Windows, ZIP requires forward slashes
+            const internalPart = item.destPath.slice(sepIdx + 2).replace(/\\/g, '/').replace(/^\//, '')
+            const lastSlash = internalPart.lastIndexOf('/')
+            if (lastSlash >= 0) {
+              destDir = archivePart + '::' + internalPart.slice(0, lastSlash)
+              destFileName = internalPart.slice(lastSlash + 1)
+            } else {
+              destDir = archivePart + '::'
+              destFileName = internalPart || item.relativePath
+            }
+          } else {
+            destDir = item.destPath.replace(/[\\/][^\\/]+$/, '') || item.destPath
+            destFileName = item.destPath.split(/[\\/]/).pop() || item.relativePath
+          }
 
           const result = await window.api.util.streamCopyFile(
             op.sourcePluginId,
@@ -381,19 +378,86 @@ export function useFileOperations() {
     if (!pendingOp) return
     setPendingOp(null)
 
-    useOperationsStore.getState().enqueue({
-      type: pendingOp.type,
-      sourceEntries: pendingOp.entries,
-      sourcePluginId: pendingOp.sourcePluginId,
-      destinationDisplay: destDir,
-      destinationLocationId: destDir,
-      destinationPluginId: pendingOp.destPluginId
-    })
+    if (pendingOp.type === 'pack') {
+      // destDir is the full archive path (e.g. D:\dest\archive.zip)
+      useOperationsStore.getState().enqueue({
+        type: 'copy',
+        sourceEntries: pendingOp.entries,
+        sourcePluginId: pendingOp.sourcePluginId,
+        destinationDisplay: destDir,
+        destinationLocationId: destDir + '::',
+        destinationPluginId: 'archive'
+      })
+    } else if (pendingOp.type === 'unpack') {
+      // Transform archive file entries to archive-root entries (archivePath::)
+      const archiveRootEntries = pendingOp.entries.map((e) => ({ ...e, id: e.id + '::' }))
+      useOperationsStore.getState().enqueue({
+        type: 'copy',
+        sourceEntries: archiveRootEntries,
+        sourcePluginId: 'archive',
+        destinationDisplay: destDir,
+        destinationLocationId: destDir,
+        destinationPluginId: pendingOp.destPluginId
+      })
+    } else {
+      useOperationsStore.getState().enqueue({
+        type: pendingOp.type,
+        sourceEntries: pendingOp.entries,
+        sourcePluginId: pendingOp.sourcePluginId,
+        destinationDisplay: destDir,
+        destinationLocationId: destDir,
+        destinationPluginId: pendingOp.destPluginId
+      })
+    }
   }, [pendingOp])
 
   const cancelOperation = useCallback(() => {
     setPendingOp(null)
   }, [])
 
-  return { handleCopy, handleMove, handleDelete, pendingOp, confirmOperation, cancelOperation, getSelectedEntries }
+  const handlePack = useCallback(() => {
+    const { selected, tab, activePanel } = getSelectedEntries()
+    if (selected.length === 0) return
+    const otherPanel = activePanel === 'left' ? 'right' : 'left'
+    const destTab = usePanelStore.getState().getActiveTab(otherPanel)
+    if (!destTab.locationId) return
+
+    // Default archive name: single selection uses its base name, multiple → 'archive'
+    const baseName = selected.length === 1
+      ? selected[0].name.replace(/\.[^.]+$/, '')
+      : 'archive'
+    const loc = destTab.locationId.replace(/[/\\]$/, '')
+    const sep = loc.includes('/') && !loc.includes('\\') ? '/' : '\\'
+    const defaultArchivePath = loc + sep + baseName + '.zip'
+
+    setPendingOp({
+      type: 'pack',
+      entries: selected,
+      sourceDir: tab.locationDisplay,
+      sourcePluginId: tab.pluginId,
+      destDir: defaultArchivePath,
+      destPluginId: destTab.pluginId
+    })
+  }, [getSelectedEntries])
+
+  const handleUnpack = useCallback(() => {
+    const { selected, tab, activePanel } = getSelectedEntries()
+    // Only archive files
+    const archives = selected.filter((e) => !e.isContainer && /\.(zip|jar)$/i.test(e.name))
+    if (archives.length === 0) return
+    const otherPanel = activePanel === 'left' ? 'right' : 'left'
+    const destTab = usePanelStore.getState().getActiveTab(otherPanel)
+    if (!destTab.locationId) return
+
+    setPendingOp({
+      type: 'unpack',
+      entries: archives,
+      sourceDir: tab.locationDisplay,
+      sourcePluginId: tab.pluginId,
+      destDir: destTab.locationId,
+      destPluginId: destTab.pluginId
+    })
+  }, [getSelectedEntries])
+
+  return { handleCopy, handleMove, handleDelete, handlePack, handleUnpack, pendingOp, confirmOperation, cancelOperation, getSelectedEntries }
 }

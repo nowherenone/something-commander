@@ -7,6 +7,11 @@ interface DriveInfo {
   path: string
 }
 
+// Module-level cache shared by both panel instances — drives change rarely
+let drivesCache: DriveInfo[] = []
+let drivesCacheTime = 0
+const DRIVES_CACHE_TTL = 30_000 // 30 seconds
+
 interface DriveBookmarkMenuProps {
   currentLocation: string
   currentPluginId: string
@@ -31,17 +36,42 @@ export function DriveBookmarkMenu({
   const removeBookmark = useBookmarksStore((s) => s.removeBookmark)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Load drives when opened
+  // Load drives when opened — use cache to avoid repeated expensive queries
   useEffect(() => {
     if (!isOpen) return
+    setAddingBookmark(false)
+
+    const isFresh = drivesCache.length > 0 && (Date.now() - drivesCacheTime) < DRIVES_CACHE_TTL
+
+    const applyDrives = (entries: DriveInfo[]): void => {
+      setDrives(entries)
+      // Start cursor on first bookmark if any exist, otherwise first drive
+      const bmCount = useBookmarksStore.getState().bookmarks.length
+      setCursorIdx(bmCount > 0 ? entries.length : 0)
+    }
+
+    if (isFresh) {
+      applyDrives(drivesCache)
+      return
+    }
+
+    // Show stale data immediately while refreshing (avoids blank menu flash)
+    if (drivesCache.length > 0) applyDrives(drivesCache)
+
+    const wasEmpty = drivesCache.length === 0
     window.api.plugins.readDirectory('local-filesystem', null).then((result) => {
-      const driveEntries = result.entries
+      const entries = result.entries
         .filter((e) => e.isContainer)
         .map((e) => ({ name: e.name, path: e.id }))
-      setDrives(driveEntries)
+      drivesCache = entries
+      drivesCacheTime = Date.now()
+      setDrives(entries)
+      if (wasEmpty) {
+        // First ever load: set cursor now (stale path already handled cursor above)
+        const bmCount = useBookmarksStore.getState().bookmarks.length
+        setCursorIdx(bmCount > 0 ? entries.length : 0)
+      }
     })
-    setCursorIdx(0)
-    setAddingBookmark(false)
   }, [isOpen])
 
   // Build flat list of all items for keyboard navigation

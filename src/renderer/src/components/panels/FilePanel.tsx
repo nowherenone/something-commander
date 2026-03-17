@@ -56,8 +56,15 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
 
   // Navigate to saved location on mount only
   useEffect(() => {
-    const savedLocation = localStorage.getItem(`panel-${panelId}-location`)
-    usePanelStore.getState().navigate(panelId, savedLocation || null)
+    window.api.store.get(`panel-${panelId}-location`).then((saved) => {
+      let location = (saved as string | null) || null
+      if (!location) {
+        // One-time migration from localStorage
+        location = localStorage.getItem(`panel-${panelId}-location`) || null
+        if (location) localStorage.removeItem(`panel-${panelId}-location`)
+      }
+      usePanelStore.getState().navigate(panelId, location || null)
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelId])
 
@@ -131,6 +138,15 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const showParentEntry = hasParentEntry(tab)
   const bookmarks = useBookmarksStore((s) => s.bookmarks)
   const isHome = tab.locationId === null
+
+  // When landing on the home page, jump cursor to first bookmark (past the drives list)
+  const prevIsHomeRef = React.useRef(false)
+  useEffect(() => {
+    const arrivedAtHome = isHome && !prevIsHomeRef.current
+    prevIsHomeRef.current = isHome
+    if (!arrivedAtHome || bookmarks.length === 0 || tab.entries.length === 0) return
+    setCursor(panelId, tab.entries.length) // first bookmark index in displayEntries
+  }, [isHome, tab.entries.length, bookmarks.length, panelId, setCursor])
 
   // At home view, append bookmarks as navigable entries
   const homeBookmarkEntries = isHome ? bookmarks.map((bm) => ({

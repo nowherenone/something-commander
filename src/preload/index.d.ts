@@ -81,14 +81,20 @@ interface UtilAPI {
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>>
 }
 
-interface SomewhatCommanderAPI {
+interface StoreAPI {
+  get(key: string): Promise<unknown>
+  set(key: string, value: unknown): Promise<void>
+}
+
+interface SomethingCommanderAPI {
   plugins: PluginsAPI
   util: UtilAPI
+  store: StoreAPI
 }
 
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: SomewhatCommanderAPI
+    api: SomethingCommanderAPI
   }
 }

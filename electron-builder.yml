@@ -1,5 +1,5 @@
-appId: com.somewhat-commander.app
-productName: Somewhat Commander
+appId: com.something-commander.app
+productName: Something Commander
 directories:
   buildResources: build
 files:
@@ -17,7 +17,7 @@ asarUnpack:
 
 # Windows
 win:
-  executableName: somewhat-commander
+  executableName: something-commander
   signAndEditExecutable: false
   icon: build/icon.ico
   target:
@@ -30,9 +30,9 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  artifactName: Somewhat-Commander-${version}-setup.${ext}
-  shortcutName: Somewhat Commander
-  uninstallDisplayName: Somewhat Commander
+  artifactName: Something-Commander-${version}-setup.${ext}
+  shortcutName: Something Commander
+  uninstallDisplayName: Something Commander
   createDesktopShortcut: always
   createStartMenuShortcut: true
 
@@ -47,7 +47,7 @@ mac:
         - x64
         - arm64
 dmg:
-  artifactName: Somewhat-Commander-${version}.${ext}
+  artifactName: Something-Commander-${version}.${ext}
 
 # Linux
 linux:
@@ -59,12 +59,12 @@ linux:
     - target: AppImage
       arch:
         - x64
-  maintainer: Somewhat Commander Contributors
+  maintainer: Something Commander Contributors
   category: Utility
   description: A modern orthodox two-panel file manager
 deb:
-  artifactName: somewhat-commander-${version}.${ext}
+  artifactName: something-commander-${version}.${ext}
 appImage:
-  artifactName: Somewhat-Commander-${version}.${ext}
+  artifactName: Something-Commander-${version}.${ext}
 
 npmRebuild: false

@@ -56,10 +56,16 @@ const mockUtilApi = {
   extractFromArchive: vi.fn().mockResolvedValue({ success: true, extractedCount: 1 })
 }
 
+const mockStoreApi = {
+  get: vi.fn().mockResolvedValue(null),
+  set: vi.fn().mockResolvedValue(undefined)
+}
+
 Object.defineProperty(window, 'api', {
   value: {
     plugins: mockPluginsApi,
-    util: mockUtilApi
+    util: mockUtilApi,
+    store: mockStoreApi
   },
   writable: true
 })
