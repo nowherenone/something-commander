@@ -39,6 +39,19 @@ const MENUS: MenuDef[] = [
     ]
   },
   {
+    label: 'Mark',
+    items: [
+      { label: 'Select Group...', shortcut: 'Num +', action: 'selectGroup' },
+      { label: 'Unselect Group...', shortcut: 'Num -', action: 'unselectGroup' },
+      { label: '', action: '', separator: true },
+      { label: 'Select All', shortcut: 'Ctrl Num +', action: 'selectAll' },
+      { label: 'Unselect All', shortcut: 'Ctrl Num -', action: 'deselectAll' },
+      { label: '', action: '', separator: true },
+      { label: 'Invert Selection', shortcut: 'Num *', action: 'invertSelection' },
+      { label: 'Select All With Same Extension', shortcut: 'Alt Num +', action: 'selectSameExt' }
+    ]
+  },
+  {
     label: 'View',
     items: [
       { label: 'Brief (File List)', shortcut: 'Ctrl+1', action: 'viewBrief' },

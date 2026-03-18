@@ -108,9 +108,17 @@ interface PanelStoreState {
   selectAll: (panelId: 'left' | 'right') => void
   deselectAll: (panelId: 'left' | 'right') => void
   invertSelection: (panelId: 'left' | 'right') => void
+  selectGroup: (panelId: 'left' | 'right', pattern: string) => void
+  unselectGroup: (panelId: 'left' | 'right', pattern: string) => void
+  selectSameExt: (panelId: 'left' | 'right') => void
 
   // Helpers
   getActiveTab: (panelId: 'left' | 'right') => TabState
+}
+
+function globToRegex(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')
+  return new RegExp(`^${escaped}$`, 'i')
 }
 
 export const usePanelStore = create<PanelStoreState>((set, get) => ({
@@ -501,6 +509,46 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       if (!tab.selectedEntryIds.has(entry.id)) {
         newSet.add(entry.id)
       }
+    }
+    set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, selectedEntryIds: newSet })) })
+  },
+
+  selectGroup: (panelId, pattern) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    const regex = globToRegex(pattern)
+    const newSet = new Set(tab.selectedEntryIds)
+    for (const entry of tab.entries) {
+      if (regex.test(entry.name)) newSet.add(entry.id)
+    }
+    set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, selectedEntryIds: newSet })) })
+  },
+
+  unselectGroup: (panelId, pattern) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    const regex = globToRegex(pattern)
+    const newSet = new Set(tab.selectedEntryIds)
+    for (const entry of tab.entries) {
+      if (regex.test(entry.name)) newSet.delete(entry.id)
+    }
+    set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, selectedEntryIds: newSet })) })
+  },
+
+  selectSameExt: (panelId) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    const offset = hasParentEntry(tab) ? 1 : 0
+    const idx = tab.cursorIndex - offset
+    if (idx < 0 || idx >= tab.entries.length) return
+    const cursorEntry = tab.entries[idx]
+    const dotIdx = cursorEntry.name.lastIndexOf('.')
+    const ext = dotIdx >= 0 ? cursorEntry.name.slice(dotIdx).toLowerCase() : ''
+    const newSet = new Set(tab.selectedEntryIds)
+    for (const entry of tab.entries) {
+      const entryDot = entry.name.lastIndexOf('.')
+      const entryExt = entryDot >= 0 ? entry.name.slice(entryDot).toLowerCase() : ''
+      if (entryExt === ext) newSet.add(entry.id)
     }
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, selectedEntryIds: newSet })) })
   }

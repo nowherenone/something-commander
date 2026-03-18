@@ -7,7 +7,7 @@ import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 import { scanPlugins, loadPlugin, unloadPlugin, ensurePluginsDir } from '../plugins/plugin-loader'
-import { extractFromZip } from '../plugins/archive'
+import { extractFromZip, ArchivePlugin, getArchiveFormats } from '../plugins/archive'
 import type { SftpPlugin } from '../plugins/sftp'
 import type { S3Plugin } from '../plugins/s3'
 
@@ -60,8 +60,11 @@ export function registerPluginIPC(): void {
   })
 
   ipcMain.handle(IPC_CHANNELS.IS_ARCHIVE, (_event, filePath: string) => {
-    const ext = path.extname(filePath).toLowerCase()
-    return ['.zip', '.jar'].includes(ext)
+    return ArchivePlugin.isArchive(filePath)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ARCHIVE_FORMATS, () => {
+    return getArchiveFormats()
   })
 
   // Open file with system default application

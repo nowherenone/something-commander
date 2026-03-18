@@ -19,6 +19,7 @@ export const IPC_CHANNELS = {
   CHECK_EXISTS: 'ops:checkExists',
   GET_FILE_INFO: 'ops:getFileInfo',
   IS_ARCHIVE: 'util:isArchive',
+  ARCHIVE_FORMATS: 'util:archiveFormats',
   OPEN_FILE: 'util:openFile',
   OPEN_VIEWER_WINDOW: 'util:openViewerWindow',
   OPEN_EDITOR_WINDOW: 'util:openEditorWindow',

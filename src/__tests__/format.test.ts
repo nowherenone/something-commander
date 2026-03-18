@@ -4,29 +4,39 @@ import { formatSize, formatDate } from '../renderer/src/utils/format'
 describe('formatSize', () => {
   it('returns empty string for negative values', () => {
     expect(formatSize(-1)).toBe('')
+    expect(formatSize(-1, 'short')).toBe('')
   })
 
-  it('formats zero bytes', () => {
-    expect(formatSize(0)).toBe('0 B')
+  it('formats zero bytes — full', () => {
+    expect(formatSize(0)).toBe('0')
+    expect(formatSize(0, 'full')).toBe('0')
   })
 
-  it('formats bytes', () => {
-    expect(formatSize(500)).toContain('500')
+  it('formats zero bytes — short', () => {
+    expect(formatSize(0, 'short')).toBe('0')
   })
 
-  it('formats kilobytes', () => {
-    const result = formatSize(2048)
-    expect(result).toContain('kB')
+  it('full format — shows raw bytes with locale separators', () => {
+    expect(formatSize(500, 'full')).toContain('500')
+    expect(formatSize(2048, 'full')).toContain('2')
+    expect(formatSize(5_000_000, 'full')).toContain('000')
   })
 
-  it('formats megabytes', () => {
-    const result = formatSize(5 * 1000 * 1000)
-    expect(result).toContain('MB')
+  it('short format — kilobytes', () => {
+    expect(formatSize(2048, 'short')).toContain('kB')
   })
 
-  it('formats gigabytes', () => {
-    const result = formatSize(3.5 * 1000 * 1000 * 1000)
-    expect(result).toContain('GB')
+  it('short format — megabytes', () => {
+    expect(formatSize(5 * 1000 * 1000, 'short')).toContain('MB')
+  })
+
+  it('short format — gigabytes', () => {
+    expect(formatSize(3.5 * 1000 * 1000 * 1000, 'short')).toContain('GB')
+  })
+
+  it('short format — no decimal places', () => {
+    const result = formatSize(1_500_000, 'short')
+    expect(result).not.toMatch(/\.\d/)
   })
 })
 

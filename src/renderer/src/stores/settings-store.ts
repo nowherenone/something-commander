@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 export type BottomBarMode = 'fnkeys' | 'status' | 'none'
+export type SizeFormat = 'full' | 'short'
 
 export interface Settings {
   // Display
@@ -9,6 +10,7 @@ export interface Settings {
   showHiddenFiles: boolean
   dateFormat: string
   fontFamily: string
+  sizeFormat: SizeFormat
 
   // Layout
   bottomBar: BottomBarMode
@@ -31,6 +33,7 @@ const DEFAULT_SETTINGS: Settings = {
   showHiddenFiles: false,
   dateFormat: 'yyyy-MM-dd HH:mm',
   fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
+  sizeFormat: 'full',
   bottomBar: 'fnkeys',
   showCommandLine: false,
   confirmDelete: true,

@@ -48,6 +48,7 @@ interface UtilAPI {
   checkExists(filePath: string): Promise<boolean>
   getFileInfo(filePath: string): Promise<{ size: number; modifiedAt: number; isDirectory: boolean } | null>
   isArchive(filePath: string): Promise<boolean>
+  getArchiveFormats(): Promise<Array<{ label: string; extensions: string[]; primaryExtension: string; supportsWrite: boolean }>>
   openFile(filePath: string): Promise<string>
   openViewerWindow(filePath: string, fileName: string): Promise<void>
   openEditorWindow(filePath: string, fileName: string): Promise<void>

@@ -10,11 +10,13 @@
   display: flex;
   align-items: center;
   padding: 0 8px;
-  font-size: var(--font-size-small);
+  font-size: var(--font-size);
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .headerCell:hover {
@@ -57,11 +59,6 @@
   color: white;
 }
 
-.entryRow.cursor .colExt,
-.entryRow.cursor .colSize,
-.entryRow.cursor .colDate {
-  color: rgba(255, 255, 255, 0.55);
-}
 
 .entryRow.cursorInactive {
   background: #3a3f47;
@@ -133,22 +130,25 @@
 }
 
 .colExt {
-  width: 60px;
+  width: 5em;
   padding: 0 8px;
-  color: var(--text-muted);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size);
   text-align: left;
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .colSize {
-  width: 90px;
-  padding: 2px 8px 0;
+  width: 7em;
+  padding: 0 8px;
   text-align: right;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size);
   flex-shrink: 0;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Drive size bar in home view */
@@ -167,9 +167,11 @@
 }
 
 .colDate {
-  width: 130px;
+  width: 11em;
   padding: 0 8px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size);
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

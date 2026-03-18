@@ -15,6 +15,8 @@ interface KeyboardActions {
   onAltF9?: () => void
   onCtrlM?: () => void
   onCompare?: () => void
+  onSelectGroup?: () => void
+  onUnselectGroup?: () => void
 }
 
 export function useKeyboard(actions: KeyboardActions): void {
@@ -23,7 +25,7 @@ export function useKeyboard(actions: KeyboardActions): void {
       const activePanel = useAppStore.getState().activePanel
       const store = usePanelStore.getState()
       const tab = store.getActiveTab(activePanel)
-      const { navigate, setCursor, toggleSelect, spaceSelect, selectAll, deselectAll, invertSelection, addTab, closeTab, toggleHidden } = store
+      const { navigate, setCursor, toggleSelect, spaceSelect, selectAll, deselectAll, invertSelection, selectSameExt, addTab, closeTab, toggleHidden } = store
 
       // Don't handle keyboard when an input is focused
       if (
@@ -157,6 +159,37 @@ export function useKeyboard(actions: KeyboardActions): void {
             toggleSelect(activePanel, tab.entries[idx].id)
           }
           setCursor(activePanel, tab.cursorIndex + 1)
+          break
+        }
+
+        case '+': {
+          if (e.code !== 'NumpadAdd') break
+          e.preventDefault()
+          if (e.ctrlKey) {
+            selectAll(activePanel)
+          } else if (e.altKey) {
+            selectSameExt(activePanel)
+          } else {
+            actions.onSelectGroup?.()
+          }
+          break
+        }
+
+        case '-': {
+          if (e.code !== 'NumpadSubtract') break
+          e.preventDefault()
+          if (e.ctrlKey) {
+            deselectAll(activePanel)
+          } else {
+            actions.onUnselectGroup?.()
+          }
+          break
+        }
+
+        case '*': {
+          if (e.code !== 'NumpadMultiply') break
+          e.preventDefault()
+          invertSelection(activePanel)
           break
         }
 

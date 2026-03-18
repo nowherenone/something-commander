@@ -14,6 +14,7 @@ import { ToastContainer } from './components/layout/Toast'
 import { SftpConnect } from './components/dialogs/SftpConnect'
 import { S3Connect } from './components/dialogs/S3Connect'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
+import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
@@ -34,6 +35,7 @@ function App(): React.JSX.Element {
   const [sftpConnectOpen, setSftpConnectOpen] = useState(false)
   const [s3ConnectOpen, setS3ConnectOpen] = useState(false)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
+  const [selectGroupMode, setSelectGroupMode] = useState<'select' | 'unselect' | null>(null)
 
   const { handleCopy, handleMove, handleDelete, handlePack, handleUnpack, pendingOp, confirmOperation, cancelOperation } = useFileOperations()
 
@@ -132,7 +134,9 @@ function App(): React.JSX.Element {
     onAltF7: handleAltF7,
     onAltF9: handleUnpack,
     onCtrlM: handleCtrlM,
-    onCompare: handleCompare
+    onCompare: handleCompare,
+    onSelectGroup: () => setSelectGroupMode('select'),
+    onUnselectGroup: () => setSelectGroupMode('unselect')
   })
 
   const bottomBar = useSettingsStore((s) => s.bottomBar)
@@ -222,6 +226,32 @@ function App(): React.JSX.Element {
       case 'setBottomNone':
         useSettingsStore.getState().updateSettings({ bottomBar: 'none' })
         break
+      case 'selectGroup':
+        setSelectGroupMode('select')
+        break
+      case 'unselectGroup':
+        setSelectGroupMode('unselect')
+        break
+      case 'selectAll': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().selectAll(ap)
+        break
+      }
+      case 'deselectAll': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().deselectAll(ap)
+        break
+      }
+      case 'invertSelection': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().invertSelection(ap)
+        break
+      }
+      case 'selectSameExt': {
+        const ap = useAppStore.getState().activePanel
+        usePanelStore.getState().selectSameExt(ap)
+        break
+      }
       case 'quit':
         window.close()
         break
@@ -413,6 +443,22 @@ function App(): React.JSX.Element {
 
       {pluginManagerOpen && (
         <PluginManagerDialog onClose={() => setPluginManagerOpen(false)} />
+      )}
+
+      {selectGroupMode && (
+        <SelectGroupDialog
+          mode={selectGroupMode}
+          onConfirm={(pattern) => {
+            const ap = useAppStore.getState().activePanel
+            if (selectGroupMode === 'select') {
+              usePanelStore.getState().selectGroup(ap, pattern)
+            } else {
+              usePanelStore.getState().unselectGroup(ap, pattern)
+            }
+            setSelectGroupMode(null)
+          }}
+          onCancel={() => setSelectGroupMode(null)}
+        />
       )}
 
       {s3ConnectOpen && (

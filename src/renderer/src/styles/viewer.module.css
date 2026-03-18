@@ -1,0 +1,71 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.toolbarName {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbarInfo {
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 150px;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  font-size: var(--font-size-small);
+  font-family: var(--font-family);
+}
+
+.modeBtn {
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.modeBtnActive {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

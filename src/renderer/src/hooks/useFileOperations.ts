@@ -440,10 +440,12 @@ export function useFileOperations() {
     })
   }, [getSelectedEntries])
 
-  const handleUnpack = useCallback(() => {
+  const handleUnpack = useCallback(async () => {
     const { selected, tab, activePanel } = getSelectedEntries()
-    // Only archive files
-    const archives = selected.filter((e) => !e.isContainer && /\.(zip|jar)$/i.test(e.name))
+    const candidates = selected.filter((e) => !e.isContainer)
+    if (candidates.length === 0) return
+    const checks = await Promise.all(candidates.map((e) => window.api.util.isArchive(e.id).then((is) => ({ e, is }))))
+    const archives = checks.filter((x) => x.is).map((x) => x.e)
     if (archives.length === 0) return
     const otherPanel = activePanel === 'left' ? 'right' : 'left'
     const destTab = usePanelStore.getState().getActiveTab(otherPanel)

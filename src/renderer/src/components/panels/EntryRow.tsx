@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize, formatDate } from '../../utils/format'
 import { getIconForHint } from '../../utils/icon-map'
+import { useSettingsStore } from '../../stores/settings-store'
 import styles from '../../styles/file-list.module.css'
 
 function DriveSizeBar({ driveId }: { driveId: string }): React.JSX.Element | null {
@@ -45,6 +46,8 @@ export const EntryRow = React.memo(function EntryRow({
   onDoubleClick,
   onContextMenu
 }: EntryRowProps): React.JSX.Element {
+  const sizeFormat = useSettingsStore((s) => s.sizeFormat)
+  const dateFormat = useSettingsStore((s) => s.dateFormat)
   const classNames = [
     styles.entryRow,
     isCursor ? (isPanelActive ? styles.cursor : styles.cursorInactive) : '',
@@ -65,9 +68,9 @@ export const EntryRow = React.memo(function EntryRow({
       if (isCalculating) {
         return <span className={styles.sizeLoading}>...</span>
       }
-      return entry.size > 0 ? formatSize(entry.size) : ''
+      return entry.size > 0 ? formatSize(entry.size, sizeFormat) : ''
     }
-    return formatSize(entry.size)
+    return formatSize(entry.size, sizeFormat)
   }
 
   return (
@@ -80,7 +83,7 @@ export const EntryRow = React.memo(function EntryRow({
         {entry.isContainer ? (isDrive ? '' : '<DIR>') : ((entry.meta.extension as string) || '')}
       </div>
       <div className={styles.colSize}>{renderSize()}</div>
-      <div className={styles.colDate}>{formatDate(entry.modifiedAt)}</div>
+      <div className={styles.colDate}>{formatDate(entry.modifiedAt, dateFormat)}</div>
     </div>
   )
 })

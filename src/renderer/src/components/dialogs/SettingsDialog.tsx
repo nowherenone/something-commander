@@ -82,6 +82,17 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                       />
                       <span className={styles.settingsLabel}>Show hidden files</span>
                     </label>
+                    <div className={styles.settingsRow}>
+                      <span className={styles.settingsLabel}>File size display</span>
+                      <select
+                        className={styles.settingsSelect}
+                        value={settings.sizeFormat}
+                        onChange={(e) => update({ sizeFormat: e.target.value as 'full' | 'short' })}
+                      >
+                        <option value="full">Full (1,234,567)</option>
+                        <option value="short">Short (1 MB)</option>
+                      </select>
+                    </div>
                   </div>
                 </>
               )}

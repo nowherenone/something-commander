@@ -83,6 +83,9 @@ const utilAPI = {
   isArchive: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.IS_ARCHIVE, filePath),
 
+  getArchiveFormats: (): Promise<Array<{ label: string; extensions: string[]; primaryExtension: string; supportsWrite: boolean }>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.ARCHIVE_FORMATS),
+
   openFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.OPEN_FILE, filePath),
 

@@ -74,10 +74,11 @@ export function DriveBookmarkMenu({
     })
   }, [isOpen])
 
-  // Build flat list of all items for keyboard navigation
+  // Build flat list of all items for keyboard navigation (includes the add button as last item)
   const allItems = [
     ...drives.map((d) => ({ type: 'drive' as const, label: d.name, path: d.path })),
-    ...bookmarks.map((b) => ({ type: 'bookmark' as const, label: b.name, path: b.path, id: b.id }))
+    ...bookmarks.map((b) => ({ type: 'bookmark' as const, label: b.name, path: b.path, id: b.id })),
+    { type: 'add' as const, label: '+ Add current folder', path: '' }
   ]
 
   const handleSelect = useCallback(
@@ -121,7 +122,10 @@ export function DriveBookmarkMenu({
           setCursorIdx((i) => Math.max(i - 1, 0))
           break
         case 'Enter':
-          if (allItems[cursorIdx]) {
+          if (allItems[cursorIdx]?.type === 'add') {
+            setBookmarkName(currentLocation.split(/[\\/]/).pop() || currentLocation)
+            setAddingBookmark(true)
+          } else if (allItems[cursorIdx]) {
             handleSelect(allItems[cursorIdx].path)
           }
           break
@@ -242,11 +246,12 @@ export function DriveBookmarkMenu({
               </div>
             ) : (
               <button
-                className={styles.addBookmark}
+                className={`${styles.addBookmark} ${cursorIdx === drives.length + bookmarks.length ? styles.itemActive : ''}`}
                 onClick={() => {
                   setBookmarkName(currentLocation.split(/[\\/]/).pop() || currentLocation)
                   setAddingBookmark(true)
                 }}
+                onMouseEnter={() => setCursorIdx(drives.length + bookmarks.length)}
               >
                 + Add current folder
               </button>

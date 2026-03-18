@@ -1,25 +1,28 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import { formatSize } from '../../utils/format'
+import { formatHexLines } from '../../utils/hex'
+import { FileContentView } from '../FileContentView'
 import type { Entry } from '@shared/types'
+import styles from '../../styles/quickview.module.css'
+import panelStyles from '../../styles/panels.module.css'
 
 interface QuickViewProps {
   /** The entry from the OPPOSITE panel's cursor */
   entry: Entry | null
 }
 
-const LINE_HEIGHT = 16
+const PREVIEW_LIMIT = 256 * 1024
 
 export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
-  const [content, setContent] = useState('')
+  const [lines, setLines] = useState<string[]>([])
   const [isBinary, setIsBinary] = useState(false)
   const [fileSize, setFileSize] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!entry || entry.isContainer) {
-      setContent('')
+      setLines([])
       setIsBinary(false)
       setFileSize(0)
       setError(null)
@@ -29,11 +32,14 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
     setLoading(true)
     setError(null)
 
-    window.api.util.readFileContent(entry.id, 256 * 1024).then((result) => {
+    window.api.util.readFileContent(entry.id, PREVIEW_LIMIT).then((result) => {
       if (result.error) {
         setError(result.error)
       } else {
-        setContent(result.isBinary ? formatHex(result.content) : result.content)
+        const newLines = result.isBinary
+          ? formatHexLines(result.content)
+          : result.content.split('\n')
+        setLines(newLines)
         setIsBinary(result.isBinary)
         setFileSize(result.totalSize)
       }
@@ -42,90 +48,37 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
   }, [entry?.id])
 
   if (!entry) {
-    return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
-        No file selected in opposite panel
-      </div>
-    )
+    return <div className={styles.empty}>No file selected in opposite panel</div>
   }
 
   if (entry.isContainer) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12, gap: 4 }}>
-        <span style={{ fontSize: 24 }}>{'\uD83D\uDCC1'}</span>
-        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{entry.name}</span>
+      <div className={styles.dirState}>
+        <span className={styles.dirIcon}>{'\uD83D\uDCC1'}</span>
+        <span className={styles.dirName}>{entry.name}</span>
         <span>Directory</span>
       </div>
     )
   }
 
+  const isTruncated = fileSize > PREVIEW_LIMIT
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{
-        padding: '4px 8px',
-        background: 'var(--bg-header)',
-        borderBottom: '1px solid var(--border-color)',
-        fontSize: 11,
-        display: 'flex',
-        justifyContent: 'space-between',
-        color: 'var(--text-muted)',
-        flexShrink: 0
-      }}>
-        <span style={{ color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {entry.name}
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <span className={styles.headerName}>{entry.name}</span>
+        <span className={styles.headerMeta}>
+          {formatSize(fileSize)}{isBinary ? ' (binary)' : ''}{isTruncated ? ' (preview)' : ''}
         </span>
-        <span>{formatSize(fileSize)}{isBinary ? ' (binary)' : ''}</span>
       </div>
 
-      {/* Content */}
       {loading ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-          Loading...
-        </div>
+        <div className={panelStyles.loading}>Loading...</div>
       ) : error ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', padding: 16 }}>
-          {error}
-        </div>
+        <div className={panelStyles.error}>{error}</div>
       ) : (
-        <div
-          ref={containerRef}
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            lineHeight: `${LINE_HEIGHT}px`,
-            color: 'var(--text-secondary)',
-            padding: '4px 8px',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all'
-          }}
-        >
-          {content}
-        </div>
+        <FileContentView lines={lines} lineHeight={16} />
       )}
     </div>
   )
-}
-
-function formatHex(hexString: string): string {
-  const lines: string[] = []
-  const bytesPerLine = 16
-  for (let i = 0; i < hexString.length && lines.length < 500; i += bytesPerLine * 2) {
-    const offset = (i / 2).toString(16).padStart(8, '0')
-    const hexPart: string[] = []
-    let asciiPart = ''
-    for (let j = 0; j < bytesPerLine; j++) {
-      const pos = i + j * 2
-      if (pos < hexString.length) {
-        const byte = hexString.slice(pos, pos + 2)
-        hexPart.push(byte)
-        const charCode = parseInt(byte, 16)
-        asciiPart += charCode >= 32 && charCode <= 126 ? String.fromCharCode(charCode) : '.'
-      }
-    }
-    lines.push(`${offset}  ${hexPart.join(' ')}  |${asciiPart}|`)
-  }
-  return lines.join('\n')
 }

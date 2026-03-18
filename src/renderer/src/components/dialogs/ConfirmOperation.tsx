@@ -3,6 +3,13 @@ import type { Entry } from '@shared/types'
 import { formatSize } from '../../utils/format'
 import styles from '../../styles/dialogs.module.css'
 
+interface ArchiveFormat {
+  label: string
+  extensions: string[]
+  primaryExtension: string
+  supportsWrite: boolean
+}
+
 interface ConfirmOperationProps {
   type: 'copy' | 'move' | 'delete' | 'pack' | 'unpack'
   entries: Entry[]
@@ -21,10 +28,37 @@ export function ConfirmOperation({
   onCancel
 }: ConfirmOperationProps): React.JSX.Element {
   const [editDest, setEditDest] = useState(destDir)
+  const [writableFormats, setWritableFormats] = useState<ArchiveFormat[]>([])
+  const [selectedFormat, setSelectedFormat] = useState<string>('')
 
   const totalSize = entries.reduce((sum, e) => sum + (e.size > 0 ? e.size : 0), 0)
   const fileCount = entries.filter((e) => !e.isContainer).length
   const dirCount = entries.filter((e) => e.isContainer).length
+
+  // Load writable archive formats for the pack dialog
+  useEffect(() => {
+    if (type !== 'pack') return
+    window.api.util.getArchiveFormats().then((formats) => {
+      const writable = formats.filter((f) => f.supportsWrite)
+      setWritableFormats(writable)
+      // Detect which format the current path uses, or default to first writable
+      const current = writable.find((f) => f.extensions.some((ext) => editDest.toLowerCase().endsWith(ext)))
+      setSelectedFormat(current?.primaryExtension ?? writable[0]?.primaryExtension ?? '.zip')
+    })
+  }, [type]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFormatChange = (primaryExt: string): void => {
+    setSelectedFormat(primaryExt)
+    // Swap the extension in the current path
+    const allExts = writableFormats.flatMap((f) => f.extensions)
+    const matchedExt = allExts.find((ext) => editDest.toLowerCase().endsWith(ext))
+    if (matchedExt) {
+      setEditDest(editDest.slice(0, editDest.length - matchedExt.length) + primaryExt)
+    } else {
+      // No known extension — append the new one
+      setEditDest(editDest + primaryExt)
+    }
+  }
 
   const typeLabel = type === 'copy' ? 'Copy'
     : type === 'move' ? 'Move'
@@ -45,7 +79,6 @@ export function ConfirmOperation({
         e.stopPropagation()
         onCancel()
       } else {
-        // Block panel shortcuts but let typing work in inputs
         if (!(document.activeElement instanceof HTMLInputElement)) {
           e.stopPropagation()
         }
@@ -64,7 +97,7 @@ export function ConfirmOperation({
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
               {type === 'pack' ? 'Pack' : type === 'unpack' ? 'Unpack' : typeLabel}{' '}
-          {entries.length} item{entries.length !== 1 ? 's' : ''}
+              {entries.length} item{entries.length !== 1 ? 's' : ''}
               {fileCount > 0 && ` (${fileCount} file${fileCount !== 1 ? 's' : ''}`}
               {dirCount > 0 && `, ${dirCount} folder${dirCount !== 1 ? 's' : ''}`}
               {(fileCount > 0 || dirCount > 0) && ')'}
@@ -106,6 +139,32 @@ export function ConfirmOperation({
               {sourceDir}
             </div>
           </div>
+
+          {/* Format selector (pack only) */}
+          {type === 'pack' && writableFormats.length > 1 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Format:</div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {writableFormats.map((fmt) => (
+                  <button
+                    key={fmt.primaryExtension}
+                    onClick={() => handleFormatChange(fmt.primaryExtension)}
+                    style={{
+                      padding: '2px 10px',
+                      background: selectedFormat === fmt.primaryExtension ? 'var(--accent)' : 'var(--bg-tertiary)',
+                      color: selectedFormat === fmt.primaryExtension ? 'white' : 'var(--text-secondary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 3,
+                      fontSize: 11,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {fmt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Destination (editable for copy/move/pack/unpack) */}
           {type !== 'delete' && (
