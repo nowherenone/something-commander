@@ -125,6 +125,12 @@ const utilAPI = {
   s3Disconnect: (connId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.S3_DISCONNECT, connId),
 
+  smbConnect: (host: string, share: string, username: string, password: string, domain?: string, label?: string): Promise<string> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SMB_CONNECT, host, share, username, password, domain, label),
+
+  smbDisconnect: (connId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SMB_DISCONNECT, connId),
+
   pluginScan: (): Promise<Array<{ id: string; name: string; version: string; description: string; path: string; enabled: boolean; error?: string }>> =>
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_SCAN),
 

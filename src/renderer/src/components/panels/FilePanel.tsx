@@ -73,17 +73,21 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       if (entry.isContainer) {
         navigate(panelId, entry.id)
       } else {
-        // Check if it's an archive file — navigate into it with archive plugin
-        const isArchive = await window.api.util.isArchive(entry.id)
-        if (isArchive) {
-          usePanelStore.getState().navigateWithPlugin(panelId, 'archive', `${entry.id}::`)
-        } else {
-          // Open with system default application
+        // Archive navigation only works for local filesystem files
+        if (tab.pluginId === 'local-filesystem') {
+          const isArchive = await window.api.util.isArchive(entry.id)
+          if (isArchive) {
+            usePanelStore.getState().navigateWithPlugin(panelId, 'archive', `${entry.id}::`)
+            return
+          }
+        }
+        // Open with system default application (only for local files)
+        if (tab.pluginId === 'local-filesystem') {
           window.api.util.openFile(entry.id)
         }
       }
     },
-    [panelId, navigate]
+    [panelId, navigate, tab.pluginId]
   )
 
   const handleSort = useCallback(
@@ -209,6 +213,9 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
           currentLocation={tab.locationDisplay}
           currentPluginId={tab.pluginId}
           onNavigate={(path) => navigate(panelId, path)}
+          onNavigatePlugin={(pluginId, locationId) =>
+            usePanelStore.getState().navigateWithPlugin(panelId, pluginId, locationId)
+          }
           isOpen={driveMenuOpen}
           onToggle={(open) => open ? openDriveMenu(panelId) : closeDriveMenu()}
         />

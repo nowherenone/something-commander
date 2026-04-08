@@ -62,6 +62,8 @@ interface UtilAPI {
   sftpListConnections(): Promise<string[]>
   s3Connect(bucket: string, region: string, accessKeyId: string, secretAccessKey: string, label?: string): Promise<string>
   s3Disconnect(connId: string): Promise<void>
+  smbConnect(host: string, share: string, username: string, password: string, domain?: string, label?: string): Promise<string>
+  smbDisconnect(connId: string): Promise<void>
   pluginScan(): Promise<Array<{ id: string; name: string; version: string; description: string; path: string; enabled: boolean; error?: string }>>
   pluginLoad(pluginDir: string): Promise<{ success: boolean; error?: string }>
   pluginUnload(pluginId: string): Promise<{ success: boolean }>

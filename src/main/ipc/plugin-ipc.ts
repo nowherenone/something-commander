@@ -10,6 +10,7 @@ import { scanPlugins, loadPlugin, unloadPlugin, ensurePluginsDir } from '../plug
 import { extractFromZip, ArchivePlugin, getArchiveFormats } from '../plugins/archive'
 import type { SftpPlugin } from '../plugins/sftp'
 import type { S3Plugin } from '../plugins/s3'
+import type { SmbPlugin } from '../plugins/smb'
 
 async function calcFolderSize(dirPath: string): Promise<number> {
   let totalSize = 0
@@ -263,6 +264,38 @@ export function registerPluginIPC(): void {
     const s3 = pluginManager.get('s3') as S3Plugin | undefined
     if (!s3) return
     s3.disconnect(connId)
+  })
+
+  // SMB connection management
+  ipcMain.handle(
+    IPC_CHANNELS.SMB_CONNECT,
+    (_event, host: string, share: string, username: string, password: string, domain?: string, label?: string) => {
+      const smb = pluginManager.get('smb') as SmbPlugin | undefined
+      if (!smb) return Promise.reject(new Error('SMB plugin not loaded'))
+      return smb.connect(host, share, username, password, domain, label).catch((err: unknown) => {
+        // node-smb2 throws Response objects with BigInt fields that Electron can't serialize.
+        // Convert to a plain Error with a string message.
+        if (err instanceof Error) throw new Error(err.message)
+        const errObj = err as Record<string, unknown>
+        const header = errObj?.header as Record<string, unknown> | undefined
+        const status = header?.status ? Number(header.status) >>> 0 : 0
+        const MSGS: Record<number, string> = {
+          0xC000006D: 'Login failed: bad username or password',
+          0xC0000022: 'Access denied',
+          0xC00000CC: 'Share not found (bad network name)',
+          0xC000000F: 'File/folder not found',
+          0xC0000034: 'Path not found'
+        }
+        const msg = MSGS[status] || (status ? `SMB error 0x${status.toString(16).toUpperCase().padStart(8, '0')}` : 'Connection failed')
+        throw new Error(msg)
+      })
+    }
+  )
+
+  ipcMain.handle(IPC_CHANNELS.SMB_DISCONNECT, async (_event, connId: string) => {
+    const smb = pluginManager.get('smb') as SmbPlugin | undefined
+    if (!smb) return
+    await smb.disconnect(connId)
   })
 
   // External plugin management

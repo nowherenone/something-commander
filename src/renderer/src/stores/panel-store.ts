@@ -179,7 +179,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     const previousLocationId = tab.locationId
 
     // Auto-detect archive paths and redirect to navigateWithPlugin
-    if (locationId && locationId.includes('::') && tab.pluginId !== 'archive') {
+    // Only do this from local-filesystem — other plugins (smb, sftp, s3) use :: as their own separator
+    if (locationId && locationId.includes('::') && tab.pluginId === 'local-filesystem') {
       return get().navigateWithPlugin(panelId, 'archive', locationId)
     }
 

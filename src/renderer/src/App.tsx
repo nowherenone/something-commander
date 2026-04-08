@@ -11,8 +11,7 @@ import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
 import { ToastContainer } from './components/layout/Toast'
-import { SftpConnect } from './components/dialogs/SftpConnect'
-import { S3Connect } from './components/dialogs/S3Connect'
+import { NetworkConnections } from './components/dialogs/NetworkConnections'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
 import { useKeyboard } from './hooks/useKeyboard'
@@ -32,8 +31,7 @@ function App(): React.JSX.Element {
   const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
   const [multiRenamePluginId, setMultiRenamePluginId] = useState('')
   const [dirCompareOpen, setDirCompareOpen] = useState(false)
-  const [sftpConnectOpen, setSftpConnectOpen] = useState(false)
-  const [s3ConnectOpen, setS3ConnectOpen] = useState(false)
+  const [networkDialogOpen, setNetworkDialogOpen] = useState(false)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
   const [selectGroupMode, setSelectGroupMode] = useState<'select' | 'unselect' | null>(null)
 
@@ -182,23 +180,9 @@ function App(): React.JSX.Element {
         useAppStore.getState().openDriveMenu(ap)
         break
       }
-      case 'sftpConnect':
-        setSftpConnectOpen(true)
+      case 'networkConnections':
+        setNetworkDialogOpen(true)
         break
-      case 's3Connect':
-        setS3ConnectOpen(true)
-        break
-      case 'sftpDisconnect': {
-        // Disconnect the SFTP connection used by active panel
-        const apanel = useAppStore.getState().activePanel
-        const atab = usePanelStore.getState().getActiveTab(apanel)
-        if (atab.pluginId === 'sftp' && atab.locationId) {
-          const cId = atab.locationId.split('::')[0]
-          window.api.util.sftpDisconnect(cId)
-          usePanelStore.getState().navigateWithPlugin(apanel, 'local-filesystem', null)
-        }
-        break
-      }
       case 'pluginManager':
         setPluginManagerOpen(true)
         break
@@ -461,24 +445,14 @@ function App(): React.JSX.Element {
         />
       )}
 
-      {s3ConnectOpen && (
-        <S3Connect
-          onClose={() => setS3ConnectOpen(false)}
-          onConnected={(connId) => {
-            setS3ConnectOpen(false)
-            const activePanel = useAppStore.getState().activePanel
-            usePanelStore.getState().navigateWithPlugin(activePanel, 's3', `${connId}::`)
-          }}
-        />
-      )}
 
-      {sftpConnectOpen && (
-        <SftpConnect
-          onClose={() => setSftpConnectOpen(false)}
-          onConnected={(connId) => {
-            setSftpConnectOpen(false)
+      {networkDialogOpen && (
+        <NetworkConnections
+          onClose={() => setNetworkDialogOpen(false)}
+          onConnected={(pluginId, locationId) => {
+            setNetworkDialogOpen(false)
             const activePanel = useAppStore.getState().activePanel
-            usePanelStore.getState().navigateWithPlugin(activePanel, 'sftp', `${connId}::/`)
+            usePanelStore.getState().navigateWithPlugin(activePanel, pluginId, locationId)
           }}
         />
       )}
