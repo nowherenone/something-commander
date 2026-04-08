@@ -56,14 +56,16 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
 
   // Navigate to saved location on mount only
   useEffect(() => {
-    window.api.store.get(`panel-${panelId}-location`).then((saved) => {
-      let location = (saved as string | null) || null
-      if (!location) {
-        // One-time migration from localStorage
-        location = localStorage.getItem(`panel-${panelId}-location`) || null
-        if (location) localStorage.removeItem(`panel-${panelId}-location`)
-      }
-      usePanelStore.getState().navigate(panelId, location || null)
+    Promise.all([
+      window.api.store.get(`panel-${panelId}-state`),
+      window.api.store.get(`panel-${panelId}-location`)
+    ]).then(([stateData, legacyData]) => {
+      const state = stateData as { pluginId?: string; locationId?: string } | null
+      const pluginId = state?.pluginId || 'local-filesystem'
+      const locationId = state?.locationId || (legacyData as string | null) || null
+
+      usePanelStore.getState().navigateWithPlugin(panelId, pluginId, locationId || null)
+        .catch(() => usePanelStore.getState().navigate(panelId, null))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelId])

@@ -228,7 +228,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         }))
       })
 
-      window.api.store.set(`panel-${panelId}-location`, locationId || '')
+      window.api.store.set(`panel-${panelId}-state`, { pluginId: tab.pluginId, locationId: locationId || '' })
     } catch (err) {
       // Don't replace current view — stay where we are, mark the folder as error
       const errorSet = new Set(getActiveTab(get()[panelId]).errorFolderIds)
@@ -306,6 +306,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           error: null
         }))
       })
+
+      window.api.store.set(`panel-${panelId}-state`, { pluginId, locationId: locationId || '' })
     } catch (err) {
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({

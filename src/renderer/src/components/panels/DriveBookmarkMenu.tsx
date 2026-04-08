@@ -123,7 +123,6 @@ export function DriveBookmarkMenu({
             host: string; share: string; username: string; password: string; domain: string; label: string
           }> | null
           if (saved) {
-            // Extract connId parts from locationId: "user@host/share/"
             const connIdPart = item.locationId.replace(/\/+$/, '')
             const match = connIdPart.match(/^(.+)@(.+)\/(.+)$/)
             if (match) {
@@ -140,7 +139,8 @@ export function DriveBookmarkMenu({
         }
         onNavigatePlugin(item.pluginId, item.locationId)
       } else {
-        onNavigate(item.path)
+        // Drives and bookmarks always navigate via local-filesystem
+        onNavigatePlugin('local-filesystem', item.path)
       }
       onToggle(false)
     },

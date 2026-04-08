@@ -55,6 +55,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  const t0 = performance.now()
   electronApp.setAppUserModelId('com.something-commander')
 
   // Remove default Electron menu to prevent Alt+key conflicts
@@ -64,8 +65,8 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Register plugins
-  // Register built-in plugins
+  // Register plugins and IPC before creating the window so everything
+  // is ready when the renderer starts making IPC calls
   pluginManager.register(new LocalFilesystemPlugin())
   const archivePlugin = new ArchivePlugin()
   pluginManager.register(archivePlugin)
@@ -73,20 +74,16 @@ app.whenReady().then(async () => {
   pluginManager.register(new S3Plugin())
   pluginManager.register(new SmbPlugin())
   await pluginManager.initializeAll()
-
-  // Wire archive plugin to plugin manager for cross-plugin resolution
   archivePlugin.setPluginManager(pluginManager)
 
-  // Load external plugins
-  const externalPlugins = await loadAllPlugins()
-  for (const p of externalPlugins) {
-    if (p.error) {
-      console.warn(`[Plugin] Failed to load ${p.id}: ${p.error}`)
-    }
-  }
-
-  // Register IPC handlers
   registerAllIPC()
+
+  // Load external plugins (non-blocking for window creation)
+  loadAllPlugins().then((externalPlugins) => {
+    for (const p of externalPlugins) {
+      if (p.error) console.warn(`[Plugin] Failed to load ${p.id}: ${p.error}`)
+    }
+  })
 
   createWindow()
 

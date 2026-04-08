@@ -38,14 +38,13 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
     const normalizedPath = path.resolve(locationId)
     const dirents = await fs.readdir(normalizedPath, { withFileTypes: true })
 
-    const entries: Entry[] = []
-    for (const dirent of dirents) {
-      try {
-        entries.push(await this.direntToEntry(normalizedPath, dirent))
-      } catch {
-        // Skip entries we can't stat (permission denied, etc.)
-      }
-    }
+    // Stat all entries in parallel instead of sequentially
+    const results = await Promise.allSettled(
+      dirents.map((dirent) => this.direntToEntry(normalizedPath, dirent))
+    )
+    const entries: Entry[] = results
+      .filter((r): r is PromiseFulfilledResult<Entry> => r.status === 'fulfilled')
+      .map((r) => r.value)
 
     const parentDir = path.dirname(normalizedPath)
     const parentId = parentDir !== normalizedPath ? parentDir : null
