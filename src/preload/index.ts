@@ -161,7 +161,10 @@ const utilAPI = {
     entryIds: string[],
     destDir: string
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> =>
-    ipcRenderer.invoke(IPC_CHANNELS.ENUMERATE_FILES, pluginId, entryIds, destDir)
+    ipcRenderer.invoke(IPC_CHANNELS.ENUMERATE_FILES, pluginId, entryIds, destDir),
+
+  startNativeDrag: (filePaths: string[]): void =>
+    ipcRenderer.send(IPC_CHANNELS.NATIVE_DRAG_START, filePaths)
 }
 
 const storeAPI = {

@@ -47,6 +47,9 @@ export const IPC_CHANNELS = {
   STORE_GET: 'store:get',
   STORE_SET: 'store:set',
 
+  // Drag and drop
+  NATIVE_DRAG_START: 'util:nativeDragStart',
+
   // Operation progress events (main → renderer)
   OP_PROGRESS: 'ops:progress',
   OP_COMPLETE: 'ops:complete',

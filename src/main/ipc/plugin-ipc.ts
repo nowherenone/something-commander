@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell, Menu } from 'electron'
+import { ipcMain, BrowserWindow, shell, Menu, nativeImage } from 'electron'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as path from 'path'
@@ -32,6 +32,19 @@ async function calcFolderSize(dirPath: string): Promise<number> {
     // Skip dirs we can't read
   }
   return totalSize
+}
+
+let dragIconCache: Electron.NativeImage | null = null
+
+function getDragIcon(): Electron.NativeImage {
+  if (dragIconCache) return dragIconCache
+  // 16x16 file icon PNG — startDrag requires a non-empty image
+  dragIconCache = nativeImage.createFromDataURL(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9h' +
+    'AAAAJ0lEQVR4nGNgoCY4ceLEf2IwXgM+fPhwBx8eNWDUgJFiAEWZiRwAAMAs84RE7n75' +
+    'AAAAAElFTkSuQmCC'
+  )
+  return dragIconCache
 }
 
 export function registerPluginIPC(): void {
@@ -517,6 +530,16 @@ export function registerPluginIPC(): void {
       }
     }
   )
+
+  // Native drag-and-drop: hand file paths to the OS for dragging to external apps
+  ipcMain.on(IPC_CHANNELS.NATIVE_DRAG_START, (event, filePaths: string[]) => {
+    if (!filePaths || filePaths.length === 0) return
+    event.sender.startDrag({
+      file: filePaths[0],
+      files: filePaths,
+      icon: getDragIcon()
+    })
+  })
 }
 
 async function copyDirRecursive(src: string, dest: string): Promise<void> {

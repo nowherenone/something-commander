@@ -232,6 +232,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
             <div className={styles.loading}>Loading...</div>
           ) : (
             <FileList
+              panelId={panelId}
               entries={displayEntries}
               cursorIndex={tab.cursorIndex}
               selectedIds={tab.selectedEntryIds}

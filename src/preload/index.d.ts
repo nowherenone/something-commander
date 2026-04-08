@@ -80,6 +80,7 @@ interface UtilAPI {
     entryIds: string[],
     destDir: string
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>>
+  startNativeDrag(filePaths: string[]): void
 }
 
 interface StoreAPI {

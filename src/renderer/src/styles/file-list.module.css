@@ -175,3 +175,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Drag and drop */
+.entryRow.dragging {
+  opacity: 0.4;
+}
+
+.fileList.dropTarget {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
