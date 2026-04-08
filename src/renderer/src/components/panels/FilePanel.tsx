@@ -133,7 +133,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       const archivePath = tab.locationId?.split('::')[0]
       if (!archivePath) return
 
-      // Check for remote source prefix (e.g. "smb:connId::path/file.zip")
+      // Check for remote source prefix (e.g. "smb:user@host/share/file.zip")
       const REMOTE_PREFIXES = ['smb:', 'sftp:', 's3:', 'archive:']
       const isRemote = REMOTE_PREFIXES.some((p) => archivePath.startsWith(p))
       if (isRemote) {
@@ -141,17 +141,10 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
         const sourcePlugin = archivePath.slice(0, colonIdx)
         const sourceEntryId = archivePath.slice(colonIdx + 1)
         // Navigate to the parent directory in the source plugin
-        const sepIdx = sourceEntryId.lastIndexOf('::')
-        if (sepIdx >= 0) {
-          const connPart = sourceEntryId.slice(0, sepIdx)
-          const pathPart = sourceEntryId.slice(sepIdx + 2)
-          const parentPath = pathPart.includes('/')
-            ? pathPart.slice(0, pathPart.lastIndexOf('/'))
-            : ''
-          usePanelStore.getState().navigateWithPlugin(panelId, sourcePlugin, `${connPart}::${parentPath}`)
-        } else {
-          usePanelStore.getState().navigateWithPlugin(panelId, sourcePlugin, null)
-        }
+        const parentPath = sourceEntryId.includes('/')
+          ? sourceEntryId.slice(0, sourceEntryId.lastIndexOf('/'))
+          : null
+        usePanelStore.getState().navigateWithPlugin(panelId, sourcePlugin, parentPath)
       } else {
         // Local archive — go back to local-filesystem
         const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')

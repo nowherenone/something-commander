@@ -91,12 +91,12 @@ export function DriveBookmarkMenu({
         if (Array.isArray(saved)) {
           for (const conn of saved as Array<{ host: string; share: string; username: string; label: string }>) {
             const connId = `${conn.username}@${conn.host}/${conn.share}`
-            const alreadyActive = active.some((a) => a.pluginId === 'smb' && a.locationId === `${connId}::`)
+            const alreadyActive = active.some((a) => a.pluginId === 'smb' && a.locationId === `${connId}/`)
             if (!alreadyActive) {
               active.push({
                 pluginId: 'smb',
                 label: `${conn.label || `\\\\${conn.host}\\${conn.share}`} (saved)`,
-                locationId: `${connId}::`
+                locationId: `${connId}/`
               })
             }
           }
@@ -123,8 +123,8 @@ export function DriveBookmarkMenu({
             host: string; share: string; username: string; password: string; domain: string; label: string
           }> | null
           if (saved) {
-            // Extract connId parts from locationId: "user@host/share::"
-            const connIdPart = item.locationId.replace(/::$/, '')
+            // Extract connId parts from locationId: "user@host/share/"
+            const connIdPart = item.locationId.replace(/\/+$/, '')
             const match = connIdPart.match(/^(.+)@(.+)\/(.+)$/)
             if (match) {
               const conn = saved.find((c) => c.username === match[1] && c.host === match[2] && c.share === match[3])

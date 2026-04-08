@@ -46,7 +46,7 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
         window.api.plugins.readDirectory(pluginId, null).then((result) =>
           result.entries.map((e) => ({
             pluginId,
-            connId: e.id.replace(/::$/, ''),
+            connId: e.id.replace(/[:/]+$/, ''),
             label: e.name,
             locationId: e.id
           }))
@@ -102,7 +102,7 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
             await window.api.store.set('smb-connections', updated)
           }
           connId = await window.api.util.smbConnect(host, share, username, password, domain || undefined, label || undefined)
-          locationId = `${connId}::`
+          locationId = `${connId}/`
           break
         }
         default:

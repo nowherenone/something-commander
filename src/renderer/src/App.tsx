@@ -120,6 +120,59 @@ function App(): React.JSX.Element {
     setDirCompareOpen(true)
   }, [])
 
+  // Activate entry (Enter / double-click) — handles archives from any plugin
+  const handleActivateEntry = useCallback(async (entry: { id: string; isContainer: boolean; name?: string }) => {
+    const activePanel = useAppStore.getState().activePanel
+    const tab = usePanelStore.getState().getActiveTab(activePanel)
+    if (entry.id === '__parent__') {
+      handleGoUp()
+      return
+    }
+    if (entry.isContainer) {
+      usePanelStore.getState().navigate(activePanel, entry.id)
+    } else {
+      const isArchive = await window.api.util.isArchive(entry.name || entry.id)
+      if (isArchive) {
+        const archiveRef = tab.pluginId === 'local-filesystem'
+          ? entry.id
+          : `${tab.pluginId}:${entry.id}`
+        usePanelStore.getState().navigateWithPlugin(activePanel, 'archive', `${archiveRef}::`)
+      } else if (tab.pluginId === 'local-filesystem') {
+        window.api.util.openFile(entry.id)
+      }
+    }
+  }, [])
+
+  // Go up — handles archives, network plugins, local filesystem
+  const handleGoUp = useCallback(() => {
+    const activePanel = useAppStore.getState().activePanel
+    const tab = usePanelStore.getState().getActiveTab(activePanel)
+    if (tab.parentId !== null) {
+      usePanelStore.getState().navigate(activePanel, tab.parentId)
+    } else if (tab.pluginId === 'archive') {
+      const archivePath = tab.locationId?.split('::')[0]
+      if (!archivePath) return
+      const REMOTE_PREFIXES = ['smb:', 'sftp:', 's3:', 'archive:']
+      const isRemote = REMOTE_PREFIXES.some((p) => archivePath.startsWith(p))
+      if (isRemote) {
+        const colonIdx = archivePath.indexOf(':')
+        const sourcePlugin = archivePath.slice(0, colonIdx)
+        const sourceEntryId = archivePath.slice(colonIdx + 1)
+        const parentPath = sourceEntryId.includes('/')
+          ? sourceEntryId.slice(0, sourceEntryId.lastIndexOf('/'))
+          : null
+        usePanelStore.getState().navigateWithPlugin(activePanel, sourcePlugin, parentPath)
+      } else {
+        const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
+        usePanelStore.getState().navigateWithPlugin(activePanel, 'local-filesystem', parentDir)
+      }
+    } else if (tab.pluginId !== 'local-filesystem') {
+      usePanelStore.getState().navigate(activePanel, null)
+    } else {
+      usePanelStore.getState().navigate(activePanel, null)
+    }
+  }, [])
+
   useKeyboard({
     onF3: handleF3,
     onF4: handleF4,
@@ -134,7 +187,9 @@ function App(): React.JSX.Element {
     onCtrlM: handleCtrlM,
     onCompare: handleCompare,
     onSelectGroup: () => setSelectGroupMode('select'),
-    onUnselectGroup: () => setSelectGroupMode('unselect')
+    onUnselectGroup: () => setSelectGroupMode('unselect'),
+    onActivate: handleActivateEntry,
+    onGoUp: handleGoUp
   })
 
   const bottomBar = useSettingsStore((s) => s.bottomBar)

@@ -149,6 +149,7 @@ async function resolveSource(archivePath: string): Promise<SourceAccess> {
     const size = await pluginManagerRef.getSize(pluginId, entryId)
     return remoteSourceAccess(pluginId, entryId, size)
   }
+
   return localSourceAccess(archivePath)
 }
 

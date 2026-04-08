@@ -17,6 +17,8 @@ interface KeyboardActions {
   onCompare?: () => void
   onSelectGroup?: () => void
   onUnselectGroup?: () => void
+  onActivate?: (entry: { id: string; isContainer: boolean; name?: string }) => void
+  onGoUp?: () => void
 }
 
 export function useKeyboard(actions: KeyboardActions): void {
@@ -105,31 +107,13 @@ export function useKeyboard(actions: KeyboardActions): void {
           const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
           if (tab.cursorIndex === 0 && hasParentEntry(tab)) {
-            // Go up — either to parent dir or exit archive/sftp
-            if (tab.parentId !== null) {
-              navigate(activePanel, tab.parentId)
-            } else if (tab.pluginId !== 'local-filesystem') {
-              const archivePath = tab.locationId?.split('::')[0]
-              if (archivePath) {
-                const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
-                store.navigateWithPlugin(activePanel, 'local-filesystem', parentDir)
-              }
-            } else {
-              navigate(activePanel, null)
-            }
+            if (actions.onGoUp) actions.onGoUp()
           } else if (idx >= 0 && idx < tab.entries.length) {
             const entry = tab.entries[idx]
-            if (entry.isContainer) {
+            if (actions.onActivate) {
+              actions.onActivate(entry)
+            } else if (entry.isContainer) {
               navigate(activePanel, entry.id)
-            } else {
-              // Check if it's an archive — enter it, otherwise open with system app
-              window.api.util.isArchive(entry.id).then((isArchive) => {
-                if (isArchive) {
-                  usePanelStore.getState().navigateWithPlugin(activePanel, 'archive', `${entry.id}::`)
-                } else {
-                  window.api.util.openFile(entry.id)
-                }
-              })
             }
           }
           break
@@ -137,18 +121,7 @@ export function useKeyboard(actions: KeyboardActions): void {
 
         case 'Backspace':
           e.preventDefault()
-          if (tab.parentId !== null) {
-            navigate(activePanel, tab.parentId)
-          } else if (tab.pluginId !== 'local-filesystem') {
-            // Exit archive/sftp — go back to local filesystem
-            const archivePath = tab.locationId?.split('::')[0]
-            if (archivePath) {
-              const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
-              store.navigateWithPlugin(activePanel, 'local-filesystem', parentDir)
-            }
-          } else {
-            navigate(activePanel, null)
-          }
+          if (actions.onGoUp) actions.onGoUp()
           break
 
         case 'Insert': {

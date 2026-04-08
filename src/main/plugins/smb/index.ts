@@ -80,13 +80,13 @@ export class SmbPlugin implements BrowsePlugin {
   }
 
   /**
-   * locationId format: "connId::\path\to\folder"
-   * connId is "user@host/share"
+   * locationId format: "user@host/share/path/to/folder"
+   * connId is "user@host/share" — the first two segments after @
    */
   async readDirectory(locationId: string | null): Promise<ReadDirectoryResult> {
     if (!locationId) {
       const entries: Entry[] = Array.from(this.connections.values()).map((conn) => ({
-        id: `${conn.id}::`,
+        id: `${conn.id}/`,
         name: conn.label || `\\\\${conn.host}\\${conn.share}`,
         isContainer: true,
         size: -1,
@@ -120,7 +120,7 @@ export class SmbPlugin implements BrowsePlugin {
       const isHidden = item.fileAttributes.includes('HIDDEN')
 
       entries.push({
-        id: `${connId}::${itemPath}`,
+        id: `${connId}/${itemPath}`,
         name,
         isContainer: isDir,
         size: isDir ? -1 : (typeof item.fileSize === 'bigint' ? Number(item.fileSize) : Number(item.fileSize || 0)),
@@ -142,7 +142,7 @@ export class SmbPlugin implements BrowsePlugin {
       const parentPath = dirPath.includes('/')
         ? dirPath.slice(0, dirPath.lastIndexOf('/'))
         : ''
-      parentId = `${connId}::${parentPath}`
+      parentId = `${connId}/${parentPath}`
     }
 
     const displayPath = dirPath ? `smb://${conn.host}/${conn.share}/${dirPath}` : `smb://${conn.host}/${conn.share}`
@@ -163,7 +163,7 @@ export class SmbPlugin implements BrowsePlugin {
       const remotePath = (smbMatch[3] || '').slice(1).replace(/\//g, '\\')
       for (const conn of this.connections.values()) {
         if (conn.host === host && conn.share === share) {
-          return `${conn.id}::${remotePath}`
+          return `${conn.id}/${remotePath}`
         }
       }
     }
@@ -174,7 +174,7 @@ export class SmbPlugin implements BrowsePlugin {
       const remotePath = (uncMatch[3] || '').slice(1)
       for (const conn of this.connections.values()) {
         if (conn.host === host && conn.share === share) {
-          return `${conn.id}::${remotePath}`
+          return `${conn.id}/${remotePath}`
         }
       }
     }
@@ -256,7 +256,7 @@ export class SmbPlugin implements BrowsePlugin {
         const childRemote = remotePath ? `${remotePath}/${name}` : name
         const childDest = `${destBase}/${name}`
         const childRel = relBase ? `${relBase}/${name}` : name
-        const childEntryId = `${connId}::${childRemote}`
+        const childEntryId = `${connId}/${childRemote}`
 
         if (item.type === 'Directory') {
           result.push({ sourcePath: childEntryId, destPath: childDest, size: 0, isDirectory: true, relativePath: childRel })
@@ -301,7 +301,7 @@ export class SmbPlugin implements BrowsePlugin {
 
         for (const remotePath of childPaths) {
           const name = remotePath.includes('/') ? remotePath.slice(remotePath.lastIndexOf('/') + 1) : remotePath
-          const entryId = `${connId}::${remotePath}`
+          const entryId = `${connId}/${remotePath}`
           const info = parentMap.get(name)
           const isDir = info ? info.type === 'Directory' : false
 
@@ -485,9 +485,20 @@ export class SmbPlugin implements BrowsePlugin {
     return Array.from(this.connections.keys())
   }
 
+  /**
+   * Parse a locationId into [connId, remotePath].
+   * Format: "user@host/share/path/to/file" where connId is "user@host/share"
+   * The connId always has exactly one / (between host and share).
+   * Everything after the second / is the remote path.
+   */
   private parseLocation(locationId: string): [string, string] {
-    const sepIdx = locationId.indexOf('::')
-    if (sepIdx < 0) return [locationId, '']
-    return [locationId.slice(0, sepIdx), locationId.slice(sepIdx + 2)]
+    // connId format: user@host/share — find the second /
+    const atIdx = locationId.indexOf('@')
+    if (atIdx < 0) return [locationId, '']
+    const firstSlash = locationId.indexOf('/', atIdx)
+    if (firstSlash < 0) return [locationId, '']
+    const secondSlash = locationId.indexOf('/', firstSlash + 1)
+    if (secondSlash < 0) return [locationId, '']
+    return [locationId.slice(0, secondSlash), locationId.slice(secondSlash + 1)]
   }
 }
