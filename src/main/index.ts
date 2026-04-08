@@ -67,11 +67,15 @@ app.whenReady().then(async () => {
   // Register plugins
   // Register built-in plugins
   pluginManager.register(new LocalFilesystemPlugin())
-  pluginManager.register(new ArchivePlugin())
+  const archivePlugin = new ArchivePlugin()
+  pluginManager.register(archivePlugin)
   pluginManager.register(new SftpPlugin())
   pluginManager.register(new S3Plugin())
   pluginManager.register(new SmbPlugin())
   await pluginManager.initializeAll()
+
+  // Wire archive plugin to plugin manager for cross-plugin resolution
+  archivePlugin.setPluginManager(pluginManager)
 
   // Load external plugins
   const externalPlugins = await loadAllPlugins()

@@ -73,13 +73,15 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       if (entry.isContainer) {
         navigate(panelId, entry.id)
       } else {
-        // Archive navigation only works for local filesystem files
-        if (tab.pluginId === 'local-filesystem') {
-          const isArchive = await window.api.util.isArchive(entry.id)
-          if (isArchive) {
-            usePanelStore.getState().navigateWithPlugin(panelId, 'archive', `${entry.id}::`)
-            return
-          }
+        // Check if it's an archive — works for any plugin
+        const isArchive = await window.api.util.isArchive(entry.name || entry.id)
+        if (isArchive) {
+          // Encode the source plugin in the archive path for non-local plugins
+          const archiveRef = tab.pluginId === 'local-filesystem'
+            ? entry.id
+            : `${tab.pluginId}:${entry.id}`
+          usePanelStore.getState().navigateWithPlugin(panelId, 'archive', `${archiveRef}::`)
+          return
         }
         // Open with system default application (only for local files)
         if (tab.pluginId === 'local-filesystem') {
@@ -126,14 +128,37 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const handleGoUp = useCallback(() => {
     if (tab.parentId !== null) {
       navigate(panelId, tab.parentId)
-    } else if (tab.pluginId !== 'local-filesystem') {
-      // Exiting an archive — switch back to local-filesystem
-      // Extract the archive path from the locationId
+    } else if (tab.pluginId === 'archive') {
+      // Exiting an archive — determine the source plugin
       const archivePath = tab.locationId?.split('::')[0]
-      if (archivePath) {
+      if (!archivePath) return
+
+      // Check for remote source prefix (e.g. "smb:connId::path/file.zip")
+      const REMOTE_PREFIXES = ['smb:', 'sftp:', 's3:', 'archive:']
+      const isRemote = REMOTE_PREFIXES.some((p) => archivePath.startsWith(p))
+      if (isRemote) {
+        const colonIdx = archivePath.indexOf(':')
+        const sourcePlugin = archivePath.slice(0, colonIdx)
+        const sourceEntryId = archivePath.slice(colonIdx + 1)
+        // Navigate to the parent directory in the source plugin
+        const sepIdx = sourceEntryId.lastIndexOf('::')
+        if (sepIdx >= 0) {
+          const connPart = sourceEntryId.slice(0, sepIdx)
+          const pathPart = sourceEntryId.slice(sepIdx + 2)
+          const parentPath = pathPart.includes('/')
+            ? pathPart.slice(0, pathPart.lastIndexOf('/'))
+            : ''
+          usePanelStore.getState().navigateWithPlugin(panelId, sourcePlugin, `${connPart}::${parentPath}`)
+        } else {
+          usePanelStore.getState().navigateWithPlugin(panelId, sourcePlugin, null)
+        }
+      } else {
+        // Local archive — go back to local-filesystem
         const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
         usePanelStore.getState().navigateWithPlugin(panelId, 'local-filesystem', parentDir)
       }
+    } else if (tab.pluginId !== 'local-filesystem') {
+      navigate(panelId, null)
     } else {
       navigate(panelId, null)
     }

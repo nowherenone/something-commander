@@ -50,16 +50,49 @@ async function executeOperation(opId: string): Promise<void> {
   const op = store().operations.find((o) => o.id === opId)
   if (!op) return
 
-  // Phase 1: Enumerate files
+  // For delete: skip enumeration, delete entries directly (fs.rm handles recursion)
+  if (op.type === 'delete') {
+    store().updateOperation(opId, {
+      status: 'running',
+      totalFiles: op.sourceEntries.length,
+      totalBytes: 0,
+      startTime: Date.now(),
+      currentFile: '',
+      processedFiles: 0,
+      processedBytes: 0
+    })
+
+    for (let i = 0; i < op.sourceEntries.length; i++) {
+      if (isCancelled(opId)) break
+      const entry = op.sourceEntries[i]
+      store().updateOperation(opId, { currentFile: entry.name, processedFiles: i })
+      try {
+        const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
+          op: 'delete',
+          entries: [entry]
+        })
+        if (!result.success) {
+          store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${result.errors?.[0]?.message || 'Delete failed'}` })
+          return
+        }
+      } catch (err) {
+        store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${String(err)}` })
+        return
+      }
+    }
+
+    await usePanelStore.getState().refresh('left')
+    await usePanelStore.getState().refresh('right')
+    store().removeOperation(opId)
+    return
+  }
+
+  // Phase 1: Enumerate files (copy/move only)
   store().updateOperation(opId, { status: 'enumerating', currentFile: 'Scanning files...' })
 
   let fileList: FileItem[] = []
 
-  if (op.type === 'delete') {
-    const sourcePaths = op.sourceEntries.map((e) => e.id)
-    fileList = await window.api.util.enumerateFiles(op.sourcePluginId, sourcePaths, '')
-    fileList = fileList.reverse()
-  } else {
+  {
     const sourcePaths = op.sourceEntries.map((e) => e.id)
     fileList = await window.api.util.enumerateFiles(op.sourcePluginId, sourcePaths, op.destinationLocationId)
   }
@@ -97,35 +130,7 @@ async function executeOperation(opId: string): Promise<void> {
     })
 
     try {
-      if (op.type === 'delete') {
-        if (item.sourcePath.includes('::')) {
-          // Archive entry — route through plugin
-          const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
-            op: 'delete',
-            entries: [{
-              id: item.sourcePath,
-              name: item.relativePath.split('/').pop() || item.relativePath,
-              isContainer: item.isDirectory,
-              size: item.size,
-              modifiedAt: 0,
-              mimeType: '',
-              iconHint: item.isDirectory ? 'folder' : 'file',
-              meta: {},
-              attributes: { readonly: false, hidden: false, symlink: false }
-            }]
-          })
-          if (!result.success) {
-            store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.errors?.[0]?.message || 'Delete failed'}` })
-            return
-          }
-        } else {
-          const result = await window.api.util.deleteSingle(item.sourcePath)
-          if (!result.success) {
-            store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${result.error}` })
-            return
-          }
-        }
-      } else {
+      {
         // copy or move
         if (item.isDirectory) {
           // Archives create directories implicitly when files are written into them

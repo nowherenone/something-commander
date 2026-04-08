@@ -443,6 +443,22 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
     }
   }
 
+  async readAt(entryId: string, offset: number, length: number): Promise<Buffer> {
+    const fd = await fs.open(entryId, 'r')
+    try {
+      const buf = Buffer.alloc(length)
+      const { bytesRead } = await fd.read(buf, 0, length, offset)
+      return bytesRead < length ? buf.subarray(0, bytesRead) : buf
+    } finally {
+      await fd.close()
+    }
+  }
+
+  async getSize(entryId: string): Promise<number> {
+    const stat = await fs.stat(entryId)
+    return stat.size
+  }
+
   async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
     try {
       await fs.access(entryId)

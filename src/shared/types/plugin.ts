@@ -85,6 +85,12 @@ export interface BrowsePlugin {
   /** Delete a single entry. */
   deleteSingle?(entryId: string): Promise<{ success: boolean; error?: string }>
 
+  /** Read a block of bytes from a file at a given offset. Universal random-access primitive. */
+  readAt?(entryId: string, offset: number, length: number): Promise<Buffer>
+
+  /** Get the size in bytes of a file entry. */
+  getSize?(entryId: string): Promise<number>
+
   /** Optional: provide file content for viewing. */
   getContent?(entryId: string): Promise<Buffer | null>
 

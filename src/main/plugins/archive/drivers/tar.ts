@@ -4,13 +4,14 @@ import * as fsSync from 'fs'
 import * as os from 'os'
 import tar from 'tar'
 import type { ArchiveDriver, ArchiveEntry } from '../driver'
+import type { SourceAccess } from '../plugin-reader'
 
 // ─── Shared read logic ─────────────────────────────────────────────────────────
 
-async function tarReadEntries(archivePath: string): Promise<ArchiveEntry[]> {
+/** Read TAR entries by piping the source stream into tar.list(). */
+async function tarReadEntries(source: SourceAccess): Promise<ArchiveEntry[]> {
   const entries: ArchiveEntry[] = []
-  await tar.list({
-    file: archivePath,
+  const listStream = tar.list({
     onentry: (entry) => {
       const isDir = entry.type === 'Directory' || entry.path.endsWith('/')
       const entryPath = isDir && !entry.path.endsWith('/') ? entry.path + '/' : entry.path
@@ -22,13 +23,28 @@ async function tarReadEntries(archivePath: string): Promise<ArchiveEntry[]> {
       })
     }
   })
+  const readStream = source.createReadStream()
+  await new Promise<void>((resolve, reject) => {
+    readStream.pipe(listStream)
+    listStream.on('end', resolve)
+    listStream.on('error', reject)
+    readStream.on('error', reject)
+  })
   return entries
 }
 
-async function tarCreateReadStream(archivePath: string, entryPath: string): Promise<NodeJS.ReadableStream | null> {
+/** Extract a single file from a TAR by piping through tar.extract to a temp dir. */
+async function tarCreateReadStream(source: SourceAccess, entryPath: string): Promise<NodeJS.ReadableStream | null> {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-tar-'))
   try {
-    await tar.extract({ file: archivePath, cwd: tmpDir, filter: (p) => p === entryPath })
+    const extractStream = tar.extract({ cwd: tmpDir, filter: (p) => p === entryPath })
+    const readStream = source.createReadStream()
+    await new Promise<void>((resolve, reject) => {
+      readStream.pipe(extractStream)
+      extractStream.on('end', resolve)
+      extractStream.on('error', reject)
+      readStream.on('error', reject)
+    })
     const extracted = path.join(tmpDir, ...entryPath.split('/').filter(Boolean))
     try { await fs.access(extracted) } catch {
       await fs.rm(tmpDir, { recursive: true, force: true })
@@ -43,25 +59,35 @@ async function tarCreateReadStream(archivePath: string, entryPath: string): Prom
   }
 }
 
+/** Extract entries from a TAR to a local destination directory. */
 async function tarExtract(
-  archivePath: string,
+  source: SourceAccess,
   entryPath: string,
   destDir: string
 ): Promise<{ success: boolean; error?: string; count: number }> {
   try {
     await fs.mkdir(destDir, { recursive: true })
-    if (!entryPath) {
-      await tar.extract({ file: archivePath, cwd: destDir })
-      const all = await tarReadEntries(archivePath)
-      return { success: true, count: all.filter((e) => !e.isDirectory).length }
-    }
-    if (entryPath.endsWith('/')) {
-      await tar.extract({ file: archivePath, cwd: destDir, filter: (p) => p.startsWith(entryPath) })
-      const all = await tarReadEntries(archivePath)
-      return { success: true, count: all.filter((e) => !e.isDirectory && e.path.startsWith(entryPath)).length }
-    }
-    await tar.extract({ file: archivePath, cwd: destDir, filter: (p) => p === entryPath })
-    return { success: true, count: 1 }
+    const filter = entryPath
+      ? entryPath.endsWith('/')
+        ? (p: string): boolean => p.startsWith(entryPath)
+        : (p: string): boolean => p === entryPath
+      : undefined
+
+    const extractStream = tar.extract({ cwd: destDir, filter })
+    const readStream = source.createReadStream()
+    await new Promise<void>((resolve, reject) => {
+      readStream.pipe(extractStream)
+      extractStream.on('end', resolve)
+      extractStream.on('error', reject)
+      readStream.on('error', reject)
+    })
+
+    // Count extracted files
+    const entries = await tarReadEntries(source)
+    const matchingFiles = entryPath
+      ? entries.filter((e) => !e.isDirectory && (entryPath.endsWith('/') ? e.path.startsWith(entryPath) : e.path === entryPath))
+      : entries.filter((e) => !e.isDirectory)
+    return { success: true, count: matchingFiles.length }
   } catch (err) {
     return { success: false, error: String(err), count: 0 }
   }

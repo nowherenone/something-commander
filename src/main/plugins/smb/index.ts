@@ -320,6 +320,61 @@ export class SmbPlugin implements BrowsePlugin {
     return result
   }
 
+  async readAt(entryId: string, offset: number, length: number): Promise<Buffer> {
+    const [connId, remotePath] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn || !remotePath) throw new Error('Not connected')
+
+    // Use the node-smb2 File class for positioned reads via SMB2 protocol
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const File = require('node-smb2/dist/client/File').default
+    const file = new File(conn.tree) as { _id: Buffer; open(p: string): Promise<void>; close(): Promise<void> }
+    await file.open(remotePath)
+
+    try {
+      const MAX_CHUNK = 0x00010000 // 64KB per SMB2 read
+      const chunks: Buffer[] = []
+      let remaining = length
+      let currentOffset = offset
+
+      while (remaining > 0) {
+        const chunkSize = Math.min(remaining, MAX_CHUNK)
+        const lenBuf = Buffer.alloc(4)
+        lenBuf.writeInt32LE(chunkSize, 0)
+        const offBuf = Buffer.alloc(8)
+        offBuf.writeBigUInt64LE(BigInt(currentOffset))
+
+        const response = await conn.tree.request(
+          { type: 8 }, // SMB2 READ
+          { fileId: file._id, length: lenBuf, offset: offBuf }
+        )
+        const data = (response as { body: { buffer: Buffer } }).body.buffer
+        if (!data || data.length === 0) break
+        chunks.push(data)
+        remaining -= data.length
+        currentOffset += data.length
+        if (data.length < chunkSize) break
+      }
+
+      return Buffer.concat(chunks)
+    } finally {
+      await file.close().catch(() => {})
+    }
+  }
+
+  async getSize(entryId: string): Promise<number> {
+    const [connId, remotePath] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn || !remotePath) throw new Error('Not connected')
+
+    const parentPath = remotePath.includes('/') ? remotePath.slice(0, remotePath.lastIndexOf('/')) : ''
+    const name = remotePath.includes('/') ? remotePath.slice(remotePath.lastIndexOf('/') + 1) : remotePath
+    const listing = await conn.tree.readDirectory(parentPath || undefined)
+    const match = listing.find((e) => e.filename.replace(/^\.\//, '').replace(/^\.\\/, '') === name)
+    if (!match) throw new Error(`File not found: ${remotePath}`)
+    return typeof match.fileSize === 'bigint' ? Number(match.fileSize) : Number(match.fileSize || 0)
+  }
+
   async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
     const [connId, remotePath] = this.parseLocation(entryId)
     const conn = this.connections.get(connId)

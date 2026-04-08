@@ -199,8 +199,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       // When going up, place cursor on the folder we came from
       let cursorIndex = 0
       if (previousLocationId) {
-        const hasParentRow = result.parentId !== null
-        const offset = hasParentRow ? 1 : 0 // account for ".." row
+        // ".." row is shown when locationId is non-null (matches hasParentEntry logic)
+        const offset = locationId !== null ? 1 : 0
         // Try exact match first, then case-insensitive match (Windows paths)
         let prevIdx = entries.findIndex((e) => e.id === previousLocationId)
         if (prevIdx < 0) {
@@ -278,8 +278,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         const searchId = previousLocationId.includes('::')
           ? previousLocationId.split('::')[0]
           : previousLocationId
-        const hasParent = result.parentId !== null || pluginId !== 'local-filesystem'
-        const offset = hasParent ? 1 : 0
+        // ".." row is shown when locationId is non-null (matches hasParentEntry logic)
+        const offset = locationId !== null ? 1 : 0
         let prevIdx = entries.findIndex((e) => e.id === searchId)
         if (prevIdx < 0) {
           const searchLower = searchId.toLowerCase()
@@ -337,7 +337,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       entries = sortEntries(entries, currentTab.sortConfig)
 
       // Restore cursor: try to find the same entry by name, else clamp to bounds
-      const newOffset = (result.parentId !== null || tab.pluginId !== 'local-filesystem') ? 1 : 0
+      const newOffset = tab.locationId !== null ? 1 : 0
       let newCursor = oldCursorIndex
       if (oldEntryName) {
         const idx = entries.findIndex((e) => e.name === oldEntryName)

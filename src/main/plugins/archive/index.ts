@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises'
+import * as fsSync from 'fs'
 import type {
   BrowsePlugin,
   PluginManifest,
@@ -8,6 +9,7 @@ import type {
   OperationResult
 } from '@shared/types'
 import type { ArchiveDriver, ArchiveEntry } from './driver'
+import type { SourceAccess } from './plugin-reader'
 import { ZipDriver } from './drivers/zip'
 import { TarDriver, TarReadOnlyDriver } from './drivers/tar'
 import {
@@ -16,7 +18,9 @@ import {
   archiveBasename,
   archiveDirname,
   joinDestPath,
-  buildDirectoryListing
+  buildDirectoryListing,
+  isRemoteArchivePath,
+  parseRemoteRef
 } from './utils'
 
 // ─── Module-level driver registry ─────────────────────────────────────────────
@@ -76,13 +80,83 @@ export async function extractFromZip(
 ): Promise<{ success: boolean; error?: string; extractedCount: number }> {
   const driver = getDriver(archivePath)
   if (!driver) return { success: false, error: 'Unsupported archive format', extractedCount: 0 }
-  const result = await driver.extract(archivePath, internalPath, destDir)
+  const source = localSourceAccess(archivePath)
+  const result = await driver.extract(source, internalPath, destDir)
   return { success: result.success, error: result.error, extractedCount: result.count }
+}
+
+// ─── Source Access helpers ─────────────────────────────────────────────────────
+
+/** Create a SourceAccess for a local file path. */
+function localSourceAccess(filePath: string): SourceAccess {
+  let cachedSize: number | null = null
+  return {
+    async readAt(offset: number, length: number): Promise<Buffer> {
+      const fd = await fs.open(filePath, 'r')
+      try {
+        const buf = Buffer.alloc(length)
+        const { bytesRead } = await fd.read(buf, 0, length, offset)
+        return bytesRead < length ? buf.subarray(0, bytesRead) : buf
+      } finally {
+        await fd.close()
+      }
+    },
+    createReadStream(): NodeJS.ReadableStream {
+      return fsSync.createReadStream(filePath, { highWaterMark: 256 * 1024 })
+    },
+    get totalSize(): number {
+      if (cachedSize === null) {
+        cachedSize = fsSync.statSync(filePath).size
+      }
+      return cachedSize
+    }
+  }
+}
+
+// Reference to the plugin manager, set during initialize()
+let pluginManagerRef: { readAt(pluginId: string, entryId: string, offset: number, length: number): Promise<Buffer>; getSize(pluginId: string, entryId: string): Promise<number>; get(pluginId: string): BrowsePlugin | undefined } | null = null
+
+/** Create a SourceAccess for a remote archive via another plugin's readAt. */
+function remoteSourceAccess(pluginId: string, entryId: string, size: number): SourceAccess {
+  return {
+    readAt(offset: number, length: number): Promise<Buffer> {
+      if (!pluginManagerRef) throw new Error('Plugin manager not initialized')
+      return pluginManagerRef.readAt(pluginId, entryId, offset, length)
+    },
+    createReadStream(): NodeJS.ReadableStream {
+      if (!pluginManagerRef) throw new Error('Plugin manager not initialized')
+      const plugin = pluginManagerRef.get(pluginId)
+      if (!plugin?.createReadStream) throw new Error(`Plugin ${pluginId} does not support streaming`)
+      // Return a PassThrough that we pipe the plugin's stream into
+      // (we need to return synchronously but createReadStream is async)
+      const { PassThrough } = require('stream')
+      const pt = new PassThrough()
+      plugin.createReadStream(entryId).then((stream) => {
+        if (stream) stream.pipe(pt)
+        else pt.destroy(new Error('Failed to create read stream'))
+      }).catch((err: Error) => pt.destroy(err))
+      return pt
+    },
+    totalSize: size
+  }
+}
+
+/** Resolve an archive path to a SourceAccess. Handles both local and remote paths. */
+async function resolveSource(archivePath: string): Promise<SourceAccess> {
+  if (isRemoteArchivePath(archivePath)) {
+    const { pluginId, entryId } = parseRemoteRef(archivePath)
+    if (!pluginManagerRef) throw new Error('Plugin manager not initialized')
+    const size = await pluginManagerRef.getSize(pluginId, entryId)
+    return remoteSourceAccess(pluginId, entryId, size)
+  }
+  return localSourceAccess(archivePath)
 }
 
 // ─── ArchivePlugin ─────────────────────────────────────────────────────────────
 
-export class ArchivePlugin implements BrowsePlugin {
+export { ArchivePlugin }
+
+class ArchivePlugin implements BrowsePlugin {
   readonly manifest: PluginManifest = {
     id: 'archive',
     displayName: 'Archive Browser',
@@ -94,6 +168,11 @@ export class ArchivePlugin implements BrowsePlugin {
   async initialize(): Promise<boolean> { return true }
   async dispose(): Promise<void> {}
 
+  /** Set the plugin manager reference for cross-plugin resolution. */
+  setPluginManager(pm: typeof pluginManagerRef): void {
+    pluginManagerRef = pm
+  }
+
   /** Check whether a file can be browsed as an archive. */
   static isArchive(filePath: string): boolean {
     return DRIVERS.has(getArchiveExtension(filePath))
@@ -103,19 +182,21 @@ export class ArchivePlugin implements BrowsePlugin {
 
   /**
    * locationId format: "archivePath::internalPath"
-   * e.g. "D:\files\a.zip::"  (root), "D:\files\a.zip::src/main/" (subfolder)
+   * archivePath can be a local path or "pluginId:entryId" for remote archives
    */
   async readDirectory(locationId: string | null): Promise<ReadDirectoryResult> {
     if (!locationId) return { entries: [], location: 'Archives', parentId: null }
     const [archivePath, internalPath] = parseLocation(locationId)
     const driver = getDriver(archivePath)
     if (!driver) return { entries: [], location: archivePath, parentId: null }
-    const allEntries = await driver.readEntries(archivePath)
+    const source = await resolveSource(archivePath)
+    const allEntries = await driver.readEntries(source)
     return buildDirectoryListing(archivePath, internalPath, allEntries)
   }
 
   async resolveLocation(input: string): Promise<string | null> {
     if (!getDriver(input)) return null
+    if (isRemoteArchivePath(input)) return `${input}::`
     try {
       await fs.access(input)
       return `${input}::`
@@ -141,7 +222,8 @@ export class ArchivePlugin implements BrowsePlugin {
           continue
         }
         try {
-          const result = await driver.extract(archivePath, internalPath, op.destinationLocationId)
+          const source = await resolveSource(archivePath)
+          const result = await driver.extract(source, internalPath, op.destinationLocationId)
           if (!result.success) errors.push({ entryId: entry.id, message: result.error || 'Extraction failed' })
         } catch (err) {
           errors.push({ entryId: entry.id, message: String(err) })
@@ -164,6 +246,10 @@ export class ArchivePlugin implements BrowsePlugin {
           errors.push({ entryId: archivePath, message: 'This archive format does not support deletion' })
           continue
         }
+        if (isRemoteArchivePath(archivePath)) {
+          errors.push({ entryId: archivePath, message: 'Cannot modify remote archives' })
+          continue
+        }
         try {
           await driver.deleteEntries(archivePath, internalPaths)
         } catch (err) {
@@ -176,6 +262,9 @@ export class ArchivePlugin implements BrowsePlugin {
     // ── rename ──────────────────────────────────────────────────────────────
     if (op.op === 'rename') {
       const [archivePath, internalPath] = parseLocation(op.entry.id)
+      if (isRemoteArchivePath(archivePath)) {
+        return { success: false, errors: [{ entryId: op.entry.id, message: 'Cannot modify remote archives' }] }
+      }
       const driver = getDriver(archivePath)
       if (!driver?.renameEntry) {
         return { success: false, errors: [{ entryId: op.entry.id, message: 'This archive format does not support renaming' }] }
@@ -196,6 +285,9 @@ export class ArchivePlugin implements BrowsePlugin {
         return { success: false, errors: [{ entryId: '', message: 'Cross-plugin move should use copy+delete' }] }
       }
       const [destArchivePath, destInternalDir] = parseLocation(op.destinationLocationId)
+      if (isRemoteArchivePath(destArchivePath)) {
+        return { success: false, errors: [{ entryId: '', message: 'Cannot modify remote archives' }] }
+      }
       const driver = getDriver(destArchivePath)
       if (!driver?.moveEntries) {
         return { success: false, errors: [{ entryId: '', message: 'This archive format does not support moving' }] }
@@ -221,6 +313,9 @@ export class ArchivePlugin implements BrowsePlugin {
     stream: NodeJS.ReadableStream
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
     const [archivePath, internalDir] = parseLocation(destLocationId)
+    if (isRemoteArchivePath(archivePath)) {
+      return { success: false, bytesWritten: 0, error: 'Cannot write to remote archives' }
+    }
     const driver = getDriver(archivePath)
     if (!driver?.addFromStream) {
       return { success: false, bytesWritten: 0, error: 'This archive format does not support writing' }
@@ -251,7 +346,8 @@ export class ArchivePlugin implements BrowsePlugin {
 
       let allEntries: ArchiveEntry[]
       try {
-        allEntries = await driver.readEntries(archivePath)
+        const source = await resolveSource(archivePath)
+        allEntries = await driver.readEntries(source)
       } catch {
         continue
       }
@@ -312,6 +408,40 @@ export class ArchivePlugin implements BrowsePlugin {
     if (!internalPath || internalPath.endsWith('/')) return null
     const driver = getDriver(archivePath)
     if (!driver) return null
-    return driver.createReadStream(archivePath, internalPath)
+    const source = await resolveSource(archivePath)
+    return driver.createReadStream(source, internalPath)
+  }
+
+  async readAt(entryId: string, offset: number, length: number): Promise<Buffer> {
+    const [archivePath, internalPath] = parseLocation(entryId)
+    if (!internalPath || internalPath.endsWith('/')) throw new Error('Cannot readAt on a directory')
+    const driver = getDriver(archivePath)
+    if (!driver) throw new Error('Unsupported archive format')
+
+    // Read the file from the archive into a buffer, then slice
+    const source = await resolveSource(archivePath)
+    const stream = await driver.createReadStream(source, internalPath)
+    if (!stream) throw new Error('Failed to open archive entry')
+
+    // Read the full entry content and return the requested range
+    const chunks: Buffer[] = []
+    for await (const chunk of stream as AsyncIterable<Buffer>) {
+      chunks.push(chunk)
+    }
+    const fullContent = Buffer.concat(chunks)
+    return fullContent.subarray(offset, offset + length)
+  }
+
+  async getSize(entryId: string): Promise<number> {
+    const [archivePath, internalPath] = parseLocation(entryId)
+    if (!internalPath) throw new Error('Cannot get size of archive root')
+    const driver = getDriver(archivePath)
+    if (!driver) throw new Error('Unsupported archive format')
+
+    const source = await resolveSource(archivePath)
+    const allEntries = await driver.readEntries(source)
+    const entry = allEntries.find((e) => e.path === internalPath || e.path === internalPath.replace(/\/$/, ''))
+    if (!entry) throw new Error(`Entry not found: ${internalPath}`)
+    return entry.size
   }
 }

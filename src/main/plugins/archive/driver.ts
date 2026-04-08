@@ -1,3 +1,5 @@
+import type { SourceAccess } from './plugin-reader'
+
 /** Normalized archive entry - the common data model all drivers produce. */
 export interface ArchiveEntry {
   /** Internal path within the archive. Directories MUST end with '/'. */
@@ -12,8 +14,12 @@ export interface ArchiveEntry {
  * Format-specific implementation. ArchivePlugin routes all work through
  * the driver that matches the archive's file extension.
  *
- * Write methods are optional — drivers set supportsWrite=false when
- * the format doesn't support modification (e.g. read-only TAR).
+ * All read methods accept a SourceAccess object instead of a file path.
+ * This allows reading archives from any source (local FS, SMB, SFTP, S3,
+ * or even nested inside another archive).
+ *
+ * Write methods still accept a local file path — writing to remote archives
+ * is handled separately.
  */
 export interface ArchiveDriver {
   /** File extensions this driver handles, e.g. ['.zip', '.jar']. */
@@ -22,10 +28,10 @@ export interface ArchiveDriver {
   readonly supportsWrite: boolean
 
   /** Return all entries in the archive (metadata only, no content). */
-  readEntries(archivePath: string): Promise<ArchiveEntry[]>
+  readEntries(source: SourceAccess): Promise<ArchiveEntry[]>
 
   /** Open a readable stream for a single file entry. Returns null if not found. */
-  createReadStream(archivePath: string, entryPath: string): Promise<NodeJS.ReadableStream | null>
+  createReadStream(source: SourceAccess, entryPath: string): Promise<NodeJS.ReadableStream | null>
 
   /**
    * Extract entryPath to destDir on disk.
@@ -34,12 +40,13 @@ export interface ArchiveDriver {
    * - otherwise → extract single file
    */
   extract(
-    archivePath: string,
+    source: SourceAccess,
     entryPath: string,
     destDir: string
   ): Promise<{ success: boolean; error?: string; count: number }>
 
   // ── Write operations (only called when supportsWrite === true) ──────────────
+  // Write operations still use local file paths since they modify archives on disk.
 
   /** Remove entries from the archive (files and/or directory trees). */
   deleteEntries?(archivePath: string, paths: string[]): Promise<void>

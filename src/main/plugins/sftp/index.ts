@@ -147,6 +147,46 @@ export class SftpPlugin implements BrowsePlugin {
     }
   }
 
+  async readAt(entryId: string, offset: number, length: number): Promise<Buffer> {
+    const [connId, remotePath] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn) throw new Error('Not connected')
+    // ssh2-sftp-client exposes the underlying sftp session for low-level operations
+    const sftp = (conn.client as unknown as { sftp: { open: Function; read: Function; close: Function } }).sftp
+    if (!sftp?.open) {
+      // Fallback: read via stream with range option
+      const stream = conn.client.createReadStream(remotePath, {
+        start: offset,
+        end: offset + length - 1
+      }) as unknown as NodeJS.ReadableStream
+      return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = []
+        stream.on('data', (chunk: Buffer) => chunks.push(chunk))
+        stream.on('end', () => resolve(Buffer.concat(chunks)))
+        stream.on('error', reject)
+      })
+    }
+    return new Promise((resolve, reject) => {
+      sftp.open(remotePath, 'r', (err: Error | null, handle: Buffer) => {
+        if (err) return reject(err)
+        const buf = Buffer.alloc(length)
+        sftp.read(handle, buf, 0, length, offset, (readErr: Error | null, bytesRead: number) => {
+          sftp.close(handle, () => {})
+          if (readErr) return reject(readErr)
+          resolve(bytesRead < length ? buf.subarray(0, bytesRead) : buf)
+        })
+      })
+    })
+  }
+
+  async getSize(entryId: string): Promise<number> {
+    const [connId, remotePath] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn) throw new Error('Not connected')
+    const stat = await conn.client.stat(remotePath)
+    return stat.size
+  }
+
   async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
     const [connId, remotePath] = this.parseLocation(entryId)
     const conn = this.connections.get(connId)

@@ -30,15 +30,59 @@ export function getArchiveExtension(filePath: string): string {
 
 // ─── Location parsing ──────────────────────────────────────────────────────────
 
+/** Known plugin prefixes for remote archive sources. */
+const PLUGIN_PREFIXES = ['smb:', 'sftp:', 's3:', 'archive:']
+
+/**
+ * Check if an archive path references a remote source plugin.
+ * e.g. "smb:connId::remote/path/file.zip" → true
+ */
+export function isRemoteArchivePath(archivePath: string): boolean {
+  return PLUGIN_PREFIXES.some((p) => archivePath.startsWith(p))
+}
+
+/**
+ * Parse a remote archive path into plugin ID and entry ID.
+ * e.g. "smb:connId::remote/path/file.zip" → { pluginId: "smb", entryId: "connId::remote/path/file.zip" }
+ */
+export function parseRemoteRef(archivePath: string): { pluginId: string; entryId: string } {
+  const colonIdx = archivePath.indexOf(':')
+  const pluginId = archivePath.slice(0, colonIdx)
+  const entryId = archivePath.slice(colonIdx + 1)
+  return { pluginId, entryId }
+}
+
 /**
  * Split a locationId of the form "archivePath::internalPath" into its parts.
- * e.g. "D:\files\a.zip::src/main/" → ["D:\files\a.zip", "src/main/"]
+ * For remote archives like "smb:connId::remote/file.zip::src/main/",
+ * splits at the LAST "::" that follows an archive extension.
  */
 export function parseLocation(locationId: string): [string, string] {
-  const sepIdx = locationId.indexOf('::')
-  if (sepIdx < 0) return [locationId, '']
-  return [locationId.slice(0, sepIdx), locationId.slice(sepIdx + 2)]
+  // Find the archive extension boundary — the :: after the archive filename
+  // For "smb:connId::path/file.zip::internal" we need to split at the :: after .zip
+  // Strategy: find the last :: that is preceded by an archive extension
+  const parts = locationId.split('::')
+  if (parts.length <= 1) return [locationId, '']
+  if (parts.length === 2) return [parts[0], parts[1]]
+
+  // Multiple :: segments — find the split point
+  // Build up the archive path by joining segments until we find one ending with an archive extension
+  for (let i = 0; i < parts.length - 1; i++) {
+    const candidate = parts.slice(0, i + 1).join('::')
+    const ext = getArchiveExtension(candidate)
+    if (ext && ARCHIVE_EXTENSIONS.has(ext)) {
+      return [candidate, parts.slice(i + 1).join('::')]
+    }
+  }
+
+  // Fallback: split at first ::
+  return [parts[0], parts.slice(1).join('::')]
 }
+
+/** Set of known archive extensions for location parsing. */
+const ARCHIVE_EXTENSIONS = new Set([
+  '.zip', '.jar', '.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz'
+])
 
 // ─── Internal path helpers ─────────────────────────────────────────────────────
 

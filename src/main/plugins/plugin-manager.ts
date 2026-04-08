@@ -81,6 +81,20 @@ export class PluginManager {
     return plugin.enumerateFiles(entryIds, destDir)
   }
 
+  async readAt(pluginId: string, entryId: string, offset: number, length: number): Promise<Buffer> {
+    const plugin = this.get(pluginId)
+    if (!plugin) throw new Error(`Unknown plugin: ${pluginId}`)
+    if (!plugin.readAt) throw new Error(`Plugin ${pluginId} does not support readAt`)
+    return plugin.readAt(entryId, offset, length)
+  }
+
+  async getSize(pluginId: string, entryId: string): Promise<number> {
+    const plugin = this.get(pluginId)
+    if (!plugin) throw new Error(`Unknown plugin: ${pluginId}`)
+    if (!plugin.getSize) throw new Error(`Plugin ${pluginId} does not support getSize`)
+    return plugin.getSize(entryId)
+  }
+
   /**
    * Stream-copy a single file between any two plugins.
    * Returns bytes written. Sends progress via onProgress callback.

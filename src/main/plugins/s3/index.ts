@@ -179,6 +179,36 @@ export class S3Plugin implements BrowsePlugin {
     }
   }
 
+  async readAt(entryId: string, offset: number, length: number): Promise<Buffer> {
+    const [connId, key] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn || !key) throw new Error('Not connected')
+
+    const response = await conn.client.send(
+      new GetObjectCommand({
+        Bucket: conn.bucket,
+        Key: key,
+        Range: `bytes=${offset}-${offset + length - 1}`
+      })
+    )
+    if (!response.Body) throw new Error('Empty response')
+    const chunks: Buffer[] = []
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+      chunks.push(Buffer.from(chunk))
+    }
+    return Buffer.concat(chunks)
+  }
+
+  async getSize(entryId: string): Promise<number> {
+    const [connId, key] = this.parseLocation(entryId)
+    const conn = this.connections.get(connId)
+    if (!conn || !key) throw new Error('Not connected')
+    const response = await conn.client.send(
+      new GetObjectCommand({ Bucket: conn.bucket, Key: key })
+    )
+    return response.ContentLength || 0
+  }
+
   async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {
     const [connId, key] = this.parseLocation(entryId)
     const conn = this.connections.get(connId)

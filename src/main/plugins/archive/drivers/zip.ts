@@ -3,6 +3,8 @@ import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as yauzl from 'yauzl'
 import type { ArchiveDriver, ArchiveEntry } from '../driver'
+import type { SourceAccess } from '../plugin-reader'
+import { PluginRandomAccessReader } from '../plugin-reader'
 import { archiveBasename } from '../utils'
 
 // ─── Internal ZIP types ────────────────────────────────────────────────────────
@@ -23,10 +25,11 @@ type ZipTransformer = (entries: ZipRebuildEntry[]) => ZipRebuildEntry[]
 
 // ─── Low-level ZIP helpers ─────────────────────────────────────────────────────
 
-/** Read all ZIP entries without buffering content (metadata only). */
-function readZipEntries(archivePath: string): Promise<ZipEntry[]> {
+/** Read all ZIP entries via a SourceAccess (random access through any plugin). */
+function readZipEntries(source: SourceAccess): Promise<ZipEntry[]> {
   return new Promise((resolve, reject) => {
-    yauzl.open(archivePath, { lazyEntries: true }, (err, zipfile) => {
+    const reader = new PluginRandomAccessReader(source.readAt.bind(source))
+    yauzl.fromRandomAccessReader(reader, source.totalSize, { lazyEntries: true }, (err, zipfile) => {
       if (err || !zipfile) return reject(err || new Error('Failed to open zip'))
       const entries: ZipEntry[] = []
       zipfile.readEntry()
@@ -45,7 +48,7 @@ function readZipEntries(archivePath: string): Promise<ZipEntry[]> {
   })
 }
 
-/** Read all ZIP entries AND buffer their content. Used for the rebuild pattern. */
+/** Read all ZIP entries AND buffer their content from a local file. Used for the rebuild pattern. */
 function readZipEntriesWithData(archivePath: string): Promise<ZipRebuildEntry[]> {
   return new Promise((resolve, reject) => {
     yauzl.open(archivePath, { lazyEntries: true }, (err, zipfile) => {
@@ -142,8 +145,8 @@ export class ZipDriver implements ArchiveDriver {
   readonly extensions = ['.zip', '.jar'] as const
   readonly supportsWrite = true
 
-  async readEntries(archivePath: string): Promise<ArchiveEntry[]> {
-    const zipEntries = await readZipEntries(archivePath)
+  async readEntries(source: SourceAccess): Promise<ArchiveEntry[]> {
+    const zipEntries = await readZipEntries(source)
     return zipEntries.map((ze) => ({
       path: ze.fileName,
       size: ze.uncompressedSize,
@@ -152,9 +155,10 @@ export class ZipDriver implements ArchiveDriver {
     }))
   }
 
-  async createReadStream(archivePath: string, entryPath: string): Promise<NodeJS.ReadableStream | null> {
+  async createReadStream(source: SourceAccess, entryPath: string): Promise<NodeJS.ReadableStream | null> {
     return new Promise((resolve) => {
-      yauzl.open(archivePath, { lazyEntries: true, autoClose: false }, (err, zipfile) => {
+      const reader = new PluginRandomAccessReader(source.readAt.bind(source))
+      yauzl.fromRandomAccessReader(reader, source.totalSize, { lazyEntries: true, autoClose: false }, (err, zipfile) => {
         if (err || !zipfile) { resolve(null); return }
         const closeZip = (): void => { try { zipfile.close() } catch { /* ignore */ } }
         zipfile.readEntry()
@@ -177,12 +181,13 @@ export class ZipDriver implements ArchiveDriver {
   }
 
   async extract(
-    archivePath: string,
+    source: SourceAccess,
     entryPath: string,
     destDir: string
   ): Promise<{ success: boolean; error?: string; count: number }> {
     return new Promise((resolve) => {
-      yauzl.open(archivePath, { lazyEntries: true }, (err, zipfile) => {
+      const reader = new PluginRandomAccessReader(source.readAt.bind(source))
+      yauzl.fromRandomAccessReader(reader, source.totalSize, { lazyEntries: true }, (err, zipfile) => {
         if (err || !zipfile) {
           resolve({ success: false, error: String(err), count: 0 })
           return
