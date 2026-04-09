@@ -55,7 +55,6 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
-  const t0 = performance.now()
   electronApp.setAppUserModelId('com.something-commander')
 
   // Remove default Electron menu to prevent Alt+key conflicts
