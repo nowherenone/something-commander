@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { Modal } from '../primitives/Modal'
 import styles from '../../styles/dialogs.module.css'
 
 interface PluginInfo {
@@ -64,13 +65,17 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
   }, [pluginsDir])
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div
-        className={`${styles.dialog} ${styles.dialogWide}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.dialogTitle}>Plugin Manager</div>
-        <div className={styles.dialogBody}>
+    <Modal
+      onClose={onClose}
+      title="Plugin Manager"
+      wide
+      footer={
+        <>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={refresh}>Refresh</button>
+          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Close</button>
+        </>
+      }
+    >
           {/* Built-in plugins */}
           <div className={styles.settingsGroup}>
             <div className={styles.settingsGroupTitle}>Built-in Plugins</div>
@@ -196,12 +201,6 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
                  // }`}</pre>
             </div>
           </div>
-        </div>
-        <div className={styles.dialogFooter}>
-          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={refresh}>Refresh</button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

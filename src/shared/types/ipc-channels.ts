@@ -5,7 +5,6 @@ export const IPC_CHANNELS = {
   PLUGIN_RESOLVE_LOC: 'plugin:resolveLocation',
   PLUGIN_GET_OPS: 'plugin:getSupportedOperations',
   PLUGIN_EXEC_OP: 'plugin:executeOperation',
-  PLUGIN_GET_CONTENT: 'plugin:getContent',
 
   // Utility
   CALC_FOLDER_SIZE: 'util:calcFolderSize',
@@ -50,10 +49,5 @@ export const IPC_CHANNELS = {
   STORE_SET: 'store:set',
 
   // Drag and drop
-  NATIVE_DRAG_START: 'util:nativeDragStart',
-
-  // Operation progress events (main → renderer)
-  OP_PROGRESS: 'ops:progress',
-  OP_COMPLETE: 'ops:complete',
-  OP_ERROR: 'ops:error'
+  NATIVE_DRAG_START: 'util:nativeDragStart'
 } as const

@@ -15,29 +15,7 @@ const pluginsAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_OPS, pluginId),
 
   executeOperation: (pluginId: string, op: unknown) =>
-    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_EXEC_OP, pluginId, op),
-
-  onOperationProgress: (callback: (data: unknown) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: unknown): void => callback(data)
-    ipcRenderer.on(IPC_CHANNELS.OP_PROGRESS, handler)
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.OP_PROGRESS, handler)
-  },
-
-  onOperationComplete: (callback: (operationId: string) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, operationId: string): void =>
-      callback(operationId)
-    ipcRenderer.on(IPC_CHANNELS.OP_COMPLETE, handler)
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.OP_COMPLETE, handler)
-  },
-
-  onOperationError: (callback: (data: { operationId: string; error: string }) => void) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      data: { operationId: string; error: string }
-    ): void => callback(data)
-    ipcRenderer.on(IPC_CHANNELS.OP_ERROR, handler)
-    return () => ipcRenderer.removeListener(IPC_CHANNELS.OP_ERROR, handler)
-  }
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_EXEC_OP, pluginId, op)
 }
 
 const utilAPI = {

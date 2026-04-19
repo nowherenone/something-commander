@@ -23,13 +23,3 @@ export interface OperationResult {
   success: boolean
   errors?: Array<{ entryId: string; message: string }>
 }
-
-export interface OperationProgress {
-  operationId: string
-  type: 'copy' | 'move' | 'delete'
-  currentFile: string
-  processedFiles: number
-  totalFiles: number
-  processedBytes: number
-  totalBytes: number
-}

@@ -8,7 +8,6 @@ export type {
 export type {
   PluginOperation,
   OperationRequest,
-  OperationResult,
-  OperationProgress
+  OperationResult
 } from './operations'
 export { IPC_CHANNELS } from './ipc-channels'

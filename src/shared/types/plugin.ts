@@ -79,20 +79,11 @@ export interface BrowsePlugin {
   /** Write a file from a readable stream. Returns bytes written. */
   writeFromStream?(destLocationId: string, fileName: string, stream: NodeJS.ReadableStream): Promise<{ success: boolean; bytesWritten: number; error?: string }>
 
-  /** Create a directory at the given location. */
-  createDirectory?(locationId: string, name: string): Promise<{ success: boolean; error?: string }>
-
-  /** Delete a single entry. */
-  deleteSingle?(entryId: string): Promise<{ success: boolean; error?: string }>
-
   /** Read a block of bytes from a file at a given offset. Universal random-access primitive. */
   readAt?(entryId: string, offset: number, length: number): Promise<Buffer>
 
   /** Get the size in bytes of a file entry. */
   getSize?(entryId: string): Promise<number>
-
-  /** Optional: provide file content for viewing. */
-  getContent?(entryId: string): Promise<Buffer | null>
 
   /** Optional: watch a location for changes. */
   watch?(locationId: string, onChange: () => void): { dispose(): void }

@@ -10,34 +10,9 @@ describe('keybindings-store', () => {
     expect(useKeybindingsStore.getState().bindings.length).toBeGreaterThan(10)
   })
 
-  it('matchAction finds Tab -> switchPanel', () => {
-    const event = new KeyboardEvent('keydown', { key: 'Tab' })
-    const action = useKeybindingsStore.getState().matchAction(event)
-    expect(action).toBe('switchPanel')
-  })
-
-  it('matchAction finds F5 -> copy', () => {
-    const event = new KeyboardEvent('keydown', { key: 'F5' })
-    const action = useKeybindingsStore.getState().matchAction(event)
-    expect(action).toBe('copy')
-  })
-
-  it('matchAction finds Ctrl+A -> selectAll', () => {
-    const event = new KeyboardEvent('keydown', { key: 'a', ctrlKey: true })
-    const action = useKeybindingsStore.getState().matchAction(event)
-    expect(action).toBe('selectAll')
-  })
-
-  it('matchAction finds Ctrl+M -> multiRename', () => {
-    const event = new KeyboardEvent('keydown', { key: 'm', ctrlKey: true })
-    const action = useKeybindingsStore.getState().matchAction(event)
-    expect(action).toBe('multiRename')
-  })
-
-  it('matchAction returns null for unbound keys', () => {
-    const event = new KeyboardEvent('keydown', { key: 'z' })
-    const action = useKeybindingsStore.getState().matchAction(event)
-    expect(action).toBeNull()
+  it('updateBinding replaces a binding at the given index', () => {
+    useKeybindingsStore.getState().updateBinding(0, { key: 'X', action: 'test' })
+    expect(useKeybindingsStore.getState().bindings[0]).toEqual({ key: 'X', action: 'test' })
   })
 
   it('resetBindings restores defaults', () => {
@@ -46,5 +21,33 @@ describe('keybindings-store', () => {
 
     useKeybindingsStore.getState().resetBindings()
     expect(useKeybindingsStore.getState().bindings[0].action).toBe(DEFAULT_KEYBINDINGS[0].action)
+  })
+
+  it('matchAction resolves F5 to copy', () => {
+    const action = useKeybindingsStore.getState().matchAction(
+      new KeyboardEvent('keydown', { key: 'F5' })
+    )
+    expect(action).toBe('copy')
+  })
+
+  it('matchAction resolves Ctrl+A to selectAll (lowercase fallback)', () => {
+    const action = useKeybindingsStore.getState().matchAction(
+      new KeyboardEvent('keydown', { key: 'a', ctrlKey: true })
+    )
+    expect(action).toBe('selectAll')
+  })
+
+  it('matchAction resolves Ctrl+Shift+D to deselectAll, not the Ctrl+D drive menu', () => {
+    const action = useKeybindingsStore.getState().matchAction(
+      new KeyboardEvent('keydown', { key: 'D', ctrlKey: true, shiftKey: true })
+    )
+    expect(action).toBe('deselectAll')
+  })
+
+  it('matchAction returns null for unbound keys', () => {
+    const action = useKeybindingsStore.getState().matchAction(
+      new KeyboardEvent('keydown', { key: 'z' })
+    )
+    expect(action).toBeNull()
   })
 })

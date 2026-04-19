@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Modal } from '../primitives/Modal'
 import styles from '../../styles/dialogs.module.css'
 
 interface SelectGroupDialogProps {
@@ -15,6 +16,8 @@ export function SelectGroupDialog({ mode, onConfirm, onCancel }: SelectGroupDial
     inputRef.current?.select()
   }, [])
 
+  // Capture-phase handler: Enter confirms, Escape cancels, every other key
+  // is stopped so it doesn't reach the panel navigation listener.
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Enter') {
@@ -25,10 +28,8 @@ export function SelectGroupDialog({ mode, onConfirm, onCancel }: SelectGroupDial
         e.preventDefault()
         e.stopPropagation()
         onCancel()
-      } else {
-        if (!(document.activeElement instanceof HTMLInputElement)) {
-          e.stopPropagation()
-        }
+      } else if (!(document.activeElement instanceof HTMLInputElement)) {
+        e.stopPropagation()
       }
     }
     window.addEventListener('keydown', handler, true)
@@ -38,32 +39,14 @@ export function SelectGroupDialog({ mode, onConfirm, onCancel }: SelectGroupDial
   const title = mode === 'select' ? 'Select Group' : 'Unselect Group'
 
   return (
-    <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.dialog} style={{ width: 340 }} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.dialogTitle}>{title}</div>
-        <div className={styles.dialogBody} style={{ padding: '12px 16px' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-            Enter file mask (e.g. *.txt, file*, *.js):
-          </div>
-          <input
-            ref={inputRef}
-            autoFocus
-            value={pattern}
-            onChange={(e) => setPattern(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '4px 8px',
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-focus)',
-              borderRadius: 3,
-              fontFamily: 'var(--font-mono)',
-              fontSize: 12,
-              boxSizing: 'border-box'
-            }}
-          />
-        </div>
-        <div className={styles.dialogFooter}>
+    <Modal
+      onClose={onCancel}
+      title={title}
+      width={340}
+      closeOnEscape={false}
+      bodyStyle={{ padding: '12px 16px' }}
+      footer={
+        <>
           <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onCancel}>
             Cancel
           </button>
@@ -73,8 +56,29 @@ export function SelectGroupDialog({ mode, onConfirm, onCancel }: SelectGroupDial
           >
             OK (Enter)
           </button>
-        </div>
+        </>
+      }
+    >
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+        Enter file mask (e.g. *.txt, file*, *.js):
       </div>
-    </div>
+      <input
+        ref={inputRef}
+        autoFocus
+        value={pattern}
+        onChange={(e) => setPattern(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '4px 8px',
+          background: 'var(--bg-tertiary)',
+          color: 'var(--text-primary)',
+          border: '1px solid var(--border-focus)',
+          borderRadius: 3,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          boxSizing: 'border-box'
+        }}
+      />
+    </Modal>
   )
 }

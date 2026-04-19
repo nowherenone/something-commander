@@ -11,10 +11,7 @@ const mockPluginsApi = {
   }),
   resolveLocation: vi.fn().mockResolvedValue(null),
   getSupportedOperations: vi.fn().mockResolvedValue([]),
-  executeOperation: vi.fn().mockResolvedValue({ success: true }),
-  onOperationProgress: vi.fn().mockReturnValue(() => {}),
-  onOperationComplete: vi.fn().mockReturnValue(() => {}),
-  onOperationError: vi.fn().mockReturnValue(() => {})
+  executeOperation: vi.fn().mockResolvedValue({ success: true })
 }
 
 const mockUtilApi = {

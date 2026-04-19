@@ -9,6 +9,7 @@ import type {
   OperationRequest,
   OperationResult
 } from '@shared/types'
+import { makeDirectoryEntry, makeFileEntry, getExtension } from '../base-plugin'
 
 interface SftpConnection {
   id: string
@@ -67,22 +68,19 @@ export class SftpPlugin implements BrowsePlugin {
 
     const entries: Entry[] = listing.map((item) => {
       const isDir = item.type === 'd'
-      const ext = isDir ? '' : path.extname(item.name).slice(1).toLowerCase()
-      return {
-        id: `${connId}::${dirPath === '/' ? '' : dirPath}/${item.name}`,
-        name: item.name,
-        isContainer: isDir,
-        size: isDir ? -1 : item.size,
-        modifiedAt: item.modifyTime,
-        mimeType: isDir ? 'inode/directory' : '',
-        iconHint: isDir ? 'folder' : 'file',
-        meta: { extension: ext, connId },
-        attributes: {
-          readonly: false,
-          hidden: item.name.startsWith('.'),
-          symlink: item.type === 'l'
-        }
+      const id = `${connId}::${dirPath === '/' ? '' : dirPath}/${item.name}`
+      const hidden = item.name.startsWith('.')
+      const symlink = item.type === 'l'
+      if (isDir) {
+        return makeDirectoryEntry(id, item.name, { hidden, symlink, meta: { connId } })
       }
+      return makeFileEntry(id, item.name, item.size, item.modifyTime, {
+        ext: getExtension(item.name),
+        iconHint: 'file',
+        hidden,
+        symlink,
+        meta: { connId }
+      })
     })
 
     const parentPath = dirPath === '/' ? null : path.posix.dirname(dirPath)
@@ -218,18 +216,6 @@ export class SftpPlugin implements BrowsePlugin {
       })
     } catch (err) {
       return { success: false, bytesWritten: 0, error: String(err) }
-    }
-  }
-
-  async deleteSingle(entryId: string): Promise<{ success: boolean; error?: string }> {
-    const [connId, remotePath] = this.parseLocation(entryId)
-    const conn = this.connections.get(connId)
-    if (!conn) return { success: false, error: 'Not connected' }
-    try {
-      await conn.client.delete(remotePath)
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: String(err) }
     }
   }
 

@@ -14,6 +14,7 @@ import { ToastContainer } from './components/layout/Toast'
 import { NetworkConnections } from './components/dialogs/NetworkConnections'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
+import { MkdirDialog } from './components/dialogs/MkdirDialog'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
@@ -21,11 +22,13 @@ import { usePanelStore, parentOffset } from './stores/panel-store'
 import { useOperationsStore } from './stores/operations-store'
 import { useSettingsStore, loadSettings } from './stores/settings-store'
 import { loadBookmarks } from './stores/bookmarks-store'
+import { registerCommands, dispatchCommand } from './commands/registry'
+import { parseArchivePath } from './utils/archive-path'
+import { splitPathTail } from './utils/entry-helpers'
 import type { Entry } from '@shared/types'
 
 function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
-  const [mkdirName, setMkdirName] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [multiRenameEntries, setMultiRenameEntries] = useState<Entry[] | null>(null)
@@ -50,12 +53,10 @@ function App(): React.JSX.Element {
   }, [theme])
 
   const handleF7 = useCallback(() => {
-    setMkdirName('')
     setMkdirDialog(true)
   }, [])
 
-  const handleF7Submit = useCallback(async () => {
-    if (!mkdirName.trim()) return
+  const handleF7Submit = useCallback(async (name: string) => {
     const activePanel = useAppStore.getState().activePanel
     const state = usePanelStore.getState()
     const tab = state.getActiveTab(activePanel)
@@ -63,11 +64,11 @@ function App(): React.JSX.Element {
     await window.api.plugins.executeOperation(tab.pluginId, {
       op: 'createDirectory',
       parentLocationId: tab.locationId!,
-      name: mkdirName.trim()
+      name
     })
     setMkdirDialog(false)
     state.refresh(activePanel)
-  }, [mkdirName])
+  }, [])
 
   const getCursorEntry = useCallback(() => {
     const activePanel = useAppStore.getState().activePanel
@@ -150,7 +151,7 @@ function App(): React.JSX.Element {
     if (tab.parentId !== null) {
       usePanelStore.getState().navigate(activePanel, tab.parentId)
     } else if (tab.pluginId === 'archive') {
-      const archivePath = tab.locationId?.split('::')[0]
+      const archivePath = tab.locationId ? parseArchivePath(tab.locationId).archive : ''
       if (!archivePath) return
       const REMOTE_PREFIXES = ['smb:', 'sftp:', 's3:', 'archive:']
       const isRemote = REMOTE_PREFIXES.some((p) => archivePath.startsWith(p))
@@ -163,31 +164,15 @@ function App(): React.JSX.Element {
           : null
         usePanelStore.getState().navigateWithPlugin(activePanel, sourcePlugin, parentPath)
       } else {
-        const parentDir = archivePath.replace(/[\\/][^\\/]+$/, '')
-        usePanelStore.getState().navigateWithPlugin(activePanel, 'local-filesystem', parentDir)
+        const { parent } = splitPathTail(archivePath)
+        usePanelStore.getState().navigateWithPlugin(activePanel, 'local-filesystem', parent)
       }
-    } else if (tab.pluginId !== 'local-filesystem') {
-      usePanelStore.getState().navigate(activePanel, null)
     } else {
       usePanelStore.getState().navigate(activePanel, null)
     }
   }, [])
 
   useKeyboard({
-    onF3: handleF3,
-    onF4: handleF4,
-    onF5: handleCopy,
-    onF6: handleMove,
-    onF7: handleF7,
-    onF8: handleDelete,
-    onF9: handleF9,
-    onAltF5: handlePack,
-    onAltF7: handleAltF7,
-    onAltF9: handleUnpack,
-    onCtrlM: handleCtrlM,
-    onCompare: handleCompare,
-    onSelectGroup: () => setSelectGroupMode('select'),
-    onUnselectGroup: () => setSelectGroupMode('unselect'),
     onActivate: handleActivateEntry,
     onGoUp: handleGoUp
   })
@@ -195,107 +180,62 @@ function App(): React.JSX.Element {
   const bottomBar = useSettingsStore((s) => s.bottomBar)
   const showCommandLine = useSettingsStore((s) => s.showCommandLine)
 
+  // Register all commands so menu clicks, keyboard shortcuts, and context
+  // menus share a single dispatch. Runs whenever any handler identity changes.
+  useEffect(() => {
+    const activePanel = (): 'left' | 'right' => useAppStore.getState().activePanel
+    const panel = (): ReturnType<typeof usePanelStore.getState> => usePanelStore.getState()
+    const app = (): ReturnType<typeof useAppStore.getState> => useAppStore.getState()
+    const settings = (): ReturnType<typeof useSettingsStore.getState> => useSettingsStore.getState()
+
+    return registerCommands({
+      view: handleF3,
+      edit: handleF4,
+      copy: handleCopy,
+      move: handleMove,
+      pack: handlePack,
+      unpack: handleUnpack,
+      mkdir: handleF7,
+      delete: handleDelete,
+      multiRename: handleCtrlM,
+      search: handleAltF7,
+      compare: handleCompare,
+      settings: handleF9,
+      // Panel-local commands.
+      toggleHidden: () => panel().toggleHidden(activePanel()),
+      refresh: () => panel().refresh(activePanel()),
+      selectAll: () => panel().selectAll(activePanel()),
+      deselectAll: () => panel().deselectAll(activePanel()),
+      invertSelection: () => panel().invertSelection(activePanel()),
+      selectSameExt: () => panel().selectSameExt(activePanel()),
+      newTab: () => panel().addTab(activePanel()),
+      closeTab: () => {
+        const ap = activePanel()
+        const tab = panel().getActiveTab(ap)
+        panel().closeTab(ap, tab.id)
+      },
+      driveMenu: () => app().openDriveMenu(activePanel()),
+      driveMenuLeft: () => app().openDriveMenu('left'),
+      driveMenuRight: () => app().openDriveMenu('right'),
+      viewBrief: () => app().setViewMode(activePanel(), 'brief'),
+      viewTree: () => app().setViewMode(activePanel(), 'tree'),
+      viewInfo: () => app().setViewMode(activePanel(), 'info'),
+      viewQuickview: () => app().setViewMode(activePanel(), 'quickview'),
+      toggleCommandLine: () => settings().updateSettings({ showCommandLine: !settings().showCommandLine }),
+      setBottomFnkeys: () => settings().updateSettings({ bottomBar: 'fnkeys' }),
+      setBottomStatus: () => settings().updateSettings({ bottomBar: 'status' }),
+      setBottomNone: () => settings().updateSettings({ bottomBar: 'none' }),
+      selectGroup: () => setSelectGroupMode('select'),
+      unselectGroup: () => setSelectGroupMode('unselect'),
+      networkConnections: () => setNetworkDialogOpen(true),
+      pluginManager: () => setPluginManagerOpen(true),
+      quit: () => window.close()
+    })
+  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9])
+
   const handleMenuAction = useCallback((action: string) => {
-    switch (action) {
-      case 'view': handleF3(); break
-      case 'edit': handleF4(); break
-      case 'copy': handleCopy(); break
-      case 'move': handleMove(); break
-      case 'pack': handlePack(); break
-      case 'unpack': handleUnpack(); break
-      case 'mkdir': handleF7(); break
-      case 'delete': handleDelete(); break
-      case 'multiRename': handleCtrlM(); break
-      case 'search': handleAltF7(); break
-      case 'compare': handleCompare(); break
-      case 'settings': handleF9(); break
-      case 'toggleHidden': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().toggleHidden(ap)
-        break
-      }
-      case 'refresh': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().refresh(ap)
-        break
-      }
-      case 'newTab': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().addTab(ap)
-        break
-      }
-      case 'closeTab': {
-        const ap = useAppStore.getState().activePanel
-        const tab = usePanelStore.getState().getActiveTab(ap)
-        usePanelStore.getState().closeTab(ap, tab.id)
-        break
-      }
-      case 'driveMenu': {
-        const ap = useAppStore.getState().activePanel
-        useAppStore.getState().openDriveMenu(ap)
-        break
-      }
-      case 'networkConnections':
-        setNetworkDialogOpen(true)
-        break
-      case 'pluginManager':
-        setPluginManagerOpen(true)
-        break
-      case 'viewBrief':
-        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'brief')
-        break
-      case 'viewTree':
-        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'tree')
-        break
-      case 'viewInfo':
-        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'info')
-        break
-      case 'viewQuickview':
-        useAppStore.getState().setViewMode(useAppStore.getState().activePanel, 'quickview')
-        break
-      case 'toggleCommandLine':
-        useSettingsStore.getState().updateSettings({ showCommandLine: !showCommandLine })
-        break
-      case 'setBottomFnkeys':
-        useSettingsStore.getState().updateSettings({ bottomBar: 'fnkeys' })
-        break
-      case 'setBottomStatus':
-        useSettingsStore.getState().updateSettings({ bottomBar: 'status' })
-        break
-      case 'setBottomNone':
-        useSettingsStore.getState().updateSettings({ bottomBar: 'none' })
-        break
-      case 'selectGroup':
-        setSelectGroupMode('select')
-        break
-      case 'unselectGroup':
-        setSelectGroupMode('unselect')
-        break
-      case 'selectAll': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().selectAll(ap)
-        break
-      }
-      case 'deselectAll': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().deselectAll(ap)
-        break
-      }
-      case 'invertSelection': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().invertSelection(ap)
-        break
-      }
-      case 'selectSameExt': {
-        const ap = useAppStore.getState().activePanel
-        usePanelStore.getState().selectSameExt(ap)
-        break
-      }
-      case 'quit':
-        window.close()
-        break
-    }
-  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9, showCommandLine])
+    dispatchCommand(action)
+  }, [])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -330,81 +270,7 @@ function App(): React.JSX.Element {
       )}
 
       {mkdirDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100
-          }}
-          onClick={() => setMkdirDialog(false)}
-        >
-          <div
-            style={{
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 6,
-              padding: 20,
-              minWidth: 320
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text-primary)' }}>
-              Create Directory
-            </h3>
-            <input
-              autoFocus
-              value={mkdirName}
-              onChange={(e) => setMkdirName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleF7Submit()
-                if (e.key === 'Escape') setMkdirDialog(false)
-              }}
-              placeholder="Directory name"
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 3,
-                fontFamily: 'var(--font-family)',
-                fontSize: 'var(--font-size)'
-              }}
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-              <button
-                onClick={() => setMkdirDialog(false)}
-                style={{
-                  padding: '4px 16px',
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-secondary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 3,
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleF7Submit}
-                style={{
-                  padding: '4px 16px',
-                  background: 'var(--accent)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 3,
-                  cursor: 'pointer'
-                }}
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
+        <MkdirDialog onClose={() => setMkdirDialog(false)} onSubmit={handleF7Submit} />
       )}
 
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}

@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import type { Entry, ColumnDefinition } from '@shared/types'
-import { sortEntries, type SortConfig } from '../utils/sort'
+import { type SortConfig, sortEntries } from '../utils/sort'
+import { isArchivePath, parseArchivePath } from '../utils/archive-path'
+import { getExtension } from '../utils/entry-helpers'
+import { buildDirView, findEntryIndexById, findEntryIndexByName } from './panel-store-helpers'
 import { showToast } from '../components/layout/Toast'
 
 const DEFAULT_PLUGIN = 'local-filesystem'
@@ -180,7 +183,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
 
     // Auto-detect archive paths and redirect to navigateWithPlugin
     // Only do this from local-filesystem — other plugins (smb, sftp, s3) use :: as their own separator
-    if (locationId && locationId.includes('::') && tab.pluginId === 'local-filesystem') {
+    if (locationId && isArchivePath(locationId) && tab.pluginId === 'local-filesystem') {
       return get().navigateWithPlugin(panelId, 'archive', locationId)
     }
 
@@ -188,41 +191,25 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
 
     try {
       const result = await window.api.plugins.readDirectory(tab.pluginId, locationId)
-      let entries = result.entries
-
       const currentTab = getActiveTab(get()[panelId])
-      if (!currentTab.showHidden) {
-        entries = entries.filter((e) => !e.attributes.hidden)
-      }
-      entries = sortEntries(entries, currentTab.sortConfig)
 
-      // When going up, place cursor on the folder we came from
-      let cursorIndex = 0
-      if (previousLocationId) {
-        // ".." row is shown when locationId is non-null (matches hasParentEntry logic)
-        const offset = locationId !== null ? 1 : 0
-        // Try exact match first, then case-insensitive match (Windows paths)
-        let prevIdx = entries.findIndex((e) => e.id === previousLocationId)
-        if (prevIdx < 0) {
-          const prevLower = previousLocationId.toLowerCase()
-          prevIdx = entries.findIndex((e) => e.id.toLowerCase() === prevLower)
-        }
-        if (prevIdx >= 0) {
-          cursorIndex = prevIdx + offset
-        }
-      }
+      const view = buildDirView(result, {
+        showHidden: currentTab.showHidden,
+        sortConfig: currentTab.sortConfig,
+        hasParentRow: locationId !== null,
+        findCursor: previousLocationId
+          ? (entries) => findEntryIndexById(entries, previousLocationId)
+          : undefined
+      })
 
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
+          ...view,
           locationId,
           locationDisplay: result.location,
-          entries,
-          parentId: result.parentId,
-          extraColumns: result.extraColumns || [],
           selectedEntryIds: new Set(),
           calculatingFolderIds: new Set(),
-          cursorIndex,
           isLoading: false,
           error: null
         }))
@@ -241,7 +228,6 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           errorFolderIds: errorSet
         }))
       })
-      // Show error as toast
       showToast(String(err))
     }
   },
@@ -251,7 +237,6 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     const tab = getActiveTab(panel)
     const previousLocationId = tab.locationId
 
-    // Switch plugin on the active tab and navigate
     set({
       [panelId]: updateTab(panel, tab.id, (t) => ({
         ...t,
@@ -263,45 +248,30 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
 
     try {
       const result = await window.api.plugins.readDirectory(pluginId, locationId)
-      let entries = result.entries
       const currentTab = getActiveTab(get()[panelId])
-      if (!currentTab.showHidden) {
-        entries = entries.filter((e) => !e.attributes.hidden)
-      }
-      entries = sortEntries(entries, currentTab.sortConfig)
 
-      // Try to place cursor on the item we came from
-      let cursorIndex = 0
-      if (previousLocationId) {
-        // When exiting archive, previousLocationId is "D:\path\file.zip::"
-        // Strip the "::" part to match the archive file in the parent listing
-        const searchId = previousLocationId.includes('::')
-          ? previousLocationId.split('::')[0]
-          : previousLocationId
-        // ".." row is shown when locationId is non-null (matches hasParentEntry logic)
-        const offset = locationId !== null ? 1 : 0
-        let prevIdx = entries.findIndex((e) => e.id === searchId)
-        if (prevIdx < 0) {
-          const searchLower = searchId.toLowerCase()
-          prevIdx = entries.findIndex((e) => e.id.toLowerCase() === searchLower)
-        }
-        if (prevIdx >= 0) {
-          cursorIndex = prevIdx + offset
-        }
-      }
+      // When exiting an archive, previousLocationId is "path::" — strip to match
+      // the archive file in the parent listing.
+      const searchId = previousLocationId && isArchivePath(previousLocationId)
+        ? parseArchivePath(previousLocationId).archive
+        : previousLocationId
+
+      const view = buildDirView(result, {
+        showHidden: currentTab.showHidden,
+        sortConfig: currentTab.sortConfig,
+        hasParentRow: locationId !== null,
+        findCursor: searchId ? (entries) => findEntryIndexById(entries, searchId) : undefined
+      })
 
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
+          ...view,
           pluginId,
           locationId,
           locationDisplay: result.location,
-          entries,
-          parentId: result.parentId,
-          extraColumns: result.extraColumns || [],
           selectedEntryIds: new Set(),
           calculatingFolderIds: new Set(),
-          cursorIndex,
           isLoading: false,
           error: null
         }))
@@ -322,42 +292,28 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
   refresh: async (panelId) => {
     const panel = get()[panelId]
     const tab = getActiveTab(panel)
-    const oldCursorIndex = tab.cursorIndex
-    const offset = parentOffset(tab)
-    const oldEntryIndex = oldCursorIndex - offset
+    const oldEntryIndex = tab.cursorIndex - parentOffset(tab)
     const oldEntryName = oldEntryIndex >= 0 && oldEntryIndex < tab.entries.length
       ? tab.entries[oldEntryIndex].name
       : null
 
     try {
       const result = await window.api.plugins.readDirectory(tab.pluginId, tab.locationId)
-      let entries = result.entries
       const currentTab = getActiveTab(get()[panelId])
-      if (!currentTab.showHidden) {
-        entries = entries.filter((e) => !e.attributes.hidden)
-      }
-      entries = sortEntries(entries, currentTab.sortConfig)
 
-      // Restore cursor: try to find the same entry by name, else clamp to bounds
-      const newOffset = tab.locationId !== null ? 1 : 0
-      let newCursor = oldCursorIndex
-      if (oldEntryName) {
-        const idx = entries.findIndex((e) => e.name === oldEntryName)
-        if (idx >= 0) {
-          newCursor = idx + newOffset
-        }
-      }
-      // If the old entry was deleted, try the same index position
-      const maxIdx = entries.length - 1 + newOffset
-      newCursor = Math.max(0, Math.min(newCursor, maxIdx))
+      const view = buildDirView(result, {
+        showHidden: currentTab.showHidden,
+        sortConfig: currentTab.sortConfig,
+        hasParentRow: tab.locationId !== null,
+        findCursor: oldEntryName ? (entries) => findEntryIndexByName(entries, oldEntryName) : undefined,
+        // If the entry is gone, keep the cursor where it was (clamped).
+        fallbackCursor: tab.cursorIndex
+      })
 
       set({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
-          entries,
-          parentId: result.parentId,
-          extraColumns: result.extraColumns || [],
-          cursorIndex: newCursor,
+          ...view,
           isLoading: false,
           error: null
         }))
@@ -545,13 +501,10 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     const idx = tab.cursorIndex - offset
     if (idx < 0 || idx >= tab.entries.length) return
     const cursorEntry = tab.entries[idx]
-    const dotIdx = cursorEntry.name.lastIndexOf('.')
-    const ext = dotIdx >= 0 ? cursorEntry.name.slice(dotIdx).toLowerCase() : ''
+    const ext = getExtension(cursorEntry.name)
     const newSet = new Set(tab.selectedEntryIds)
     for (const entry of tab.entries) {
-      const entryDot = entry.name.lastIndexOf('.')
-      const entryExt = entryDot >= 0 ? entry.name.slice(entryDot).toLowerCase() : ''
-      if (entryExt === ext) newSet.add(entry.id)
+      if (getExtension(entry.name) === ext) newSet.add(entry.id)
     }
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, selectedEntryIds: newSet })) })
   }

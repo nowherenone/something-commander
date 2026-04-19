@@ -65,15 +65,15 @@ app.whenReady().then(async () => {
   })
 
   // Register plugins and IPC before creating the window so everything
-  // is ready when the renderer starts making IPC calls
+  // is ready when the renderer starts making IPC calls.
+  // The archive plugin needs to reach other plugins for remote archives, so it
+  // takes the plugin manager as a host via DI.
   pluginManager.register(new LocalFilesystemPlugin())
-  const archivePlugin = new ArchivePlugin()
-  pluginManager.register(archivePlugin)
+  pluginManager.register(new ArchivePlugin(pluginManager))
   pluginManager.register(new SftpPlugin())
   pluginManager.register(new S3Plugin())
   pluginManager.register(new SmbPlugin())
   await pluginManager.initializeAll()
-  archivePlugin.setPluginManager(pluginManager)
 
   registerAllIPC()
 

@@ -12,6 +12,12 @@ import type {
   OperationRequest,
   OperationResult
 } from '@shared/types'
+import {
+  makeDirectoryEntry,
+  makeFileEntry,
+  iconHintForExtension,
+  getExtension
+} from '../base-plugin'
 
 export class LocalFilesystemPlugin implements BrowsePlugin {
   readonly manifest: PluginManifest = {
@@ -195,36 +201,19 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
   private async direntToEntry(parentPath: string, dirent: import('fs').Dirent): Promise<Entry> {
     const fullPath = path.join(parentPath, dirent.name)
     const stat = await fs.stat(fullPath)
-    const ext = dirent.isDirectory() ? '' : path.extname(dirent.name).slice(1).toLowerCase()
+    const hidden = dirent.name.startsWith('.')
+    const symlink = dirent.isSymbolicLink()
 
-    return {
-      id: fullPath,
-      name: dirent.name,
-      isContainer: dirent.isDirectory(),
-      size: dirent.isDirectory() ? -1 : stat.size,
-      modifiedAt: stat.mtimeMs,
-      mimeType: dirent.isDirectory() ? 'inode/directory' : '',
-      iconHint: dirent.isDirectory() ? 'folder' : this.getIconHint(ext),
-      meta: { extension: ext },
-      attributes: {
-        readonly: false,
-        hidden: dirent.name.startsWith('.'),
-        symlink: dirent.isSymbolicLink()
-      }
+    if (dirent.isDirectory()) {
+      return makeDirectoryEntry(fullPath, dirent.name, { meta: { extension: '' }, hidden, symlink })
     }
-  }
-
-  private getIconHint(ext: string): string {
-    const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp', 'ico']
-    const archiveExts = ['zip', 'tar', 'gz', 'bz2', '7z', 'rar', 'xz']
-    const codeExts = ['ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h']
-    const docExts = ['md', 'txt', 'pdf', 'doc', 'docx', 'rtf']
-
-    if (imageExts.includes(ext)) return 'image'
-    if (archiveExts.includes(ext)) return 'archive'
-    if (codeExts.includes(ext)) return 'code'
-    if (docExts.includes(ext)) return 'document'
-    return 'file'
+    const ext = getExtension(dirent.name)
+    return makeFileEntry(fullPath, dirent.name, stat.size, stat.mtimeMs, {
+      ext,
+      iconHint: iconHintForExtension(ext),
+      hidden,
+      symlink
+    })
   }
 
   private async listRoots(): Promise<ReadDirectoryResult> {
@@ -240,55 +229,24 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
   private async listLinuxRoots(): Promise<ReadDirectoryResult> {
     const entries: Entry[] = []
 
-    const makeEntry = (id: string, name: string, icon: string): Entry => ({
-      id,
-      name,
-      isContainer: true,
-      size: -1,
-      modifiedAt: 0,
-      mimeType: 'inode/directory',
-      iconHint: icon,
-      meta: {},
-      attributes: { readonly: false, hidden: false, symlink: false }
-    })
+    entries.push(makeDirectoryEntry('/', '/ (root)', { iconHint: 'drive' }))
+    entries.push(makeDirectoryEntry(os.homedir(), `~ (${os.userInfo().username})`))
 
-    // Root filesystem
-    entries.push(makeEntry('/', '/ (root)', 'drive'))
-
-    // Home directory
-    entries.push(makeEntry(os.homedir(), `~ (${os.userInfo().username})`, 'folder'))
-
-    // Mount points from /mnt/
-    try {
-      const mntEntries = await fs.readdir('/mnt', { withFileTypes: true })
-      for (const d of mntEntries) {
-        if (d.isDirectory()) {
-          entries.push(makeEntry(`/mnt/${d.name}`, `/mnt/${d.name}`, 'drive'))
+    const pushMountPoints = async (baseDir: string, labelFn: (name: string) => { id: string; name: string }): Promise<void> => {
+      try {
+        const dirents = await fs.readdir(baseDir, { withFileTypes: true })
+        for (const d of dirents) {
+          if (!d.isDirectory()) continue
+          const { id, name } = labelFn(d.name)
+          entries.push(makeDirectoryEntry(id, name, { iconHint: 'drive' }))
         }
-      }
-    } catch { /* /mnt may not exist */ }
+      } catch { /* directory may not exist */ }
+    }
 
-    // Media mount points from /media/$USER/
-    try {
-      const user = os.userInfo().username
-      const mediaEntries = await fs.readdir(`/media/${user}`, { withFileTypes: true })
-      for (const d of mediaEntries) {
-        if (d.isDirectory()) {
-          entries.push(makeEntry(`/media/${user}/${d.name}`, d.name, 'drive'))
-        }
-      }
-    } catch { /* /media/$USER may not exist */ }
-
-    // /run/media/$USER/ (Arch, Fedora)
-    try {
-      const user = os.userInfo().username
-      const runMediaEntries = await fs.readdir(`/run/media/${user}`, { withFileTypes: true })
-      for (const d of runMediaEntries) {
-        if (d.isDirectory()) {
-          entries.push(makeEntry(`/run/media/${user}/${d.name}`, d.name, 'drive'))
-        }
-      }
-    } catch { /* may not exist */ }
+    await pushMountPoints('/mnt', (n) => ({ id: `/mnt/${n}`, name: `/mnt/${n}` }))
+    const user = os.userInfo().username
+    await pushMountPoints(`/media/${user}`, (n) => ({ id: `/media/${user}/${n}`, name: n }))
+    await pushMountPoints(`/run/media/${user}`, (n) => ({ id: `/run/media/${user}/${n}`, name: n }))
 
     return { entries, location: 'Filesystems', parentId: null }
   }
@@ -296,29 +254,14 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
   private async listMacRoots(): Promise<ReadDirectoryResult> {
     const entries: Entry[] = []
 
-    const makeEntry = (id: string, name: string, icon: string): Entry => ({
-      id,
-      name,
-      isContainer: true,
-      size: -1,
-      modifiedAt: 0,
-      mimeType: 'inode/directory',
-      iconHint: icon,
-      meta: {},
-      attributes: { readonly: false, hidden: false, symlink: false }
-    })
+    entries.push(makeDirectoryEntry('/', '/ (Macintosh HD)', { iconHint: 'drive' }))
+    entries.push(makeDirectoryEntry(os.homedir(), `~ (${os.userInfo().username})`))
 
-    // Root
-    entries.push(makeEntry('/', '/ (Macintosh HD)', 'drive'))
-    // Home
-    entries.push(makeEntry(os.homedir(), `~ (${os.userInfo().username})`, 'folder'))
-
-    // Volumes
     try {
       const volumes = await fs.readdir('/Volumes', { withFileTypes: true })
       for (const v of volumes) {
         if (v.isDirectory() && v.name !== 'Macintosh HD') {
-          entries.push(makeEntry(`/Volumes/${v.name}`, v.name, 'drive'))
+          entries.push(makeDirectoryEntry(`/Volumes/${v.name}`, v.name, { iconHint: 'drive' }))
         }
       }
     } catch { /* /Volumes may not exist */ }
@@ -329,44 +272,24 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
   private async listWindowsDrives(): Promise<ReadDirectoryResult> {
     const entries: Entry[] = []
 
-    // Get drive letters with labels via PowerShell
     const driveInfo = await this.getWindowsDriveInfo()
     for (const drive of driveInfo) {
       const label = drive.label ? ` [${drive.label}]` : ''
-      entries.push({
-        id: `${drive.letter}:\\`,
-        name: `${drive.letter}:${label}`,
-        isContainer: true,
-        size: -1,
-        modifiedAt: 0,
-        mimeType: 'inode/directory',
+      entries.push(makeDirectoryEntry(`${drive.letter}:\\`, `${drive.letter}:${label}`, {
         iconHint: 'drive',
-        meta: { driveLabel: drive.label },
-        attributes: { readonly: false, hidden: false, symlink: false }
-      })
+        meta: { driveLabel: drive.label }
+      }))
     }
 
-    // WSL distributions
     const wslDistros = await this.listWslDistros()
     for (const distro of wslDistros) {
-      entries.push({
-        id: `//wsl.localhost/${distro}/`,
-        name: `WSL: ${distro}`,
-        isContainer: true,
-        size: -1,
-        modifiedAt: 0,
-        mimeType: 'inode/directory',
+      entries.push(makeDirectoryEntry(`//wsl.localhost/${distro}/`, `WSL: ${distro}`, {
         iconHint: 'network',
-        meta: { wsl: true, distro },
-        attributes: { readonly: false, hidden: false, symlink: false }
-      })
+        meta: { wsl: true, distro }
+      }))
     }
 
-    return {
-      entries,
-      location: 'My Computer',
-      parentId: null
-    }
+    return { entries, location: 'My Computer', parentId: null }
   }
 
   private getWindowsDriveInfo(): Promise<Array<{ letter: string; label: string }>> {
@@ -487,24 +410,6 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
       })
     } catch (err) {
       return { success: false, bytesWritten: 0, error: String(err) }
-    }
-  }
-
-  async createDirectory(locationId: string, name: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      await fs.mkdir(path.join(locationId, name), { recursive: true })
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: String(err) }
-    }
-  }
-
-  async deleteSingle(entryId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      await fs.rm(entryId, { recursive: true })
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: String(err) }
     }
   }
 

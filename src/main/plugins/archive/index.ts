@@ -113,44 +113,11 @@ function localSourceAccess(filePath: string): SourceAccess {
   }
 }
 
-// Reference to the plugin manager, set during initialize()
-let pluginManagerRef: { readAt(pluginId: string, entryId: string, offset: number, length: number): Promise<Buffer>; getSize(pluginId: string, entryId: string): Promise<number>; get(pluginId: string): BrowsePlugin | undefined } | null = null
-
-/** Create a SourceAccess for a remote archive via another plugin's readAt. */
-function remoteSourceAccess(pluginId: string, entryId: string, size: number): SourceAccess {
-  return {
-    readAt(offset: number, length: number): Promise<Buffer> {
-      if (!pluginManagerRef) throw new Error('Plugin manager not initialized')
-      return pluginManagerRef.readAt(pluginId, entryId, offset, length)
-    },
-    createReadStream(): NodeJS.ReadableStream {
-      if (!pluginManagerRef) throw new Error('Plugin manager not initialized')
-      const plugin = pluginManagerRef.get(pluginId)
-      if (!plugin?.createReadStream) throw new Error(`Plugin ${pluginId} does not support streaming`)
-      // Return a PassThrough that we pipe the plugin's stream into
-      // (we need to return synchronously but createReadStream is async)
-      const { PassThrough } = require('stream')
-      const pt = new PassThrough()
-      plugin.createReadStream(entryId).then((stream) => {
-        if (stream) stream.pipe(pt)
-        else pt.destroy(new Error('Failed to create read stream'))
-      }).catch((err: Error) => pt.destroy(err))
-      return pt
-    },
-    totalSize: size
-  }
-}
-
-/** Resolve an archive path to a SourceAccess. Handles both local and remote paths. */
-async function resolveSource(archivePath: string): Promise<SourceAccess> {
-  if (isRemoteArchivePath(archivePath)) {
-    const { pluginId, entryId } = parseRemoteRef(archivePath)
-    if (!pluginManagerRef) throw new Error('Plugin manager not initialized')
-    const size = await pluginManagerRef.getSize(pluginId, entryId)
-    return remoteSourceAccess(pluginId, entryId, size)
-  }
-
-  return localSourceAccess(archivePath)
+/** Minimum surface the archive plugin needs from the plugin manager. */
+export interface ArchivePluginHost {
+  readAt(pluginId: string, entryId: string, offset: number, length: number): Promise<Buffer>
+  getSize(pluginId: string, entryId: string): Promise<number>
+  get(pluginId: string): BrowsePlugin | undefined
 }
 
 // ─── ArchivePlugin ─────────────────────────────────────────────────────────────
@@ -166,12 +133,56 @@ class ArchivePlugin implements BrowsePlugin {
     schemes: ['archive']
   }
 
+  private host: ArchivePluginHost | null = null
+
+  constructor(host?: ArchivePluginHost) {
+    if (host) this.host = host
+  }
+
   async initialize(): Promise<boolean> { return true }
   async dispose(): Promise<void> {}
 
-  /** Set the plugin manager reference for cross-plugin resolution. */
-  setPluginManager(pm: typeof pluginManagerRef): void {
-    pluginManagerRef = pm
+  /** Attach the plugin-manager host. Must be called before remote archives can be browsed. */
+  setHost(host: ArchivePluginHost): void {
+    this.host = host
+  }
+
+  private requireHost(): ArchivePluginHost {
+    if (!this.host) throw new Error('Archive plugin host not attached')
+    return this.host
+  }
+
+  /** Create a SourceAccess for a remote archive via another plugin. */
+  private remoteSourceAccess(pluginId: string, entryId: string, size: number): SourceAccess {
+    const host = this.requireHost()
+    return {
+      readAt: (offset: number, length: number): Promise<Buffer> =>
+        host.readAt(pluginId, entryId, offset, length),
+      createReadStream: (): NodeJS.ReadableStream => {
+        const plugin = host.get(pluginId)
+        if (!plugin?.createReadStream) throw new Error(`Plugin ${pluginId} does not support streaming`)
+        // createReadStream is async but callers need a synchronous stream; bridge with PassThrough.
+        const { PassThrough } = require('stream')
+        const pt = new PassThrough()
+        plugin.createReadStream(entryId).then((stream) => {
+          if (stream) stream.pipe(pt)
+          else pt.destroy(new Error('Failed to create read stream'))
+        }).catch((err: Error) => pt.destroy(err))
+        return pt
+      },
+      totalSize: size
+    }
+  }
+
+  /** Resolve an archive path to a SourceAccess. Handles both local and remote paths. */
+  private async resolveSource(archivePath: string): Promise<SourceAccess> {
+    if (isRemoteArchivePath(archivePath)) {
+      const { pluginId, entryId } = parseRemoteRef(archivePath)
+      const host = this.requireHost()
+      const size = await host.getSize(pluginId, entryId)
+      return this.remoteSourceAccess(pluginId, entryId, size)
+    }
+    return localSourceAccess(archivePath)
   }
 
   /** Check whether a file can be browsed as an archive. */
@@ -190,7 +201,7 @@ class ArchivePlugin implements BrowsePlugin {
     const [archivePath, internalPath] = parseLocation(locationId)
     const driver = getDriver(archivePath)
     if (!driver) return { entries: [], location: archivePath, parentId: null }
-    const source = await resolveSource(archivePath)
+    const source = await this.resolveSource(archivePath)
     const allEntries = await driver.readEntries(source)
     return buildDirectoryListing(archivePath, internalPath, allEntries)
   }
@@ -223,7 +234,7 @@ class ArchivePlugin implements BrowsePlugin {
           continue
         }
         try {
-          const source = await resolveSource(archivePath)
+          const source = await this.resolveSource(archivePath)
           const result = await driver.extract(source, internalPath, op.destinationLocationId)
           if (!result.success) errors.push({ entryId: entry.id, message: result.error || 'Extraction failed' })
         } catch (err) {
@@ -347,7 +358,7 @@ class ArchivePlugin implements BrowsePlugin {
 
       let allEntries: ArchiveEntry[]
       try {
-        const source = await resolveSource(archivePath)
+        const source = await this.resolveSource(archivePath)
         allEntries = await driver.readEntries(source)
       } catch {
         continue
@@ -409,7 +420,7 @@ class ArchivePlugin implements BrowsePlugin {
     if (!internalPath || internalPath.endsWith('/')) return null
     const driver = getDriver(archivePath)
     if (!driver) return null
-    const source = await resolveSource(archivePath)
+    const source = await this.resolveSource(archivePath)
     return driver.createReadStream(source, internalPath)
   }
 
@@ -420,7 +431,7 @@ class ArchivePlugin implements BrowsePlugin {
     if (!driver) throw new Error('Unsupported archive format')
 
     // Read the file from the archive into a buffer, then slice
-    const source = await resolveSource(archivePath)
+    const source = await this.resolveSource(archivePath)
     const stream = await driver.createReadStream(source, internalPath)
     if (!stream) throw new Error('Failed to open archive entry')
 
@@ -439,7 +450,7 @@ class ArchivePlugin implements BrowsePlugin {
     const driver = getDriver(archivePath)
     if (!driver) throw new Error('Unsupported archive format')
 
-    const source = await resolveSource(archivePath)
+    const source = await this.resolveSource(archivePath)
     const allEntries = await driver.readEntries(source)
     const entry = allEntries.find((e) => e.path === internalPath || e.path === internalPath.replace(/\/$/, ''))
     if (!entry) throw new Error(`Entry not found: ${internalPath}`)

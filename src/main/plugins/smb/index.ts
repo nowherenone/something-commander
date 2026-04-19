@@ -1,6 +1,5 @@
 import SMB2 from 'node-smb2'
 import type { Readable } from 'stream'
-import * as path from 'path'
 import type {
   BrowsePlugin,
   PluginManifest,
@@ -10,6 +9,8 @@ import type {
   OperationRequest,
   OperationResult
 } from '@shared/types'
+import { makeDirectoryEntry, makeFileEntry, getExtension } from '../base-plugin'
+import { smbError } from '../shared/smb-errors'
 
 interface SmbConnection {
   id: string
@@ -21,36 +22,6 @@ interface SmbConnection {
   username: string
   domain: string
   label: string
-}
-
-// node-smb2 throws raw Response objects instead of Errors for protocol failures.
-// Convert them to proper Error instances with human-readable messages.
-const NTSTATUS_MESSAGES: Record<number, string> = {
-  0xC000006D: 'Login failed: bad username or password',
-  0xC0000022: 'Access denied',
-  0xC00000CC: 'Share not found (bad network name)',
-  0xC000006E: 'Account restriction (locked, disabled, or expired)',
-  0xC0000064: 'User does not exist',
-  0xC000015B: 'Logon type not allowed',
-  0xC0000034: 'Path not found',
-  0xC000000F: 'File/folder not found',
-  0xC0000035: 'Already exists',
-  0xC0000043: 'Sharing violation'
-}
-
-function smbError(err: unknown): Error {
-  if (err instanceof Error) return err
-  if (typeof err === 'object' && err !== null) {
-    const resp = err as Record<string, unknown>
-    const header = resp.header as Record<string, unknown> | undefined
-    if (header?.status) {
-      const status = Number(header.status) >>> 0 // unsigned
-      const known = NTSTATUS_MESSAGES[status]
-      if (known) return new Error(known)
-      return new Error(`SMB error 0x${status.toString(16).toUpperCase().padStart(8, '0')}`)
-    }
-  }
-  return new Error(typeof err === 'string' ? err : 'Unknown SMB error')
 }
 
 export class SmbPlugin implements BrowsePlugin {
@@ -85,17 +56,12 @@ export class SmbPlugin implements BrowsePlugin {
    */
   async readDirectory(locationId: string | null): Promise<ReadDirectoryResult> {
     if (!locationId) {
-      const entries: Entry[] = Array.from(this.connections.values()).map((conn) => ({
-        id: `${conn.id}/`,
-        name: conn.label || `\\\\${conn.host}\\${conn.share}`,
-        isContainer: true,
-        size: -1,
-        modifiedAt: 0,
-        mimeType: 'inode/directory',
-        iconHint: 'drive',
-        meta: { host: conn.host, share: conn.share },
-        attributes: { readonly: false, hidden: false, symlink: false }
-      }))
+      const entries: Entry[] = Array.from(this.connections.values()).map((conn) =>
+        makeDirectoryEntry(`${conn.id}/`, conn.label || `\\\\${conn.host}\\${conn.share}`, {
+          iconHint: 'drive',
+          meta: { host: conn.host, share: conn.share }
+        })
+      )
       return { entries, location: 'SMB Shares', parentId: null }
     }
 
@@ -115,25 +81,22 @@ export class SmbPlugin implements BrowsePlugin {
       if (name === '.' || name === '..' || name === '') continue
 
       const isDir = item.type === 'Directory'
-      const ext = isDir ? '' : path.extname(name).slice(1).toLowerCase()
       const itemPath = dirPath ? `${dirPath}/${name}` : name
-      const isHidden = item.fileAttributes.includes('HIDDEN')
+      const id = `${connId}/${itemPath}`
+      const readonly = item.fileAttributes.includes('READONLY')
+      const hidden = item.fileAttributes.includes('HIDDEN')
 
-      entries.push({
-        id: `${connId}/${itemPath}`,
-        name,
-        isContainer: isDir,
-        size: isDir ? -1 : (typeof item.fileSize === 'bigint' ? Number(item.fileSize) : Number(item.fileSize || 0)),
-        modifiedAt: item.lastWriteTime.getTime(),
-        mimeType: isDir ? 'inode/directory' : '',
-        iconHint: isDir ? 'folder' : 'file',
-        meta: { extension: ext },
-        attributes: {
-          readonly: item.fileAttributes.includes('READONLY'),
-          hidden: isHidden,
-          symlink: false
-        }
-      })
+      if (isDir) {
+        entries.push(makeDirectoryEntry(id, name, { readonly, hidden }))
+      } else {
+        const size = typeof item.fileSize === 'bigint' ? Number(item.fileSize) : Number(item.fileSize || 0)
+        entries.push(makeFileEntry(id, name, size, item.lastWriteTime.getTime(), {
+          ext: getExtension(name),
+          iconHint: 'file',
+          readonly,
+          hidden
+        }))
+      }
     }
 
     // Parent navigation
@@ -406,18 +369,6 @@ export class SmbPlugin implements BrowsePlugin {
       })
     } catch (err) {
       return { success: false, bytesWritten: 0, error: smbError(err).message }
-    }
-  }
-
-  async deleteSingle(entryId: string): Promise<{ success: boolean; error?: string }> {
-    const [connId, remotePath] = this.parseLocation(entryId)
-    const conn = this.connections.get(connId)
-    if (!conn) return { success: false, error: 'Not connected' }
-    try {
-      await conn.tree.removeFile(remotePath)
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: smbError(err).message }
     }
   }
 

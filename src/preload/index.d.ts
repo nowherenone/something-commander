@@ -4,8 +4,7 @@ import type {
   ReadDirectoryResult,
   PluginOperation,
   OperationRequest,
-  OperationResult,
-  OperationProgress
+  OperationResult
 } from '../shared/types'
 
 interface PluginsAPI {
@@ -14,9 +13,6 @@ interface PluginsAPI {
   resolveLocation(pluginId: string, input: string): Promise<string | null>
   getSupportedOperations(pluginId: string): Promise<PluginOperation[]>
   executeOperation(pluginId: string, op: OperationRequest): Promise<OperationResult>
-  onOperationProgress(callback: (data: OperationProgress) => void): () => void
-  onOperationComplete(callback: (operationId: string) => void): () => void
-  onOperationError(callback: (data: { operationId: string; error: string }) => void): () => void
 }
 
 interface UtilAPI {

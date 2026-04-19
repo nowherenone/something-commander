@@ -16,6 +16,7 @@ import type {
   OperationRequest,
   OperationResult
 } from '@shared/types'
+import { makeDirectoryEntry, makeFileEntry } from '../base-plugin'
 
 interface S3Connection {
   id: string
@@ -51,17 +52,12 @@ export class S3Plugin implements BrowsePlugin {
   async readDirectory(locationId: string | null): Promise<ReadDirectoryResult> {
     if (!locationId) {
       // Show list of connected buckets
-      const entries: Entry[] = Array.from(this.connections.values()).map((conn) => ({
-        id: `${conn.id}::`,
-        name: `${conn.label} (${conn.bucket})`,
-        isContainer: true,
-        size: -1,
-        modifiedAt: 0,
-        mimeType: 'inode/directory',
-        iconHint: 'drive',
-        meta: { bucket: conn.bucket },
-        attributes: { readonly: false, hidden: false, symlink: false }
-      }))
+      const entries: Entry[] = Array.from(this.connections.values()).map((conn) =>
+        makeDirectoryEntry(`${conn.id}::`, `${conn.label} (${conn.bucket})`, {
+          iconHint: 'drive',
+          meta: { bucket: conn.bucket }
+        })
+      )
       return { entries, location: 'S3 Buckets', parentId: null }
     }
 
@@ -85,17 +81,7 @@ export class S3Plugin implements BrowsePlugin {
         if (!cp.Prefix) continue
         const name = cp.Prefix.slice((prefix || '').length).replace(/\/$/, '')
         if (!name) continue
-        entries.push({
-          id: `${connId}::${cp.Prefix}`,
-          name,
-          isContainer: true,
-          size: -1,
-          modifiedAt: 0,
-          mimeType: 'inode/directory',
-          iconHint: 'folder',
-          meta: {},
-          attributes: { readonly: false, hidden: false, symlink: false }
-        })
+        entries.push(makeDirectoryEntry(`${connId}::${cp.Prefix}`, name))
       }
     }
 
@@ -105,17 +91,13 @@ export class S3Plugin implements BrowsePlugin {
         if (!obj.Key) continue
         const name = obj.Key.slice((prefix || '').length)
         if (!name || name.endsWith('/')) continue // skip the prefix itself and "directory markers"
-        entries.push({
-          id: `${connId}::${obj.Key}`,
+        entries.push(makeFileEntry(
+          `${connId}::${obj.Key}`,
           name,
-          isContainer: false,
-          size: obj.Size || 0,
-          modifiedAt: obj.LastModified?.getTime() || 0,
-          mimeType: '',
-          iconHint: 'file',
-          meta: { key: obj.Key },
-          attributes: { readonly: false, hidden: false, symlink: false }
-        })
+          obj.Size || 0,
+          obj.LastModified?.getTime() || 0,
+          { iconHint: 'file', meta: { key: obj.Key } }
+        ))
       }
     }
 
@@ -273,18 +255,6 @@ export class S3Plugin implements BrowsePlugin {
       return { success: true, bytesWritten }
     } catch (err) {
       return { success: false, bytesWritten: 0, error: String(err) }
-    }
-  }
-
-  async deleteSingle(entryId: string): Promise<{ success: boolean; error?: string }> {
-    const [connId, key] = this.parseLocation(entryId)
-    const conn = this.connections.get(connId)
-    if (!conn) return { success: false, error: 'Not connected' }
-    try {
-      await conn.client.send(new DeleteObjectCommand({ Bucket: conn.bucket, Key: key }))
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: String(err) }
     }
   }
 

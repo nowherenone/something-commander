@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useSettingsStore } from '../../stores/settings-store'
+import { Modal } from '../primitives/Modal'
 import styles from '../../styles/dialogs.module.css'
 
 interface SettingsDialogProps {
@@ -22,13 +23,21 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
   const reset = useSettingsStore((s) => s.resetSettings)
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div
-        className={`${styles.dialog} ${styles.dialogWide}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.dialogTitle}>Configuration</div>
-        <div className={styles.dialogBody}>
+    <Modal
+      onClose={onClose}
+      title="Configuration"
+      wide
+      footer={
+        <>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={reset}>
+            Reset Defaults
+          </button>
+          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>
+            Close
+          </button>
+        </>
+      }
+    >
           <div className={styles.settingsLayout}>
             <div className={styles.settingsSidebar}>
               {TABS.map((tab) => (
@@ -258,16 +267,6 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
               )}
             </div>
           </div>
-        </div>
-        <div className={styles.dialogFooter}>
-          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={reset}>
-            Reset Defaults
-          </button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
