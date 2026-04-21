@@ -73,6 +73,30 @@
   --success: #238551;
 }
 
+/* Monokai */
+:root[data-theme='monokai'] {
+  --bg-primary: #272822;
+  --bg-secondary: #1e1f1c;
+  --bg-tertiary: #3e3d32;
+  --bg-panel: #272822;
+  --bg-header: #1e1f1c;
+  --bg-selected: #49483e;
+  --bg-cursor: #28639a;
+  --bg-hover: #3e3d32;
+
+  --text-primary: #f8f8f2;
+  --text-secondary: #cfcfc2;
+  --text-muted: #75715e;
+
+  --border-color: #49483e;
+  --border-focus: #28639a;
+
+  --accent: #28639a;
+  --accent-hover: #3a7fb8;
+  --danger: #f92672;
+  --success: #a6e22e;
+}
+
 /* Classic blue (Norton Commander style) */
 :root[data-theme='classic'] {
   --bg-primary: #0000aa;

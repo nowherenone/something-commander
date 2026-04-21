@@ -1,5 +1,10 @@
 import React, { useState } from 'react'
-import { useSettingsStore } from '../../stores/settings-store'
+import {
+  useSettingsStore,
+  COLOR_OVERRIDE_META,
+  type ColorOverrideKey,
+  type ThemeName
+} from '../../stores/settings-store'
 import { Modal } from '../primitives/Modal'
 import styles from '../../styles/dialogs.module.css'
 
@@ -9,6 +14,7 @@ interface SettingsDialogProps {
 
 const TABS = [
   { id: 'display', label: 'Display' },
+  { id: 'colors', label: 'Colors' },
   { id: 'layout', label: 'Layout' },
   { id: 'operations', label: 'Operations' },
   { id: 'keyboard', label: 'Keyboard' }
@@ -16,11 +22,43 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]['id']
 
+/**
+ * Normalize any CSS color expression into a `#RRGGBB` string so HTML
+ * `<input type="color">` can display it. Returns '#000000' if the value is
+ * unparseable.
+ */
+function cssColorToHex(color: string): string {
+  if (!color) return '#000000'
+  const c = color.trim()
+  if (c.startsWith('#')) {
+    if (c.length === 4) {
+      // #abc → #aabbcc
+      return '#' + c.slice(1).split('').map((ch) => ch + ch).join('').toLowerCase()
+    }
+    return c.slice(0, 7).toLowerCase()
+  }
+  const rgb = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
+  if (rgb) {
+    const hex = (n: string): string => parseInt(n, 10).toString(16).padStart(2, '0')
+    return `#${hex(rgb[1])}${hex(rgb[2])}${hex(rgb[3])}`
+  }
+  return '#000000'
+}
+
+/** Effective color currently applied to the document for the given variable. */
+function currentColor(key: ColorOverrideKey): string {
+  const root = document.documentElement
+  const raw = getComputedStyle(root).getPropertyValue(key)
+  return cssColorToHex(raw)
+}
+
 export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TabId>('display')
   const settings = useSettingsStore()
   const update = useSettingsStore((s) => s.updateSettings)
   const reset = useSettingsStore((s) => s.resetSettings)
+  const setColorOverride = useSettingsStore((s) => s.setColorOverride)
+  const resetColorOverrides = useSettingsStore((s) => s.resetColorOverrides)
 
   return (
     <Modal
@@ -60,10 +98,11 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                       <select
                         className={styles.settingsSelect}
                         value={settings.theme}
-                        onChange={(e) => update({ theme: e.target.value as 'dark' | 'light' })}
+                        onChange={(e) => update({ theme: e.target.value as ThemeName })}
                       >
                         <option value="dark">Dark (BlueprintJS)</option>
                         <option value="light">Light</option>
+                        <option value="monokai">Monokai</option>
                         <option value="classic">Classic Blue (NC)</option>
                       </select>
                     </div>
@@ -104,6 +143,67 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                     </div>
                   </div>
                 </>
+              )}
+
+              {activeTab === 'colors' && (
+                <div className={styles.settingsGroup}>
+                  <div className={styles.settingsGroupTitle}>Custom Colors</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                    Overrides layer on top of the selected theme. Clear a value to fall
+                    back to the theme default.
+                  </div>
+                  {COLOR_OVERRIDE_META.map(({ key, label }) => {
+                    const override = settings.colorOverrides[key]
+                    const displayColor = override ?? currentColor(key)
+                    return (
+                      <div key={key} className={styles.settingsRow}>
+                        <span className={styles.settingsLabel}>{label}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <input
+                            type="color"
+                            aria-label={label}
+                            value={displayColor}
+                            onChange={(e) => setColorOverride(key, e.target.value)}
+                            style={{
+                              width: 34,
+                              height: 22,
+                              padding: 0,
+                              background: 'transparent',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 3,
+                              cursor: 'pointer'
+                            }}
+                          />
+                          <span style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 11,
+                            color: override ? 'var(--text-primary)' : 'var(--text-muted)',
+                            minWidth: 64
+                          }}>
+                            {displayColor}
+                          </span>
+                          <button
+                            className={`${styles.btn} ${styles.btnSecondary}`}
+                            style={{ fontSize: 10, padding: '2px 8px' }}
+                            disabled={!override}
+                            onClick={() => setColorOverride(key, null)}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      className={`${styles.btn} ${styles.btnSecondary}`}
+                      onClick={resetColorOverrides}
+                      disabled={Object.keys(settings.colorOverrides).length === 0}
+                    >
+                      Reset all colors
+                    </button>
+                  </div>
+                </div>
               )}
 
               {activeTab === 'layout' && (
