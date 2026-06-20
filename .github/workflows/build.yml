@@ -52,6 +52,8 @@ jobs:
             dist/*.dmg
             dist/*.deb
             dist/*.AppImage
+            dist/latest*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   release:
@@ -77,4 +79,6 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.deb
             artifacts/**/*.AppImage
+            artifacts/**/latest*.yml
+            artifacts/**/*.blockmap
           generate_release_notes: true

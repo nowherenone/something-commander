@@ -70,6 +70,7 @@ function App(): React.JSX.Element {
         // Could update a progress toast, but keep simple
       } else if (status.type === 'error') {
         console.warn('[Updater]', status.data)
+        showToast('Update failed: ' + (status.data || 'unknown error'), 10000)
       }
     })
 

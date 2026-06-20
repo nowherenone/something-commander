@@ -73,7 +73,7 @@ appImage:
 # Set your owner/repo when publishing.
 publish:
   provider: github
-  owner: something-commander
+  owner: nowherenone
   repo: something-commander
   # Set to true if using private repo + release token in CI
   private: false

@@ -70,20 +70,44 @@ export function initializeUpdater() {
 
 export async function checkForUpdates(): Promise<{ updateAvailable: boolean; version?: string; error?: string }> {
   if (is.dev) {
-    // Simulate in dev
-    return { updateAvailable: false, version: undefined }
+    return { updateAvailable: false, error: 'Updates are not available in development mode' }
   }
 
-  try {
-    const result = await autoUpdater.checkForUpdates()
-    if (result && result.updateInfo) {
-      return { updateAvailable: true, version: result.updateInfo.version }
+  return new Promise((resolve) => {
+    let settled = false
+    const settle = (result: { updateAvailable: boolean; version?: string; error?: string }) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(result)
     }
-    return { updateAvailable: false }
-  } catch (err: any) {
-    sendStatus({ type: 'error', data: err.message })
-    return { updateAvailable: false, error: err.message }
-  }
+
+    const onAvailable = (info: { version: string }) => {
+      settle({ updateAvailable: true, version: info.version })
+    }
+    const onNotAvailable = () => {
+      settle({ updateAvailable: false })
+    }
+    const onError = (err: Error) => {
+      const message = err.message || String(err)
+      sendStatus({ type: 'error', data: message })
+      settle({ updateAvailable: false, error: message })
+    }
+
+    const cleanup = () => {
+      autoUpdater.removeListener('update-available', onAvailable)
+      autoUpdater.removeListener('update-not-available', onNotAvailable)
+      autoUpdater.removeListener('error', onError)
+    }
+
+    autoUpdater.once('update-available', onAvailable)
+    autoUpdater.once('update-not-available', onNotAvailable)
+    autoUpdater.once('error', onError)
+
+    autoUpdater.checkForUpdates().catch((err: Error) => {
+      onError(err)
+    })
+  })
 }
 
 export async function downloadUpdate(): Promise<{ success: boolean; error?: string }> {
