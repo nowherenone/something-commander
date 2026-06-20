@@ -35,7 +35,8 @@
 }
 
 .header {
-  padding: 4px 8px;
+  height: var(--header-height);
+  padding: 0 8px;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border-color);
   font-size: var(--font-size-small);

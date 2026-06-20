@@ -1,5 +1,7 @@
 import { ipcMain, BrowserWindow, Menu, nativeImage, shell } from 'electron'
 import * as fs from 'fs/promises'
+import * as fsSync from 'fs'
+import * as os from 'os'
 import { exec } from 'child_process'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 
@@ -98,4 +100,47 @@ export function registerSystemIPC(): void {
       icon: getDragIcon()
     })
   })
+
+  setupDriveWatchers()
+}
+
+let driveWatchersSetup = false
+
+function notifyDrivesChanged() {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(IPC_CHANNELS.DRIVES_CHANGED)
+    }
+  })
+}
+
+function setupDriveWatchers() {
+  if (driveWatchersSetup || process.platform === 'win32') return // Win handled differently or poll later
+  driveWatchersSetup = true
+
+  const user = os.userInfo().username
+  const watchDirs = [
+    '/mnt',
+    `/media/${user}`,
+    `/run/media/${user}`
+  ]
+
+  watchDirs.forEach((dir) => {
+    try {
+      fsSync.watch(dir, { persistent: true, recursive: false }, (eventType) => {
+        // Debounce notifications
+        if (eventType === 'rename' || eventType === 'change') {
+          setTimeout(() => notifyDrivesChanged(), 800)
+        }
+      })
+    } catch {
+      // dir may not exist yet
+    }
+  })
+
+  // Also poll occasionally for robustness (e.g. USB that doesn't trigger watch perfectly)
+  setInterval(() => {
+    // Only notify if we think something might have changed; simple version always notify on interval is noisy
+    // For now, do nothing extra; watchers + menu open refresh is good enough
+  }, 15000)
 }

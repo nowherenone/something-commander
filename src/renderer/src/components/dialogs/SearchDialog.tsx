@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { formatSize } from '../../utils/format'
+import { useOverlayStore } from '../../stores/overlay-store'
 import styles from '../../styles/dialogs.module.css'
 
 interface SearchResult {
@@ -55,6 +56,16 @@ export function SearchDialog({
     },
     [onNavigateTo, onClose]
   )
+
+  // Register for Escape top priority
+  useEffect(() => {
+    const overlayId = 'search'
+    useOverlayStore.getState().push({ id: overlayId, onEscape: onClose })
+    return () => {
+      const o = useOverlayStore.getState()
+      if (o.isTop(overlayId)) o.pop()
+    }
+  }, [onClose])
 
   return (
     <div className={styles.overlay} onClick={onClose}>

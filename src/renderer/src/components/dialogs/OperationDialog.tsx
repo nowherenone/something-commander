@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { useOperationsStore, type FileOperation, type OverwritePrompt } from '../../stores/operations-store'
 import { resolveOverwriteAction } from '../../hooks/useFileOperations'
 import { formatSize, formatDate } from '../../utils/format'
+import { useOverlayStore } from '../../stores/overlay-store'
 import styles from '../../styles/operations.module.css'
 
 function formatSpeed(bytesPerSec: number): string {
@@ -33,7 +34,7 @@ function OverwritePromptView({ prompt }: { prompt: OverwritePrompt }): React.JSX
         </div>
         <div className={styles.overwriteFile}>
           <div className={styles.overwriteLabel}>Existing</div>
-          <div className={styles.overwriteName} data-testid="ow-dest-name">{prompt.sourceName}</div>
+          <div className={styles.overwriteName} data-testid="ow-dest-name">{prompt.destPath.split(/[\\/]/).pop() || prompt.sourceName}</div>
           <div className={styles.overwriteMeta} data-testid="ow-dest-meta">
             {formatSize(prompt.destSize)}
             {prompt.destDate > 0 ? ` | ${formatDate(prompt.destDate)}` : ''}
@@ -194,25 +195,51 @@ export function OperationDialog(): React.JSX.Element | null {
   const operations = useOperationsStore((s) => s.operations)
   const showDialog = useOperationsStore((s) => s.showDialog)
   const current = useOperationsStore((s) => s.getCurrentOperation())
+  const cancel = useOperationsStore((s) => s.cancelOperation)
+  const remove = useOperationsStore((s) => s.removeOperation)
 
-  // Focus trap
+  // Register with overlay stack for top-wins Escape. Proper semantics:
+  // - running + no prompt -> cancel
+  // - error/cancelled -> dismiss (remove)
+  // - queued -> cancel or dismiss
+  // - overwrite prompt -> ignore (buttons handle)
+  // - minimized -> re-open on click queue, Escape from outside not here
   useEffect(() => {
-    if (!showDialog || operations.length === 0) return
-    const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        const running = operations.find((op) => op.status === 'running' || op.status === 'enumerating')
-        if (running) {
-          useOperationsStore.getState().cancelOperation(running.id)
-        }
-        e.preventDefault()
-        e.stopPropagation()
+    if (!showDialog || !current) return
+
+    const opId = current.id
+    const isActive = current.status === 'running' || current.status === 'enumerating' || current.status === 'queued'
+
+    const onEscape = () => {
+      if (current.overwritePrompt) {
+        // Let overwrite buttons handle
         return
       }
-      e.stopPropagation()
+      if (isActive && !current.overwritePrompt) {
+        cancel(opId)
+      } else if (current.status === 'error' || current.status === 'cancelled') {
+        remove(opId)
+      } else {
+        // queued or other: dismiss or cancel
+        if (current.status === 'queued') {
+          cancel(opId)
+        } else {
+          remove(opId)
+        }
+      }
     }
-    window.addEventListener('keydown', handler, true)
-    return () => window.removeEventListener('keydown', handler, true)
-  }, [showDialog, operations])
+
+    const overlayId = `operation-${opId}`
+    useOverlayStore.getState().push({ id: overlayId, onEscape })
+
+    return () => {
+      const o = useOverlayStore.getState()
+      if (o.isTop(overlayId)) o.pop()
+    }
+  }, [showDialog, current, cancel, remove])
+
+  // Remove old direct listener reliance (now via overlay + useKeyboard)
+  // Keep for minimized re-open support etc.
 
   if (!showDialog || operations.length === 0 || !current) return null
 

@@ -4,6 +4,7 @@ import { usePanelStore, parentOffset } from '../stores/panel-store'
 import { useOperationsStore } from '../stores/operations-store'
 import { getBaseName } from '../utils/entry-helpers'
 import { startOperationQueue, resolveOverwriteAction } from '../services/file-operation-service'
+import { showToast } from '../components/layout/Toast'
 import type { Entry } from '@shared/types'
 
 export interface PendingOperation {
@@ -47,10 +48,24 @@ export function useFileOperations() {
   const queueTwoPanelOp = useCallback(
     (type: 'copy' | 'move') => {
       const { selected, tab, activePanel } = getSelectedEntries()
-      if (selected.length === 0) return
+      if (selected.length === 0) {
+        showToast('Nothing selected')
+        return
+      }
       const otherPanel = activePanel === 'left' ? 'right' : 'left'
       const destTab = usePanelStore.getState().getActiveTab(otherPanel)
-      if (!destTab.locationId) return
+      if (!destTab.locationId) {
+        showToast('Select a destination folder')
+        return
+      }
+
+      // Preflight: prevent copy into self or descendant (basic)
+      const srcRoot = tab.locationId || ''
+      const dst = destTab.locationId
+      if (srcRoot && dst && (dst === srcRoot || dst.startsWith(srcRoot + '/'))) {
+        showToast('Cannot copy into self or subfolder')
+        return
+      }
 
       setPendingOp({
         type,
@@ -69,7 +84,10 @@ export function useFileOperations() {
 
   const handleDelete = useCallback(() => {
     const { selected, tab } = getSelectedEntries()
-    if (selected.length === 0) return
+    if (selected.length === 0) {
+      showToast('Nothing selected')
+      return
+    }
 
     setPendingOp({
       type: 'delete',
@@ -122,10 +140,16 @@ export function useFileOperations() {
 
   const handlePack = useCallback(() => {
     const { selected, tab, activePanel } = getSelectedEntries()
-    if (selected.length === 0) return
+    if (selected.length === 0) {
+      showToast('Nothing selected')
+      return
+    }
     const otherPanel = activePanel === 'left' ? 'right' : 'left'
     const destTab = usePanelStore.getState().getActiveTab(otherPanel)
-    if (!destTab.locationId) return
+    if (!destTab.locationId) {
+      showToast('Select a destination folder')
+      return
+    }
 
     const baseName = selected.length === 1 ? getBaseName(selected[0].name) : 'archive'
     const loc = destTab.locationId.replace(/[/\\]$/, '')
@@ -145,15 +169,24 @@ export function useFileOperations() {
   const handleUnpack = useCallback(async () => {
     const { selected, tab, activePanel } = getSelectedEntries()
     const candidates = selected.filter((e) => !e.isContainer)
-    if (candidates.length === 0) return
+    if (candidates.length === 0) {
+      showToast('Nothing selected')
+      return
+    }
     const checks = await Promise.all(
       candidates.map((e) => window.api.util.isArchive(e.id).then((is) => ({ e, is })))
     )
     const archives = checks.filter((x) => x.is).map((x) => x.e)
-    if (archives.length === 0) return
+    if (archives.length === 0) {
+      showToast('No archives selected')
+      return
+    }
     const otherPanel = activePanel === 'left' ? 'right' : 'left'
     const destTab = usePanelStore.getState().getActiveTab(otherPanel)
-    if (!destTab.locationId) return
+    if (!destTab.locationId) {
+      showToast('Select a destination folder')
+      return
+    }
 
     setPendingOp({
       type: 'unpack',

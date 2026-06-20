@@ -103,7 +103,63 @@ export class SftpPlugin implements BrowsePlugin {
   }
 
   getSupportedOperations(): PluginOperation[] {
-    return ['delete', 'rename', 'createDirectory']
+    return ['delete', 'rename', 'createDirectory', 'copy', 'move']
+  }
+
+  async enumerateFiles(
+    entryIds: string[],
+    destDir: string
+  ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> {
+    const result: Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }> = []
+
+    const walk = async (conn: SftpConnection, remotePath: string, destBase: string, relBase: string): Promise<void> => {
+      try {
+        const listing = await conn.client.list(remotePath || '/')
+        for (const item of listing) {
+          if (item.name === '.' || item.name === '..') continue
+          const childRemote = remotePath ? `${remotePath}/${item.name}`.replace(/\/+/, '/') : `/${item.name}`
+          const childDest = `${destBase}/${item.name}`
+          const childRel = relBase ? `${relBase}/${item.name}` : item.name
+          const isDir = item.type === 'd'
+          const childEntryId = `${conn.id}::${childRemote}`
+          if (isDir) {
+            result.push({ sourcePath: childEntryId, destPath: childDest, size: 0, isDirectory: true, relativePath: childRel })
+            await walk(conn, childRemote, childDest, childRel)
+          } else {
+            result.push({ sourcePath: childEntryId, destPath: childDest, size: item.size || 0, isDirectory: false, relativePath: childRel })
+          }
+        }
+      } catch {
+        // skip unreadable
+      }
+    }
+
+    for (const entryId of entryIds) {
+      const [connId, remotePath] = this.parseLocation(entryId)
+      const conn = this.connections.get(connId)
+      if (!conn) continue
+      const baseName = remotePath ? remotePath.split('/').pop() || '' : ''
+      const destBase = destDir ? `${destDir}/${baseName}`.replace(/\/+/, '/') : baseName
+      const isDir = await this.isDirectory(conn, remotePath)
+      if (isDir || remotePath === '' || remotePath === '/') {
+        const relBase = baseName
+        result.push({ sourcePath: entryId, destPath: destBase, size: 0, isDirectory: true, relativePath: relBase })
+        await walk(conn, remotePath || '/', destBase, relBase)
+      } else {
+        const stat = await conn.client.stat(remotePath).catch(() => ({ size: 0 }))
+        result.push({ sourcePath: entryId, destPath: `${destDir}/${baseName}`.replace(/\/+/, '/'), size: (stat as any).size || 0, isDirectory: false, relativePath: baseName })
+      }
+    }
+    return result
+  }
+
+  private async isDirectory(conn: SftpConnection, remotePath: string): Promise<boolean> {
+    try {
+      const stat = await conn.client.stat(remotePath)
+      return stat.isDirectory
+    } catch {
+      return true // assume dir for root
+    }
   }
 
   async executeOperation(op: OperationRequest): Promise<OperationResult> {
@@ -248,6 +304,25 @@ export class SftpPlugin implements BrowsePlugin {
 
   getConnections(): string[] {
     return Array.from(this.connections.keys())
+  }
+
+  async statEntry(entryId: string): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null> {
+    try {
+      const [connId, remotePath] = this.parseLocation(entryId)
+      const conn = this.connections.get(connId)
+      if (!conn) return null
+      const stat = await conn.client.stat(remotePath)
+      return { size: stat.size || 0, modifiedAt: (stat as any).mtime || 0, isDirectory: (stat as any).isDirectory }
+    } catch {
+      return null
+    }
+  }
+
+  async exists(entryId: string): Promise<boolean> {
+    try {
+      const s = await this.statEntry(entryId)
+      return !!s
+    } catch { return false }
   }
 
   private parseLocation(locationId: string): [string, string] {

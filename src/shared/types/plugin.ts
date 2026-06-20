@@ -87,4 +87,8 @@ export interface BrowsePlugin {
 
   /** Optional: watch a location for changes. */
   watch?(locationId: string, onChange: () => void): { dispose(): void }
+
+  /** Optional plugin level stat/exists for overwrite and preflight. */
+  statEntry?(entryId: string): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null>
+  exists?(entryId: string): Promise<boolean>
 }

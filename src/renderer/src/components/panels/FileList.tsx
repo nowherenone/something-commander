@@ -5,6 +5,8 @@ import { EntryRow } from './EntryRow'
 import { useDragStore } from '../../stores/drag-store'
 import { usePanelStore } from '../../stores/panel-store'
 import { useOperationsStore } from '../../stores/operations-store'
+import { dispatchCommand } from '../../commands/registry'
+import { showToast } from '../../components/layout/Toast'
 import styles from '../../styles/file-list.module.css'
 
 interface FileListProps {
@@ -80,6 +82,7 @@ export function FileList({
 
       const destTab = usePanelStore.getState().getActiveTab(panelId)
       if (!destTab.locationId) {
+        showToast('Select a destination folder')
         useDragStore.getState().endDrag()
         return
       }
@@ -131,14 +134,30 @@ export function FileList({
           onActivate(entry)
           break
         case 'view':
-          if (!entry.isContainer) window.api.util.openViewerWindow(entry.id, entry.name)
+          if (!entry.isContainer) {
+            const tab = usePanelStore.getState().getActiveTab(panelId)
+            window.api.util.openViewerWindow(tab.pluginId, entry.id, entry.name)
+          }
           break
         case 'edit':
-          if (!entry.isContainer) window.api.util.openEditorWindow(entry.id, entry.name)
+          if (!entry.isContainer) {
+            const tab = usePanelStore.getState().getActiveTab(panelId)
+            window.api.util.openEditorWindow(tab.pluginId, entry.id, entry.name)
+          }
+          break
+        case 'copy':
+          dispatchCommand('copy')
+          break
+        case 'move':
+          dispatchCommand('move')
+          break
+        case 'delete':
+          dispatchCommand('delete')
+          break
+        case 'rename':
+          dispatchCommand('multiRename')
           break
       }
-      // copy/move/delete/rename are handled by the keyboard shortcuts
-      // which read from the panel store's current cursor position
     },
     [onCursorChange, onActivate]
   )

@@ -10,7 +10,7 @@ import { SearchDialog } from './components/dialogs/SearchDialog'
 import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
-import { ToastContainer } from './components/layout/Toast'
+import { ToastContainer, showToast } from './components/layout/Toast'
 import { NetworkConnections } from './components/dialogs/NetworkConnections'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
@@ -26,6 +26,8 @@ import { registerCommands, dispatchCommand } from './commands/registry'
 import { parseArchivePath } from './utils/archive-path'
 import { splitPathTail } from './utils/entry-helpers'
 import type { Entry } from '@shared/types'
+
+declare const __APP_VERSION__: string
 
 function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
@@ -45,6 +47,59 @@ function App(): React.JSX.Element {
     loadSettings()
     loadBookmarks()
   }, [])
+
+  // Auto-update handling
+  useEffect(() => {
+    const api = (window as any).api
+    if (!api?.update) return
+
+    // Listen for update status changes
+    const unsubscribe = api.update.onUpdateStatus((status: { type: string; data?: any }) => {
+      if (status.type === 'available') {
+        const ver = status.data?.version
+        showToast(`Update ${ver} available. Downloading...`, 8000)
+        // Auto download if setting allows
+        const autoDownload = useSettingsStore.getState().autoDownloadUpdates
+        if (autoDownload) {
+          api.update.downloadUpdate()
+        }
+      } else if (status.type === 'downloaded') {
+        showToast('Update downloaded. Restart to install.', 15000)
+        // Could show a restart button, for now user can use settings or restart manually
+      } else if (status.type === 'download-progress') {
+        // Could update a progress toast, but keep simple
+      } else if (status.type === 'error') {
+        console.warn('[Updater]', status.data)
+      }
+    })
+
+    // Check on startup if enabled (after a short delay to let settings load)
+    const timer = setTimeout(() => {
+      const shouldCheck = useSettingsStore.getState().autoCheckForUpdates
+      const autoDl = useSettingsStore.getState().autoDownloadUpdates
+      if (api.update) {
+        // Tell main the preference
+        ;(window as any).api?.util?.[''] // no-op placeholder
+      }
+      if (shouldCheck) {
+        api.update.checkForUpdates().catch(() => {})
+      }
+      // sync auto download preference to main
+      api.update.setAutoDownload?.(autoDl)
+    }, 2500)
+
+    return () => {
+      clearTimeout(timer)
+      unsubscribe?.()
+    }
+  }, [])
+
+  // Keep main process in sync with auto-download setting
+  const autoDownload = useSettingsStore((s) => s.autoDownloadUpdates)
+  useEffect(() => {
+    const api = (window as any).api
+    api?.update?.setAutoDownload?.(autoDownload)
+  }, [autoDownload])
 
   // Apply saved theme on mount
   const theme = useSettingsStore((s) => s.theme)
@@ -84,14 +139,16 @@ function App(): React.JSX.Element {
   const handleF3 = useCallback(() => {
     const entry = getCursorEntry()
     if (entry && !entry.isContainer) {
-      window.api.util.openViewerWindow(entry.id, entry.name)
+      const tab = usePanelStore.getState().getActiveTab(useAppStore.getState().activePanel)
+      window.api.util.openViewerWindow(tab.pluginId, entry.id, entry.name)
     }
   }, [getCursorEntry])
 
   const handleF4 = useCallback(() => {
     const entry = getCursorEntry()
     if (entry && !entry.isContainer) {
-      window.api.util.openEditorWindow(entry.id, entry.name)
+      const tab = usePanelStore.getState().getActiveTab(useAppStore.getState().activePanel)
+      window.api.util.openEditorWindow(tab.pluginId, entry.id, entry.name)
     }
   }, [getCursorEntry])
 
@@ -180,6 +237,33 @@ function App(): React.JSX.Element {
   const bottomBar = useSettingsStore((s) => s.bottomBar)
   const showCommandLine = useSettingsStore((s) => s.showCommandLine)
 
+  const handleCheckForUpdates = useCallback(async () => {
+    try {
+      const api = (window as any).api
+      if (!api?.update?.checkForUpdates) {
+        showToast('Update system not available')
+        return
+      }
+      const res = await api.update.checkForUpdates()
+      if (res?.updateAvailable) {
+        showToast(`Update ${res.version} available`)
+      } else if (res?.error) {
+        showToast('Update check failed: ' + res.error)
+      } else {
+        showToast('You are running the latest version.')
+      }
+    } catch (e: any) {
+      showToast('Failed to check for updates')
+    }
+  }, [])
+
+  const handleAbout = useCallback(() => {
+    // Simple about for now
+    const msg = `Something Commander\nVersion ${__APP_VERSION__}\n\nA modern orthodox two-panel file manager.`
+    // Use a toast or alert; for better UX we could add a dialog later
+    alert(msg)
+  }, [])
+
   // Register all commands so menu clicks, keyboard shortcuts, and context
   // menus share a single dispatch. Runs whenever any handler identity changes.
   useEffect(() => {
@@ -222,16 +306,26 @@ function App(): React.JSX.Element {
       viewInfo: () => app().setViewMode(activePanel(), 'info'),
       viewQuickview: () => app().setViewMode(activePanel(), 'quickview'),
       toggleCommandLine: () => settings().updateSettings({ showCommandLine: !settings().showCommandLine }),
-      setBottomFnkeys: () => settings().updateSettings({ bottomBar: 'fnkeys' }),
+      // "Function Key Bar" in the View menu now acts as a toggle (unlike the other bottom bar setters).
+      // This is because the bottom bar was originally a tri-state choice (fnkeys/status/none),
+      // but 'status' mode currently has no extra UI (panel status bars are always present in brief mode).
+      // Treating fn bar as toggle makes the menu more consistent with Command Line / Hidden toggles.
+      setBottomFnkeys: () => {
+        const current = settings().bottomBar;
+        settings().updateSettings({ bottomBar: current === 'fnkeys' ? 'none' : 'fnkeys' });
+      },
       setBottomStatus: () => settings().updateSettings({ bottomBar: 'status' }),
       setBottomNone: () => settings().updateSettings({ bottomBar: 'none' }),
       selectGroup: () => setSelectGroupMode('select'),
       unselectGroup: () => setSelectGroupMode('unselect'),
       networkConnections: () => setNetworkDialogOpen(true),
       pluginManager: () => setPluginManagerOpen(true),
-      quit: () => window.close()
+      quit: () => window.close(),
+      cancel: cancelOperation,
+      checkForUpdates: handleCheckForUpdates,
+      about: handleAbout
     })
-  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9])
+  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout])
 
   const handleMenuAction = useCallback((action: string) => {
     dispatchCommand(action)

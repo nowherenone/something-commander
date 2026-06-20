@@ -68,4 +68,14 @@ deb:
 appImage:
   artifactName: Something-Commander-${version}.${ext}
 
+# Auto-update configuration (electron-updater)
+# GitHub releases are recommended for public projects.
+# Set your owner/repo when publishing.
+publish:
+  provider: github
+  owner: something-commander
+  repo: something-commander
+  # Set to true if using private repo + release token in CI
+  private: false
+
 npmRebuild: false

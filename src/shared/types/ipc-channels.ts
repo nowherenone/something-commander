@@ -25,6 +25,7 @@ export const IPC_CHANNELS = {
   READ_FILE_CHUNK: 'util:readFileChunk',
   GET_FILE_SIZE: 'util:getFileSize',
   SAVE_FILE: 'util:saveFile',
+  READ_ENTRY_CONTENT: 'util:readEntryContent',
   SHOW_CONTEXT_MENU: 'util:showContextMenu',
   GET_DISK_SPACE: 'util:getDiskSpace',
   SFTP_CONNECT: 'sftp:connect',
@@ -49,5 +50,14 @@ export const IPC_CHANNELS = {
   STORE_SET: 'store:set',
 
   // Drag and drop
-  NATIVE_DRAG_START: 'util:nativeDragStart'
+  NATIVE_DRAG_START: 'util:nativeDragStart',
+
+  // Auto-update
+  CHECK_FOR_UPDATES: 'update:checkForUpdates',
+  DOWNLOAD_UPDATE: 'update:downloadUpdate',
+  QUIT_AND_INSTALL: 'update:quitAndInstall',
+  GET_UPDATE_STATUS: 'update:getStatus',
+
+  // Drive hotplug notifications
+  DRIVES_CHANGED: 'util:drivesChanged'
 } as const

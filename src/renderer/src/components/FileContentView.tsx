@@ -15,6 +15,8 @@ interface FileContentViewProps {
   /** Called when the user scrolls within `loadAheadLines` of the end of loaded content */
   onNearEnd?: () => void
   loadAheadLines?: number
+  /** Optional ref to the scrollable container (for external keyboard scrolling etc.) */
+  scrollRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export function FileContentView({
@@ -25,14 +27,62 @@ export function FileContentView({
   lineHeight = DEFAULT_LINE_HEIGHT,
   visibleBuffer = DEFAULT_VISIBLE_BUFFER,
   onNearEnd,
-  loadAheadLines = 300
+  loadAheadLines = 300,
+  scrollRef
 }: FileContentViewProps): React.JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const internalContainerRef = useRef<HTMLDivElement>(null)
+  const containerRef = scrollRef || internalContainerRef
   const [scrollTop, setScrollTop] = useState(0)
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop)
   }, [])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (
+      document.activeElement instanceof HTMLInputElement ||
+      document.activeElement instanceof HTMLTextAreaElement
+    ) {
+      return
+    }
+
+    const el = containerRef.current
+    if (!el) return
+
+    const lh = lineHeight
+    const vh = el.clientHeight || 400
+    let delta = 0
+
+    switch (e.key) {
+      case 'ArrowDown':
+        delta = lh
+        break
+      case 'ArrowUp':
+        delta = -lh
+        break
+      case 'PageDown':
+        delta = vh * 0.85
+        break
+      case 'PageUp':
+        delta = -vh * 0.85
+        break
+      case 'Home':
+        el.scrollTop = 0
+        e.preventDefault()
+        return
+      case 'End':
+        el.scrollTop = el.scrollHeight
+        e.preventDefault()
+        return
+      default:
+        return
+    }
+
+    if (delta !== 0) {
+      e.preventDefault()
+      el.scrollTop = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, el.scrollTop + delta))
+    }
+  }, [lineHeight])
 
   // Reset scroll when content changes (new file)
   const prevFirstLine = useRef(lines[0])
@@ -60,7 +110,13 @@ export function FileContentView({
   const visibleLines = lines.slice(startLine, endLine)
 
   return (
-    <div ref={containerRef} onScroll={handleScroll} className={styles.container}>
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      className={styles.container}
+    >
       <div className={styles.spacer} style={{ height: total * lineHeight }}>
         <div className={styles.slice} style={{ top: startLine * lineHeight, lineHeight: `${lineHeight}px` }}>
           {visibleLines.map((line, i) => {

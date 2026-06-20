@@ -390,6 +390,24 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
     }
   }
 
+  async statEntry(entryId: string): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null> {
+    try {
+      const st = await fs.stat(entryId)
+      return { size: st.size, modifiedAt: st.mtimeMs, isDirectory: st.isDirectory() }
+    } catch {
+      return null
+    }
+  }
+
+  async exists(entryId: string): Promise<boolean> {
+    try {
+      await fs.access(entryId)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   async writeFromStream(
     destLocationId: string,
     fileName: string,

@@ -67,17 +67,20 @@ const utilAPI = {
   openFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.OPEN_FILE, filePath),
 
-  openViewerWindow: (filePath: string, fileName: string): Promise<void> =>
-    ipcRenderer.invoke(IPC_CHANNELS.OPEN_VIEWER_WINDOW, filePath, fileName),
+  openViewerWindow: (pluginId: string, entryId: string, fileName: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OPEN_VIEWER_WINDOW, pluginId, entryId, fileName),
 
-  openEditorWindow: (filePath: string, fileName: string): Promise<void> =>
-    ipcRenderer.invoke(IPC_CHANNELS.OPEN_EDITOR_WINDOW, filePath, fileName),
+  openEditorWindow: (pluginId: string, entryId: string, fileName: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OPEN_EDITOR_WINDOW, pluginId, entryId, fileName),
 
   readFileChunk: (filePath: string, offset: number, length: number): Promise<{ data: string; bytesRead: number; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.READ_FILE_CHUNK, filePath, offset, length),
 
   getFileSize: (filePath: string): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_FILE_SIZE, filePath),
+
+  readEntryContent: (pluginId: string, entryId: string, offset?: number, length?: number): Promise<{ data: string | Buffer; totalSize: number; isBinary: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.READ_ENTRY_CONTENT, pluginId, entryId, offset || 0, length),
 
   saveFile: (filePath: string, content: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.SAVE_FILE, filePath, content),
@@ -126,7 +129,9 @@ const utilAPI = {
     sourceEntryId: string,
     destPluginId: string,
     destLocationId: string,
-    destFileName: string
+    destFileName: string,
+    _onProgress?: any,
+    _signal?: AbortSignal
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.STREAM_COPY_FILE, sourcePluginId, sourceEntryId, destPluginId, destLocationId, destFileName),
 
@@ -148,7 +153,13 @@ const utilAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.ENUMERATE_FILES, pluginId, entryIds, destDir),
 
   startNativeDrag: (filePaths: string[]): void =>
-    ipcRenderer.send(IPC_CHANNELS.NATIVE_DRAG_START, filePaths)
+    ipcRenderer.send(IPC_CHANNELS.NATIVE_DRAG_START, filePaths),
+
+  onDrivesChanged: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on(IPC_CHANNELS.DRIVES_CHANGED, handler)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.DRIVES_CHANGED, handler)
+  }
 }
 
 const storeAPI = {
@@ -159,10 +170,32 @@ const storeAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.STORE_SET, key, value)
 }
 
+const updateAPI = {
+  checkForUpdates: (): Promise<{ updateAvailable: boolean; version?: string; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CHECK_FOR_UPDATES),
+
+  downloadUpdate: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_UPDATE),
+
+  quitAndInstall: (): void =>
+    ipcRenderer.send(IPC_CHANNELS.QUIT_AND_INSTALL),
+
+  onUpdateStatus: (callback: (status: { type: string; data?: any }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: any) => callback(status)
+    ipcRenderer.on('update:status', handler)
+    return () => ipcRenderer.removeListener('update:status', handler)
+  },
+
+  setAutoDownload: (enabled: boolean) => {
+    ipcRenderer.send('update:setAutoDownload', enabled)
+  }
+}
+
 const api = {
   plugins: pluginsAPI,
   util: utilAPI,
-  store: storeAPI
+  store: storeAPI,
+  update: updateAPI
 }
 
 if (process.contextIsolated) {

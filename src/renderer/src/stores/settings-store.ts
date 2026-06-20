@@ -66,6 +66,10 @@ export interface Settings {
 
   // Command line
   shell: string
+
+  // Updates
+  autoCheckForUpdates: boolean
+  autoDownloadUpdates: boolean
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -81,7 +85,9 @@ const DEFAULT_SETTINGS: Settings = {
   confirmOverwrite: true,
   theme: 'monokai',
   colorOverrides: {},
-  shell: navigator.platform?.startsWith('Win') ? 'powershell' : '/bin/bash'
+  shell: navigator.platform?.startsWith('Win') ? 'powershell' : '/bin/bash',
+  autoCheckForUpdates: true,
+  autoDownloadUpdates: true
 }
 
 interface SettingsState extends Settings {

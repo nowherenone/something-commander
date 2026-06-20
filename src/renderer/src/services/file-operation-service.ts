@@ -2,6 +2,7 @@ import { useOperationsStore, type OverwritePolicy, type FileItem } from '../stor
 import { usePanelStore } from '../stores/panel-store'
 import { isArchivePath, toArchivePathForInternalFile } from '../utils/archive-path'
 import { splitPathTail } from '../utils/entry-helpers'
+import { showToast } from '../components/layout/Toast'
 
 /**
  * Runs file operations end-to-end (enumerate → copy/move/delete per file →
@@ -12,6 +13,7 @@ import { splitPathTail } from '../utils/entry-helpers'
 // Shared promise used by the "ask"-policy overwrite prompt. The dialog
 // surfaces the decision; the executor blocks here until the user picks.
 let overwriteResolve: ((action: 'overwrite' | 'skip') => void) | null = null
+let currentAbortController: AbortController | null = null
 
 export function resolveOverwriteAction(
   action: 'overwrite' | 'skip' | 'overwrite-all' | 'skip-all'
@@ -41,46 +43,66 @@ function waitForOverwriteDecision(): Promise<'overwrite' | 'skip'> {
 
 function isCancelled(opId: string): boolean {
   const op = useOperationsStore.getState().operations.find((o) => o.id === opId)
-  return !op || op.status === 'cancelled'
+  const cancelled = !op || op.status === 'cancelled'
+  if (cancelled && currentAbortController) {
+    currentAbortController.abort()
+  }
+  return cancelled
 }
 
 async function executeDelete(opId: string, op: ReturnType<typeof useOperationsStore.getState>['operations'][number]): Promise<void> {
   const store = () => useOperationsStore.getState()
-  store().updateOperation(opId, {
-    status: 'running',
-    totalFiles: op.sourceEntries.length,
-    totalBytes: 0,
-    startTime: Date.now(),
-    currentFile: '',
-    processedFiles: 0,
-    processedBytes: 0
-  })
 
-  for (let i = 0; i < op.sourceEntries.length; i++) {
-    if (isCancelled(opId)) break
-    const entry = op.sourceEntries[i]
-    store().updateOperation(opId, { currentFile: entry.name, processedFiles: i })
-    try {
-      const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
-        op: 'delete',
-        entries: [entry]
-      })
-      if (!result.success) {
-        store().updateOperation(opId, {
-          status: 'error',
-          error: `${entry.name}: ${result.errors?.[0]?.message || 'Delete failed'}`
+  try {
+    store().updateOperation(opId, {
+      status: 'running',
+      totalFiles: op.sourceEntries.length,
+      totalBytes: 0,
+      startTime: Date.now(),
+      currentFile: '',
+      processedFiles: 0,
+      processedBytes: 0
+    })
+
+    for (let i = 0; i < op.sourceEntries.length; i++) {
+      if (isCancelled(opId)) break
+      const entry = op.sourceEntries[i]
+      store().updateOperation(opId, { currentFile: entry.name, processedFiles: i })
+      try {
+        const result = await window.api.plugins.executeOperation(op.sourcePluginId, {
+          op: 'delete',
+          entries: [entry]
         })
+        if (!result.success) {
+          store().updateOperation(opId, {
+            status: 'error',
+            error: `${entry.name}: ${result.errors?.[0]?.message || 'Delete failed'}`
+          })
+          return
+        }
+      } catch (err) {
+        store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${String(err)}` })
         return
       }
-    } catch (err) {
-      store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${String(err)}` })
-      return
+    }
+
+    await usePanelStore.getState().refresh('left')
+    await usePanelStore.getState().refresh('right')
+
+    const final = store().operations.find((o) => o.id === opId)
+    if (final && !isCancelled(opId) && final.status !== 'error') {
+      store().updateOperation(opId, { status: 'done' })
+      const count = final.processedFiles || final.totalFiles || op.sourceEntries.length
+      showToast(`Deleted ${count} item${count === 1 ? '' : 's'}`)
+    }
+    store().removeOperation(opId)
+  } catch (err) {
+    // Top-level safety net for delete
+    const current = store().operations.find((o) => o.id === opId)
+    if (current && current.status !== 'error' && current.status !== 'cancelled') {
+      store().updateOperation(opId, { status: 'error', error: String(err) })
     }
   }
-
-  await usePanelStore.getState().refresh('left')
-  await usePanelStore.getState().refresh('right')
-  store().removeOperation(opId)
 }
 
 function splitDestPathForCopy(destPath: string, relativePath: string): {
@@ -100,187 +122,243 @@ function splitDestPathForCopy(destPath: string, relativePath: string): {
 
 async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperationsStore.getState>['operations'][number]): Promise<void> {
   const store = () => useOperationsStore.getState()
-  store().updateOperation(opId, { status: 'enumerating', currentFile: 'Scanning files...' })
 
-  const sourcePaths = op.sourceEntries.map((e) => e.id)
-  const fileList: FileItem[] = await window.api.util.enumerateFiles(
-    op.sourcePluginId,
-    sourcePaths,
-    op.destinationLocationId
-  )
-  if (isCancelled(opId)) return
+  try {
+    store().updateOperation(opId, { status: 'enumerating', currentFile: 'Scanning files...' })
 
-  const totalFiles = fileList.filter((f) => !f.isDirectory).length
-  const totalBytes = fileList.reduce((sum, f) => sum + f.size, 0)
+    const sourcePaths = op.sourceEntries.map((e) => e.id)
+    let fileList: FileItem[]
+    try {
+      fileList = await window.api.util.enumerateFiles(
+        op.sourcePluginId,
+        sourcePaths,
+        op.destinationLocationId
+      )
+    } catch (err) {
+      store().updateOperation(opId, {
+        status: 'error',
+        error: `Failed to scan files: ${String(err)}`
+      })
+      return
+    }
 
-  store().updateOperation(opId, {
-    status: 'running',
-    fileList,
-    totalFiles,
-    totalBytes,
-    startTime: Date.now(),
-    currentFile: '',
-    processedFiles: 0,
-    processedBytes: 0
-  })
+    if (isCancelled(opId)) {
+      // Explicitly mark as cancelled so UI and queue treat it as terminal
+      store().updateOperation(opId, { status: 'cancelled' })
+      return
+    }
 
-  let processedFiles = 0
-  let processedBytes = 0
-
-  for (let i = 0; i < fileList.length; i++) {
-    if (isCancelled(opId)) break
-    const item = fileList[i]
+    const totalFiles = fileList.filter((f) => !f.isDirectory).length
+    const totalBytes = fileList.reduce((sum, f) => sum + f.size, 0)
 
     store().updateOperation(opId, {
-      currentFile: item.relativePath,
-      currentFileIndex: i,
-      currentFileSize: item.size,
-      currentFileCopied: 0
+      status: 'running',
+      fileList,
+      totalFiles,
+      totalBytes,
+      startTime: Date.now(),
+      currentFile: '',
+      processedFiles: 0,
+      processedBytes: 0
     })
 
-    try {
-      if (item.isDirectory) {
-        // Archives create directories implicitly when files are written into them.
-        if (!isArchivePath(item.destPath)) {
-          const { parent, name } = splitPathTail(item.destPath)
-          await window.api.plugins.executeOperation(op.destinationPluginId, {
-            op: 'createDirectory',
-            parentLocationId: parent || item.destPath,
-            name
-          })
-        }
-      } else {
-        // Overwrite check (only meaningful for local-filesystem destinations).
-        const exists = !isArchivePath(item.destPath) && (await window.api.util.checkExists(item.destPath))
-        if (exists) {
-          const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
+    let processedFiles = 0
+    let processedBytes = 0
 
-          if (policy === 'skip-all') {
-            processedBytes += item.size
-            store().updateOperation(opId, { processedBytes })
-            continue
-          }
-          if (policy === 'ask') {
-            const destInfo = await window.api.util.getFileInfo(item.destPath)
-            store().updateOperation(opId, {
-              overwritePrompt: {
-                sourcePath: item.sourcePath,
-                sourceName: item.relativePath,
-                sourceSize: item.size,
-                sourceDate: 0,
-                destPath: item.destPath,
-                destSize: destInfo?.size || 0,
-                destDate: destInfo?.modifiedAt || 0
-              }
+    for (let i = 0; i < fileList.length; i++) {
+      if (isCancelled(opId)) break
+      const item = fileList[i]
+
+      store().updateOperation(opId, {
+        currentFile: item.relativePath,
+        currentFileIndex: i,
+        currentFileSize: item.size,
+        currentFileCopied: 0
+      })
+
+      try {
+        if (item.isDirectory) {
+          // Archives create directories implicitly when files are written into them.
+          if (!isArchivePath(item.destPath)) {
+            const { parent, name } = splitPathTail(item.destPath)
+            await window.api.plugins.executeOperation(op.destinationPluginId, {
+              op: 'createDirectory',
+              parentLocationId: parent || item.destPath,
+              name
             })
-            const decision = await waitForOverwriteDecision()
-            if (isCancelled(opId)) break
-            if (decision === 'skip') {
+          }
+        } else {
+          // Overwrite check (only meaningful for local-filesystem destinations).
+          const exists = !isArchivePath(item.destPath) && (await window.api.util.checkExists(item.destPath))
+          if (exists) {
+            const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
+
+            if (policy === 'skip-all') {
               processedBytes += item.size
               store().updateOperation(opId, { processedBytes })
               continue
             }
+            if (policy === 'ask') {
+              const destInfo = await window.api.util.getFileInfo(item.destPath)
+              const srcEntry = op.sourceEntries.find((e) => e.id === item.sourcePath)
+              store().updateOperation(opId, {
+                overwritePrompt: {
+                  sourcePath: item.sourcePath,
+                  sourceName: item.relativePath,
+                  sourceSize: item.size,
+                  sourceDate: srcEntry?.modifiedAt || 0,
+                  destPath: item.destPath,
+                  destSize: destInfo?.size || 0,
+                  destDate: destInfo?.modifiedAt || 0
+                }
+              })
+              const decision = await waitForOverwriteDecision()
+              if (isCancelled(opId)) break
+              if (decision === 'skip') {
+                processedBytes += item.size
+                store().updateOperation(opId, { processedBytes })
+                continue
+              }
+            }
           }
-        }
 
-        // Stream copy through the plugin system — works across any plugin combination.
-        let lastProgressUpdate = 0
-        const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
-          const now = Date.now()
-          if (now - lastProgressUpdate >= 250) {
-            store().updateOperation(opId, { currentFileCopied: bytesCopied })
-            lastProgressUpdate = now
-          }
-        })
-
-        const { destDir, destFileName } = splitDestPathForCopy(item.destPath, item.relativePath)
-
-        const result = await window.api.util.streamCopyFile(
-          op.sourcePluginId,
-          item.sourcePath,
-          op.destinationPluginId,
-          destDir,
-          destFileName
-        )
-        unsubProgress()
-
-        if (!result.success) {
-          store().updateOperation(opId, {
-            status: 'error',
-            error: `${item.relativePath}: ${result.error}`
+          // Stream copy through the plugin system — works across any plugin combination.
+          let lastProgressUpdate = 0
+          const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
+            const now = Date.now()
+            if (now - lastProgressUpdate >= 250) {
+              store().updateOperation(opId, { currentFileCopied: bytesCopied })
+              lastProgressUpdate = now
+            }
           })
-          return
-        }
 
-        if (op.type === 'move') {
-          // Source plugin deletes its own entry.
+          const { destDir, destFileName } = splitDestPathForCopy(item.destPath, item.relativePath)
+
+          currentAbortController = new AbortController()
+          const result = await window.api.util.streamCopyFile(
+            op.sourcePluginId,
+            item.sourcePath,
+            op.destinationPluginId,
+            destDir,
+            destFileName,
+            undefined,
+            currentAbortController.signal
+          )
+          currentAbortController = null
+          unsubProgress()
+
+          if (!result.success) {
+            store().updateOperation(opId, {
+              error: `${item.relativePath}: ${result.error}`
+            })
+            // continue to next instead of full stop
+          }
+
+          if (op.type === 'move') {
+            // Source plugin deletes its own entry.
+            await window.api.plugins.executeOperation(op.sourcePluginId, {
+              op: 'delete',
+              entries: [{
+                id: item.sourcePath,
+                name: destFileName,
+                isContainer: false,
+                size: item.size,
+                modifiedAt: 0,
+                mimeType: '',
+                iconHint: 'file',
+                meta: {},
+                attributes: { readonly: false, hidden: false, symlink: false }
+              }]
+            })
+          }
+        }
+      } catch (err) {
+        // Resilient: log error but keep going for other files (full skip/retry UI in future)
+        store().updateOperation(opId, { error: `${item.relativePath}: ${String(err)}` })
+        // continue processing other files
+      }
+
+      if (!item.isDirectory) {
+        processedFiles++
+        processedBytes += item.size
+      }
+      store().updateOperation(opId, { processedFiles, processedBytes })
+    }
+
+    // For move, delete source directories after all files are moved.
+    if (op.type === 'move' && !isCancelled(opId)) {
+      const dirs = fileList.filter((f) => f.isDirectory).reverse()
+      for (const dir of dirs) {
+        if (isCancelled(opId)) break
+        try {
           await window.api.plugins.executeOperation(op.sourcePluginId, {
             op: 'delete',
             entries: [{
-              id: item.sourcePath,
-              name: destFileName,
-              isContainer: false,
-              size: item.size,
+              id: dir.sourcePath,
+              name: dir.relativePath,
+              isContainer: true,
+              size: 0,
               modifiedAt: 0,
               mimeType: '',
-              iconHint: 'file',
+              iconHint: 'folder',
               meta: {},
               attributes: { readonly: false, hidden: false, symlink: false }
             }]
           })
-        }
+        } catch { /* ignore errors deleting source dirs */ }
       }
-    } catch (err) {
-      store().updateOperation(opId, { status: 'error', error: `${item.relativePath}: ${String(err)}` })
-      return
     }
 
-    if (!item.isDirectory) {
-      processedFiles++
-      processedBytes += item.size
-    }
-    store().updateOperation(opId, { processedFiles, processedBytes })
-  }
+    await usePanelStore.getState().refresh('left')
+    await usePanelStore.getState().refresh('right')
 
-  // For move, delete source directories after all files are moved.
-  if (op.type === 'move' && !isCancelled(opId)) {
-    const dirs = fileList.filter((f) => f.isDirectory).reverse()
-    for (const dir of dirs) {
-      if (isCancelled(opId)) break
-      try {
-        await window.api.plugins.executeOperation(op.sourcePluginId, {
-          op: 'delete',
-          entries: [{
-            id: dir.sourcePath,
-            name: dir.relativePath,
-            isContainer: true,
-            size: 0,
-            modifiedAt: 0,
-            mimeType: '',
-            iconHint: 'folder',
-            meta: {},
-            attributes: { readonly: false, hidden: false, symlink: false }
-          }]
-        })
-      } catch { /* ignore errors deleting source dirs */ }
+    const finalOp = store().operations.find((o) => o.id === opId)
+    if (finalOp && finalOp.status !== 'error' && finalOp.status !== 'cancelled') {
+      store().updateOperation(opId, { status: 'done' })
+      const count = finalOp.processedFiles || finalOp.totalFiles || 0
+      const verb = op.type === 'move' ? 'Moved' : 'Copied'
+      if (count > 0) {
+        showToast(`${verb} ${count} file${count === 1 ? '' : 's'}`)
+      } else {
+        showToast(`${verb} complete`)
+      }
+    }
+    // Success: auto-dismiss. Errors and cancels are left for user to review/dismiss.
+    if (finalOp && (finalOp.status === 'done' || finalOp.status === 'running')) {
+      store().removeOperation(opId)
+    }
+  } catch (err) {
+    // Top-level safety net — never leave operation stuck in enumerating or running
+    const current = store().operations.find((o) => o.id === opId)
+    if (current && current.status !== 'error' && current.status !== 'cancelled') {
+      store().updateOperation(opId, {
+        status: 'error',
+        error: `Operation failed: ${String(err)}`
+      })
     }
   }
-
-  await usePanelStore.getState().refresh('left')
-  await usePanelStore.getState().refresh('right')
-
-  const finalOp = store().operations.find((o) => o.id === opId)
-  if (finalOp?.status === 'running') store().removeOperation(opId)
 }
 
 export async function executeOperation(opId: string): Promise<void> {
   const op = useOperationsStore.getState().operations.find((o) => o.id === opId)
   if (!op) return
 
-  if (op.type === 'delete') {
-    await executeDelete(opId, op)
-  } else {
-    await executeCopyOrMove(opId, op)
+  try {
+    if (op.type === 'delete') {
+      await executeDelete(opId, op)
+    } else {
+      await executeCopyOrMove(opId, op)
+    }
+  } catch (err) {
+    // Ultimate safety net — ensure we never leave an op blocking the queue
+    const store = useOperationsStore.getState()
+    const current = store.operations.find((o) => o.id === opId)
+    if (current && current.status !== 'error' && current.status !== 'cancelled' && current.status !== 'done') {
+      store.updateOperation(opId, {
+        status: 'error',
+        error: `Unexpected failure: ${String(err)}`
+      })
+    }
   }
 }
 

@@ -3,6 +3,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
+import { pluginManager } from '../plugins/plugin-manager'
 
 type UtilWindowKind = 'viewer' | 'editor'
 
@@ -31,12 +32,13 @@ function openUtilWindow(kind: UtilWindowKind, filePath: string, fileName: string
 
 /** File-viewer/editor IO and window lifecycle handlers. */
 export function registerViewerIPC(): void {
-  ipcMain.handle(IPC_CHANNELS.OPEN_VIEWER_WINDOW, (_event, filePath: string, fileName: string) => {
-    openUtilWindow('viewer', filePath, fileName)
+  ipcMain.handle(IPC_CHANNELS.OPEN_VIEWER_WINDOW, (_event, pluginId: string, entryId: string, fileName: string) => {
+    // Pass as query: pluginId|entryId for the pages to use new API
+    openUtilWindow('viewer', `${pluginId}|${entryId}`, fileName)
   })
 
-  ipcMain.handle(IPC_CHANNELS.OPEN_EDITOR_WINDOW, (_event, filePath: string, fileName: string) => {
-    openUtilWindow('editor', filePath, fileName)
+  ipcMain.handle(IPC_CHANNELS.OPEN_EDITOR_WINDOW, (_event, pluginId: string, entryId: string, fileName: string) => {
+    openUtilWindow('editor', `${pluginId}|${entryId}`, fileName)
   })
 
   ipcMain.handle(
@@ -47,7 +49,8 @@ export function registerViewerIPC(): void {
         const buffer = Buffer.alloc(length)
         const { bytesRead } = await handle.read(buffer, 0, length, offset)
         await handle.close()
-        return { data: buffer.slice(0, bytesRead).toString('utf-8'), bytesRead }
+        // Return base64 to avoid utf8 boundary corruption for binary/large text
+        return { data: buffer.slice(0, bytesRead).toString('base64'), bytesRead, encoding: 'base64' }
       } catch (err) {
         return { data: '', bytesRead: 0, error: String(err) }
       }
@@ -70,6 +73,10 @@ export function registerViewerIPC(): void {
     } catch (err) {
       return { success: false, error: String(err) }
     }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.READ_ENTRY_CONTENT, async (_event, pluginId: string, entryId: string, offset = 0, length?: number) => {
+    return pluginManager.readEntryContent(pluginId, entryId, offset, length)
   })
 
   ipcMain.handle(

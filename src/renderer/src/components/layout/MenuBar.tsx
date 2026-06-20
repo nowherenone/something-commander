@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
+import { useAppStore } from '../../stores/app-store'
+import { usePanelStore } from '../../stores/panel-store'
+import { useSettingsStore } from '../../stores/settings-store'
 import styles from '../../styles/menubar.module.css'
 
 declare const __APP_VERSION__: string
@@ -64,7 +67,6 @@ const MENUS: MenuDef[] = [
       { label: '', action: '', separator: true },
       { label: 'Command Line', action: 'toggleCommandLine' },
       { label: 'Function Key Bar', action: 'setBottomFnkeys' },
-      { label: 'Status Bar', action: 'setBottomStatus' },
       { label: 'Hide Bottom Bar', action: 'setBottomNone' },
       { label: '', action: '', separator: true },
       { label: 'New Tab', shortcut: 'Ctrl+T', action: 'newTab' },
@@ -84,6 +86,8 @@ const MENUS: MenuDef[] = [
       { label: '', action: '', separator: true },
       { label: 'Plugin Manager', action: 'pluginManager' },
       { label: '', action: '', separator: true },
+      { label: 'Check for Updates...', action: 'checkForUpdates' },
+      { label: '', action: '', separator: true },
       { label: 'Settings', shortcut: 'F9', action: 'settings' }
     ]
   }
@@ -91,7 +95,28 @@ const MENUS: MenuDef[] = [
 
 export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
+
+  const activePanel = useAppStore((s) => s.activePanel)
+  const viewMode = useAppStore((s) => activePanel === 'left' ? s.leftViewMode : s.rightViewMode)
+  const tab = usePanelStore((s) => s.getActiveTab(activePanel))
+  const showHidden = tab.showHidden
+  const { showCommandLine, bottomBar } = useSettingsStore()
+
+  const getChecked = useCallback((action: string): boolean => {
+    switch (action) {
+      case 'viewBrief': return viewMode === 'brief'
+      case 'viewTree': return viewMode === 'tree'
+      case 'viewInfo': return viewMode === 'info'
+      case 'viewQuickview': return viewMode === 'quickview'
+      case 'toggleHidden': return showHidden
+      case 'toggleCommandLine': return showCommandLine
+      case 'setBottomFnkeys': return bottomBar === 'fnkeys'
+      case 'setBottomNone': return bottomBar === 'none'
+      default: return false
+    }
+  }, [viewMode, showHidden, showCommandLine, bottomBar])
 
   const handleMenuClick = useCallback((label: string) => {
     setOpenMenu((prev) => (prev === label ? null : label))
@@ -107,25 +132,29 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
 
   // Close on click outside
   useEffect(() => {
-    if (!openMenu) return
+    if (!openMenu && !versionMenuOpen) return
     const handler = (e: MouseEvent): void => {
       if (barRef.current && !barRef.current.contains(e.target as Node)) {
         setOpenMenu(null)
+        setVersionMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [openMenu])
+  }, [openMenu, versionMenuOpen])
 
   // Close on Escape
   useEffect(() => {
-    if (!openMenu) return
+    if (!openMenu && !versionMenuOpen) return
     const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOpenMenu(null)
+      if (e.key === 'Escape') {
+        setOpenMenu(null)
+        setVersionMenuOpen(false)
+      }
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [openMenu])
+  }, [openMenu, versionMenuOpen])
 
   return (
     <div className={styles.menuBar} ref={barRef}>
@@ -149,7 +178,7 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
                     className={styles.menuAction}
                     onClick={() => handleAction(item.action)}
                   >
-                    <span>{item.label}</span>
+                    <span>{getChecked(item.action) ? '✓ ' : ''}{item.label}</span>
                     {item.shortcut && (
                       <span className={styles.menuShortcut}>{item.shortcut}</span>
                     )}
@@ -161,7 +190,41 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
         </div>
       ))}
       <div className={styles.spacer} />
-      <span className={styles.titleText}>v{__APP_VERSION__}</span>
+      <div style={{ position: 'relative' }}>
+        <button
+          className={`${styles.menuItem} ${versionMenuOpen ? styles.menuItemActive : ''}`}
+          onClick={() => {
+            setOpenMenu(null)
+            setVersionMenuOpen(!versionMenuOpen)
+          }}
+          title="Version and updates"
+        >
+          v{__APP_VERSION__}
+        </button>
+        {versionMenuOpen && (
+          <div className={styles.menuDropdown} style={{ right: 0, left: 'auto' }}>
+            <button
+              className={styles.menuAction}
+              onClick={() => {
+                setVersionMenuOpen(false)
+                onAction('checkForUpdates')
+              }}
+            >
+              <span>Check for Updates...</span>
+            </button>
+            <div className={styles.menuSep} />
+            <button
+              className={styles.menuAction}
+              onClick={() => {
+                setVersionMenuOpen(false)
+                onAction('about')
+              }}
+            >
+              <span>About</span>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

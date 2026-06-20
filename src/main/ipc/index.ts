@@ -5,6 +5,8 @@ import { registerConnectionIPC } from './connection-ipc'
 import { registerSystemIPC } from './system-ipc'
 import { registerFsIPC } from './fs-ipc'
 import { registerSearchIPC } from './search-ipc'
+import { registerUpdateIPC, registerMainWindowForUpdates } from './update-ipc'
+import { BrowserWindow } from 'electron'
 
 export function registerAllIPC(): void {
   registerPluginIPC()
@@ -14,4 +16,9 @@ export function registerAllIPC(): void {
   registerSystemIPC()
   registerFsIPC()
   registerSearchIPC()
+  registerUpdateIPC()
+}
+
+export function registerWindowForUpdater(win: BrowserWindow) {
+  registerMainWindowForUpdates(win)
 }

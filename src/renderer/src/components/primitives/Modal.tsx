@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react'
+import { useOverlayStore } from '../../stores/overlay-store'
 import styles from '../../styles/dialogs.module.css'
 
 interface ModalProps {
+  id?: string
   onClose: () => void
   title?: string
   width?: number | string
@@ -15,6 +17,7 @@ interface ModalProps {
 }
 
 export function Modal({
+  id,
   onClose,
   title,
   width,
@@ -27,6 +30,7 @@ export function Modal({
   dialogStyle
 }: ModalProps): React.JSX.Element {
   const previouslyFocused = useRef<Element | null>(null)
+  const overlayId = id || `modal-${Date.now()}`
 
   useEffect(() => {
     previouslyFocused.current = document.activeElement
@@ -38,15 +42,15 @@ export function Modal({
 
   useEffect(() => {
     if (!closeOnEscape) return
-    const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
+    const overlay = useOverlayStore.getState()
+    overlay.push({ id: overlayId, onEscape: onClose })
+    return () => {
+      // Only pop if still top to avoid removing wrong one
+      if (overlay.isTop(overlayId)) {
+        overlay.pop()
       }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [closeOnEscape, onClose])
+  }, [closeOnEscape, onClose, overlayId])
 
   const mergedDialogStyle: React.CSSProperties = { ...dialogStyle }
   if (width !== undefined) mergedDialogStyle.width = width

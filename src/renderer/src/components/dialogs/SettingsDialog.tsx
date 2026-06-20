@@ -17,6 +17,7 @@ const TABS = [
   { id: 'colors', label: 'Colors' },
   { id: 'layout', label: 'Layout' },
   { id: 'operations', label: 'Operations' },
+  { id: 'updates', label: 'Updates' },
   { id: 'keyboard', label: 'Keyboard' }
 ] as const
 
@@ -62,6 +63,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
 
   return (
     <Modal
+      id="settings"
       onClose={onClose}
       title="Configuration"
       wide
@@ -309,6 +311,54 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                       onChange={(e) => update({ shell: e.target.value })}
                       style={{ width: 180 }}
                     />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'updates' && (
+                <div className={styles.settingsGroup}>
+                  <div className={styles.settingsGroupTitle}>Automatic Updates</div>
+                  <label className={styles.settingsCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={settings.autoCheckForUpdates}
+                      onChange={(e) => update({ autoCheckForUpdates: e.target.checked })}
+                    />
+                    <span className={styles.settingsLabel}>Check for updates on startup</span>
+                  </label>
+                  <label className={styles.settingsCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={settings.autoDownloadUpdates}
+                      onChange={(e) => update({ autoDownloadUpdates: e.target.checked })}
+                    />
+                    <span className={styles.settingsLabel}>Automatically download updates</span>
+                  </label>
+
+                  <div style={{ marginTop: 16 }}>
+                    <button
+                      className={`${styles.btn} ${styles.btnPrimary}`}
+                      onClick={async () => {
+                        try {
+                          const api = (window as any).api
+                          const res = await api?.update?.checkForUpdates?.()
+                          if (res?.updateAvailable) {
+                            console.log('[Update] Available:', res.version)
+                          } else if (res?.error) {
+                            alert('Update check failed: ' + res.error)
+                          } else {
+                            alert('You are running the latest version.')
+                          }
+                        } catch (e: any) {
+                          alert('Update check error: ' + (e?.message || e))
+                        }
+                      }}
+                    >
+                      Check for updates now
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
+                    Updates are delivered via GitHub Releases when the app is packaged. Restart after download to apply the update.
                   </div>
                 </div>
               )}

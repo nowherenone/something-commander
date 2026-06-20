@@ -228,7 +228,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       className={`${styles.panel} ${isActive ? styles.active : ''}`}
       onClick={() => setActivePanel(panelId)}
     >
-      <div style={{ display: 'flex', height: 26, flexShrink: 0 }}>
+      <div style={{ display: 'flex', height: 'var(--tabbar-height)', flexShrink: 0 }}>
         <DriveBookmarkMenu
           currentLocation={tab.locationDisplay}
           currentPluginId={tab.pluginId}
@@ -275,18 +275,24 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
         </>
       )}
       {viewMode === 'tree' && (
-        <TreeView
-          pluginId={tab.pluginId}
-          locationId={tab.locationId}
-          onNavigate={(loc) => navigate(panelId, loc)}
-        />
+        <>
+          <div style={{ height: 'var(--header-height)', background: 'var(--bg-header)', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }} />
+          <TreeView
+            pluginId={tab.pluginId}
+            locationId={tab.locationId}
+            onNavigate={(loc) => navigate(panelId, loc)}
+          />
+        </>
       )}
       {viewMode === 'info' && (
-        <InfoView
-          pluginId={tab.pluginId}
-          locationId={tab.locationId}
-          locationDisplay={tab.locationDisplay}
-        />
+        <>
+          <div style={{ height: 'var(--header-height)', background: 'var(--bg-header)', borderBottom: '1px solid var(--border-color)', flexShrink: 0 }} />
+          <InfoView
+            pluginId={tab.pluginId}
+            locationId={tab.locationId}
+            locationDisplay={tab.locationDisplay}
+          />
+        </>
       )}
       {viewMode === 'quickview' && (
         <QuickViewBridge panelId={panelId} />

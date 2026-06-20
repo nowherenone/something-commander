@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize } from '../../utils/format'
+import { useOverlayStore } from '../../stores/overlay-store'
 import styles from '../../styles/dialogs.module.css'
 
 interface ArchiveFormat {
@@ -87,6 +88,16 @@ export function ConfirmOperation({
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
   }, [editDest, onConfirm, onCancel])
+
+  // Register with overlay for top-wins priority (confirm is highest)
+  useEffect(() => {
+    const overlayId = 'confirm-op'
+    useOverlayStore.getState().push({ id: overlayId, onEscape: onCancel })
+    return () => {
+      const o = useOverlayStore.getState()
+      if (o.isTop(overlayId)) o.pop()
+    }
+  }, [onCancel])
 
   return (
     <div className={styles.overlay} onClick={onCancel}>

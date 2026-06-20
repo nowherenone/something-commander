@@ -13,10 +13,7 @@ interface NetworkConnection {
   locationId: string
 }
 
-// Module-level cache shared by both panel instances — drives change rarely
-let drivesCache: DriveInfo[] = []
-let drivesCacheTime = 0
-const DRIVES_CACHE_TTL = 30_000 // 30 seconds
+// (cache removed in favor of fresh loads + hotplug events for drive changes)
 
 interface DriveBookmarkMenuProps {
   currentLocation: string
@@ -50,27 +47,25 @@ export function DriveBookmarkMenu({
     if (!isOpen) return
     setAddingBookmark(false)
 
-    const isFresh = drivesCache.length > 0 && (Date.now() - drivesCacheTime) < DRIVES_CACHE_TTL
-
-    const applyDrives = (entries: DriveInfo[]): void => {
-      setDrives(entries)
-      setCursorIdx(0)
-    }
-
-    if (isFresh) {
-      applyDrives(drivesCache)
-    } else {
-      if (drivesCache.length > 0) applyDrives(drivesCache)
-
+    // Always refresh on open to catch newly inserted drives
+    const loadDrives = () => {
       window.api.plugins.readDirectory('local-filesystem', null).then((result) => {
         const entries = result.entries
           .filter((e) => e.isContainer)
           .map((e) => ({ name: e.name, path: e.id }))
-        drivesCache = entries
-        drivesCacheTime = Date.now()
         setDrives(entries)
-      })
+        setCursorIdx(0)
+      }).catch(() => {})
     }
+
+    loadDrives()  // force fresh on every open
+
+    // Subscribe to hotplug events (flash drives, etc.)
+    const unsubscribeDrives = window.api.util.onDrivesChanged?.(() => {
+      if (isOpen) {
+        loadDrives()
+      }
+    })
 
     // Load active network connections from all network plugins
     const networkPlugins = ['sftp', 's3', 'smb']
@@ -104,6 +99,10 @@ export function DriveBookmarkMenu({
         setNetworkConns(active)
       }).catch(() => setNetworkConns(results.flat()))
     })
+
+    return () => {
+      unsubscribeDrives?.()
+    }
   }, [isOpen])
 
   // Build flat list of all items for keyboard navigation (includes the add button as last item)

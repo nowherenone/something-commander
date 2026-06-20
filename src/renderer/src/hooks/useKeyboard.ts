@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useAppStore } from '../stores/app-store'
 import { usePanelStore, parentOffset, hasParentEntry } from '../stores/panel-store'
 import { useKeybindingsStore } from '../stores/keybindings-store'
+import { useOverlayStore } from '../stores/overlay-store'
 import { dispatchCommand } from '../commands/registry'
 
 export interface KeyboardNavActions {
@@ -42,6 +43,18 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
       switch (e.key) {
         case 'Escape':
           e.preventDefault()
+          // Top priority: overlay stack (top wins)
+          const overlays = useOverlayStore.getState()
+          if (overlays.overlays.length > 0) {
+            overlays.dismissTop()
+            return
+          }
+          // Try keybinding (e.g. 'cancel' command)
+          const cancelAction = useKeybindingsStore.getState().matchAction(e)
+          if (cancelAction && dispatchCommand(cancelAction)) {
+            return
+          }
+          // Fallback: cancel any running folder size calculations
           store.cancelFolderCalculations(activePanel)
           return
 

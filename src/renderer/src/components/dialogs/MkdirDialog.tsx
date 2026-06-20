@@ -18,6 +18,7 @@ export function MkdirDialog({ onClose, onSubmit }: MkdirDialogProps): React.JSX.
 
   return (
     <Modal
+      id="mkdir"
       onClose={onClose}
       title="Create Directory"
       width={360}

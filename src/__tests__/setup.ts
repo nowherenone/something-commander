@@ -35,6 +35,7 @@ const mockUtilApi = {
   openFile: vi.fn().mockResolvedValue(''),
   openViewerWindow: vi.fn().mockResolvedValue(undefined),
   openEditorWindow: vi.fn().mockResolvedValue(undefined),
+  readEntryContent: vi.fn().mockResolvedValue({ data: '', totalSize: 0, isBinary: false }),
   readFileChunk: vi.fn().mockResolvedValue({ data: '', bytesRead: 0 }),
   getFileSize: vi.fn().mockResolvedValue(0),
   saveFile: vi.fn().mockResolvedValue({ success: true }),

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { formatSize } from '../utils/format'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 interface EditorPageProps {
   filePath: string
@@ -20,7 +21,31 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
     async function loadFile(): Promise<void> {
       setLoading(true)
       try {
-        const size = await window.api.util.getFileSize(filePath)
+        const parts = filePath.split('|')
+        const usePlugin = parts.length === 2
+        const pluginId = usePlugin ? parts[0] : ''
+        const entryId = usePlugin ? parts[1] : filePath
+
+        let size = 0
+        let content = ''
+        let isBin = false
+        if (usePlugin) {
+          const res = await window.api.util.readEntryContent(pluginId, entryId, 0)
+          size = res.totalSize || 0
+          isBin = res.isBinary
+          content = typeof res.data === 'string' ? res.data : ''
+          if (res.error) {
+            setError(res.error)
+          }
+        } else {
+          size = await window.api.util.getFileSize(filePath)
+          const res = await window.api.util.readFileContent(filePath, size)
+          size = size
+          isBin = res.isBinary
+          content = res.content || ''
+          if (res.error) setError(res.error)
+        }
+
         setFileSize(size)
 
         // Limit editor to ~10MB
@@ -30,14 +55,13 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
           return
         }
 
-        const result = await window.api.util.readFileContent(filePath, size)
-        if (result.error) {
-          setError(result.error)
-        } else if (result.isBinary) {
+        if (isBin) {
           setError('Cannot edit binary files. Use F3 viewer instead.')
+        } else if (!content && !usePlugin) {
+          setError('Empty or unreadable')
         } else {
-          setContent(result.content)
-          setOriginalContent(result.content)
+          setContent(content)
+          setOriginalContent(content)
         }
       } catch (err) {
         setError(String(err))
@@ -64,17 +88,35 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
     setModified(e.target.value !== originalContent)
   }, [originalContent])
 
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // Use shared escape handler: blur inputs first, then close (with confirm if dirty)
+  useEscapeKey(() => {
+    if (modified) {
+      if (window.confirm('Unsaved changes. Close anyway?')) {
+        window.close()
+      }
+    } else {
+      window.close()
+    }
+  })
+
+  // Ensure focus for keyboard
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+      } else {
+        rootRef.current?.focus()
+      }
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.ctrlKey && e.key === 's') {
       e.preventDefault()
       handleSave()
-    }
-    if (e.key === 'Escape') {
-      if (modified) {
-        if (confirm('Unsaved changes. Close anyway?')) window.close()
-      } else {
-        window.close()
-      }
     }
     // Tab inserts a tab character
     if (e.key === 'Tab') {
@@ -91,12 +133,12 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
         }, 0)
       }
     }
-  }, [handleSave, modified, content, originalContent])
+  }, [handleSave, content, originalContent])
 
   const lineCount = content.split('\n').length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)' }}>
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)' }}>
       {/* Toolbar */}
       <div style={{
         display: 'flex',

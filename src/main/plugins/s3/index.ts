@@ -129,7 +129,66 @@ export class S3Plugin implements BrowsePlugin {
   }
 
   getSupportedOperations(): PluginOperation[] {
-    return ['copy', 'delete', 'rename', 'createDirectory']
+    return ['copy', 'delete', 'rename', 'createDirectory', 'move']
+  }
+
+  async enumerateFiles(
+    entryIds: string[],
+    destDir: string
+  ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>> {
+    const result: Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }> = []
+
+    const listAll = async (conn: S3Connection, prefix: string): Promise<any[]> => {
+      const all: any[] = []
+      let ContinuationToken: string | undefined
+      do {
+        const resp = await conn.client.send(
+          new ListObjectsV2Command({
+            Bucket: conn.bucket,
+            Prefix: prefix || undefined,
+            ContinuationToken
+          })
+        )
+        if (resp.Contents) all.push(...resp.Contents)
+        if (resp.CommonPrefixes) all.push(...(resp.CommonPrefixes as any[]).map((p: any) => ({ Key: p.Prefix, isPrefix: true })))
+        ContinuationToken = resp.NextContinuationToken
+      } while (ContinuationToken)
+      return all
+    }
+
+    for (const entryId of entryIds) {
+      const [connId, prefix] = this.parseLocation(entryId)
+      const conn = this.connections.get(connId)
+      if (!conn) continue
+      const name = prefix ? prefix.replace(/\/$/, '').split('/').pop() || '' : ''
+      const destBase = destDir ? `${destDir}/${name}`.replace(/\/+/, '/') : name
+
+      try {
+        const objects = await listAll(conn, prefix || '')
+        const seenDirs = new Set<string>()
+        for (const obj of objects) {
+          if (!obj.Key) continue
+          const key = obj.Key
+          const rel = prefix ? key.slice(prefix.length) : key
+          if (!rel || rel.endsWith('/')) continue
+          const size = obj.Size || 0
+          const parts = rel.split('/').filter(Boolean)
+          let curRel = ''
+          for (let i = 0; i < parts.length - 1; i++) {
+            curRel = curRel ? `${curRel}/${parts[i]}` : parts[i]
+            const dirRel = curRel
+            if (!seenDirs.has(dirRel)) {
+              seenDirs.add(dirRel)
+              result.push({ sourcePath: `${connId}::${prefix || ''}${dirRel}/`, destPath: `${destBase}/${dirRel}`, size: 0, isDirectory: true, relativePath: dirRel })
+            }
+          }
+          result.push({ sourcePath: `${connId}::${key}`, destPath: `${destBase}/${rel}`, size, isDirectory: false, relativePath: rel })
+        }
+      } catch {
+        // skip
+      }
+    }
+    return result
   }
 
   async executeOperation(op: OperationRequest): Promise<OperationResult> {
@@ -291,6 +350,24 @@ export class S3Plugin implements BrowsePlugin {
 
   getConnections(): string[] {
     return Array.from(this.connections.keys())
+  }
+
+  async statEntry(entryId: string): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null> {
+    try {
+      const size = await this.getSize(entryId)
+      return { size, modifiedAt: 0 }
+    } catch {
+      return null
+    }
+  }
+
+  async exists(entryId: string): Promise<boolean> {
+    try {
+      const s = await this.statEntry(entryId)
+      return !!s
+    } catch {
+      return false
+    }
   }
 
   private parseLocation(locationId: string): [string, string] {

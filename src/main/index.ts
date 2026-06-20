@@ -4,7 +4,7 @@ app.setName('something-commander')
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerAllIPC } from './ipc'
+import { registerAllIPC, registerWindowForUpdater } from './ipc'
 import { pluginManager } from './plugins/plugin-manager'
 import { LocalFilesystemPlugin } from './plugins/local-filesystem'
 import { ArchivePlugin } from './plugins/archive'
@@ -12,8 +12,9 @@ import { SftpPlugin } from './plugins/sftp'
 import { S3Plugin } from './plugins/s3'
 import { SmbPlugin } from './plugins/smb'
 import { loadAllPlugins } from './plugins/plugin-loader'
+import { initializeUpdater } from './updater'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -52,6 +53,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 app.whenReady().then(async () => {
@@ -77,6 +80,9 @@ app.whenReady().then(async () => {
 
   registerAllIPC()
 
+  // Initialize auto-updater (respects settings from renderer side)
+  initializeUpdater()
+
   // Load external plugins (non-blocking for window creation)
   loadAllPlugins().then((externalPlugins) => {
     for (const p of externalPlugins) {
@@ -84,10 +90,14 @@ app.whenReady().then(async () => {
     }
   })
 
-  createWindow()
+  const win = createWindow()
+  registerWindowForUpdater(win)
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      const w = createWindow()
+      registerWindowForUpdater(w)
+    }
   })
 })
 

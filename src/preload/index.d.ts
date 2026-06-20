@@ -46,10 +46,11 @@ interface UtilAPI {
   isArchive(filePath: string): Promise<boolean>
   getArchiveFormats(): Promise<Array<{ label: string; extensions: string[]; primaryExtension: string; supportsWrite: boolean }>>
   openFile(filePath: string): Promise<string>
-  openViewerWindow(filePath: string, fileName: string): Promise<void>
-  openEditorWindow(filePath: string, fileName: string): Promise<void>
+  openViewerWindow(pluginId: string, entryId: string, fileName: string): Promise<void>
+  openEditorWindow(pluginId: string, entryId: string, fileName: string): Promise<void>
   readFileChunk(filePath: string, offset: number, length: number): Promise<{ data: string; bytesRead: number; error?: string }>
   getFileSize(filePath: string): Promise<number>
+  readEntryContent(pluginId: string, entryId: string, offset?: number, length?: number): Promise<{ data: string | Buffer; totalSize: number; isBinary: boolean; error?: string }>
   saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
   getDiskSpace(dirPath: string): Promise<{ free: number; total: number }>
@@ -69,7 +70,9 @@ interface UtilAPI {
     sourceEntryId: string,
     destPluginId: string,
     destLocationId: string,
-    destFileName: string
+    destFileName: string,
+    onProgress?: (bytes: number) => void,
+    signal?: AbortSignal
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }>
   extractFromArchive(archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
@@ -79,6 +82,7 @@ interface UtilAPI {
     destDir: string
   ): Promise<Array<{ sourcePath: string; destPath: string; size: number; isDirectory: boolean; relativePath: string }>>
   startNativeDrag(filePaths: string[]): void
+  onDrivesChanged(callback: () => void): () => void
 }
 
 interface StoreAPI {
@@ -86,10 +90,24 @@ interface StoreAPI {
   set(key: string, value: unknown): Promise<void>
 }
 
+interface UpdateStatus {
+  type: string
+  data?: any
+}
+
+interface UpdateAPI {
+  checkForUpdates(): Promise<{ updateAvailable: boolean; version?: string; error?: string }>
+  downloadUpdate(): Promise<{ success: boolean; error?: string }>
+  quitAndInstall(): void
+  onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
+  setAutoDownload(enabled: boolean): void
+}
+
 interface SomethingCommanderAPI {
   plugins: PluginsAPI
   util: UtilAPI
   store: StoreAPI
+  update: UpdateAPI
 }
 
 declare global {

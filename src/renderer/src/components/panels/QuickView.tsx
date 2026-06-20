@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { formatSize } from '../../utils/format'
 import { formatHexLines } from '../../utils/hex'
 import { FileContentView } from '../FileContentView'
@@ -19,6 +19,7 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
   const [fileSize, setFileSize] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!entry || entry.isContainer) {
@@ -32,6 +33,11 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
     setLoading(true)
     setError(null)
 
+    // Prefer plugin aware if we can infer, but fallback to legacy for quickview simplicity
+    const useNew = false // full wiring later
+    if (useNew) {
+      // would call readEntryContent but need pluginId from context
+    }
     window.api.util.readFileContent(entry.id, PREVIEW_LIMIT).then((result) => {
       if (result.error) {
         setError(result.error)
@@ -45,6 +51,14 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
       }
       setLoading(false)
     })
+  }, [entry?.id])
+
+  // Auto-focus the content area so PageUp/Down etc work without extra click
+  useEffect(() => {
+    if (!contentRef.current) return
+    // small delay
+    const t = setTimeout(() => contentRef.current?.focus(), 10)
+    return () => clearTimeout(t)
   }, [entry?.id])
 
   if (!entry) {
@@ -77,7 +91,7 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
       ) : error ? (
         <div className={panelStyles.error}>{error}</div>
       ) : (
-        <FileContentView lines={lines} lineHeight={16} />
+        <FileContentView lines={lines} lineHeight={16} scrollRef={contentRef} />
       )}
     </div>
   )

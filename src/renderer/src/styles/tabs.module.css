@@ -1,6 +1,6 @@
 .tabBar {
   display: flex;
-  height: 26px;
+  height: var(--tabbar-height);
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-color);
   overflow-x: auto;
