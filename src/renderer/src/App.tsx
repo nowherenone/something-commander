@@ -137,6 +137,10 @@ function App(): React.JSX.Element {
     return null
   }, [])
 
+  const handleF2 = useCallback(() => {
+    dispatchCommand('rename')
+  }, [])
+
   const handleF3 = useCallback(() => {
     const entry = getCursorEntry()
     if (entry && !entry.isContainer) {
@@ -173,6 +177,21 @@ function App(): React.JSX.Element {
       setMultiRenameEntries(selected)
       setMultiRenamePluginId(tab.pluginId)
     }
+  }, [])
+
+  const handleRename = useCallback(() => {
+    const activePanel = useAppStore.getState().activePanel
+    const state = usePanelStore.getState()
+    const tab = state.getActiveTab(activePanel)
+    const offset = parentOffset(tab)
+    const idx = tab.cursorIndex - offset
+    if (idx < 0 || idx >= tab.entries.length) return
+    const entry = tab.entries[idx]
+    const isDrive = entry.iconHint === 'drive' || entry.iconHint === 'network'
+    if (entry.id === '__parent__' || isDrive) {
+      return
+    }
+    state.startInlineRename(activePanel, entry.id)
   }, [])
 
   const handleCompare = useCallback(() => {
@@ -282,6 +301,7 @@ function App(): React.JSX.Element {
       unpack: handleUnpack,
       mkdir: handleF7,
       delete: handleDelete,
+      rename: handleRename,
       multiRename: handleCtrlM,
       search: handleAltF7,
       compare: handleCompare,
@@ -316,7 +336,6 @@ function App(): React.JSX.Element {
         settings().updateSettings({ bottomBar: current === 'fnkeys' ? 'none' : 'fnkeys' });
       },
       setBottomStatus: () => settings().updateSettings({ bottomBar: 'status' }),
-      setBottomNone: () => settings().updateSettings({ bottomBar: 'none' }),
       selectGroup: () => setSelectGroupMode('select'),
       unselectGroup: () => setSelectGroupMode('unselect'),
       networkConnections: () => setNetworkDialogOpen(true),
@@ -326,7 +345,7 @@ function App(): React.JSX.Element {
       checkForUpdates: handleCheckForUpdates,
       about: handleAbout
     })
-  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout])
+  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleRename, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout])
 
   const handleMenuAction = useCallback((action: string) => {
     dispatchCommand(action)
@@ -339,6 +358,7 @@ function App(): React.JSX.Element {
       {showCommandLine && <CommandLine />}
       {bottomBar === 'fnkeys' && (
         <FunctionKeyBar
+          onF2={handleF2}
           onF3={handleF3}
           onF5={handleCopy}
           onF6={handleMove}

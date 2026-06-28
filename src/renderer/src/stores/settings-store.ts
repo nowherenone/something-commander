@@ -77,7 +77,7 @@ const DEFAULT_SETTINGS: Settings = {
   rowHeight: 24,
   showHiddenFiles: false,
   dateFormat: 'yyyy-MM-dd HH:mm',
-  fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
+  fontFamily: "'Cascadia Code', 'Consolas', 'Fira Code', 'Menlo', 'Monaco', monospace",
   sizeFormat: 'full',
   bottomBar: 'fnkeys',
   showCommandLine: false,

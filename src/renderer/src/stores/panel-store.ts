@@ -39,6 +39,7 @@ export interface TabState {
   isLoading: boolean
   error: string | null
   errorFolderIds: Set<string>
+  renamingEntryId: string | null
 }
 
 function createInitialTab(): TabState {
@@ -57,7 +58,8 @@ function createInitialTab(): TabState {
     showHidden: false,
     isLoading: false,
     error: null,
-    errorFolderIds: new Set()
+    errorFolderIds: new Set(),
+    renamingEntryId: null
   }
 }
 
@@ -114,6 +116,10 @@ interface PanelStoreState {
   selectGroup: (panelId: 'left' | 'right', pattern: string) => void
   unselectGroup: (panelId: 'left' | 'right', pattern: string) => void
   selectSameExt: (panelId: 'left' | 'right') => void
+
+  // Inline rename (F2)
+  startInlineRename: (panelId: 'left' | 'right', entryId: string) => void
+  clearInlineRename: (panelId: 'left' | 'right') => void
 
   // Helpers
   getActiveTab: (panelId: 'left' | 'right') => TabState
@@ -211,7 +217,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           selectedEntryIds: new Set(),
           calculatingFolderIds: new Set(),
           isLoading: false,
-          error: null
+          error: null,
+          renamingEntryId: null
         }))
       })
 
@@ -273,7 +280,8 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           selectedEntryIds: new Set(),
           calculatingFolderIds: new Set(),
           isLoading: false,
-          error: null
+          error: null,
+          renamingEntryId: null
         }))
       })
 
@@ -345,6 +353,18 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     const maxIdx = tab.entries.length - 1 + parentOffset(tab)
     const clamped = Math.max(0, Math.min(index, maxIdx))
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, cursorIndex: clamped })) })
+  },
+
+  startInlineRename: (panelId, entryId) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, renamingEntryId: entryId })) })
+  },
+
+  clearInlineRename: (panelId) => {
+    const panel = get()[panelId]
+    const tab = getActiveTab(panel)
+    set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, renamingEntryId: null })) })
   },
 
   toggleSelect: (panelId, entryId) => {

@@ -408,6 +408,35 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
     }
   }
 
+  async getDiskSpace(locationId: string): Promise<{ free: number; total: number } | null> {
+    try {
+      if (process.platform === 'win32') {
+        // PowerShell gives the most accurate numbers for mapped drives
+        const driveLetter = locationId.charAt(0).toUpperCase()
+        return new Promise((resolve) => {
+          exec(
+            `powershell -Command "(Get-PSDrive ${driveLetter}).Free,(Get-PSDrive ${driveLetter}).Used"`,
+            { timeout: 5000 },
+            (err, stdout) => {
+              if (err) return resolve({ free: 0, total: 0 })
+              const lines = stdout.trim().split(/\r?\n/).map((s) => parseInt(s.trim(), 10))
+              const free = lines[0] || 0
+              const used = lines[1] || 0
+              resolve({ free, total: free + used })
+            }
+          )
+        })
+      }
+      const stats = await fs.statfs(locationId)
+      return {
+        free: Number(stats.bavail) * Number(stats.bsize),
+        total: Number(stats.blocks) * Number(stats.bsize)
+      }
+    } catch {
+      return null
+    }
+  }
+
   async writeFromStream(
     destLocationId: string,
     fileName: string,

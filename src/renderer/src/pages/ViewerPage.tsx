@@ -17,7 +17,7 @@ interface ViewerPageProps {
 
 type ViewMode = 'text' | 'hex'
 
-export function ViewerPage({ filePath, fileName }: ViewerPageProps): React.JSX.Element {
+export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
   const [fileSize, setFileSize] = useState(0)
   const [lines, setLines] = useState<string[]>([])
   const [estimatedTotalLines, setEstimatedTotalLines] = useState(0)
@@ -274,33 +274,7 @@ export function ViewerPage({ filePath, fileName }: ViewerPageProps): React.JSX.E
       className={styles.root}
       tabIndex={0}
     >
-      <div className={styles.toolbar}>
-        <span className={styles.toolbarName}>{fileName}</span>
-        <span className={styles.toolbarInfo}>
-          {formatSize(fileSize, 'short')}
-          {estimatedTotalLines > 0 && ` | ${allLoadedRef.current ? '' : '~'}${estimatedTotalLines.toLocaleString()} lines`}
-          {isBinary ? ' | Binary' : ''}
-        </span>
-        <input
-          data-search-input
-          placeholder="Search (Ctrl+F)"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className={styles.searchInput}
-        />
-        <button
-          onClick={() => setViewMode('text')}
-          className={`${styles.modeBtn} ${viewMode === 'text' ? styles.modeBtnActive : ''}`}
-        >
-          Text
-        </button>
-        <button
-          onClick={() => setViewMode('hex')}
-          className={`${styles.modeBtn} ${viewMode === 'hex' ? styles.modeBtnActive : ''}`}
-        >
-          Hex
-        </button>
-      </div>
+      {/* No top menu/toolbar at all; filename is in the window title (left-aligned) */}
 
       {loading ? (
         <div className={panelStyles.loading}>Loading...</div>
@@ -318,9 +292,36 @@ export function ViewerPage({ filePath, fileName }: ViewerPageProps): React.JSX.E
         />
       )}
 
+      {/* Status bar with controls (search + modes) - no duplicate filename, no top bar */}
       <div className={styles.statusBar}>
         <span>{filePath}</span>
-        <span>Esc to close</span>
+        <span style={{ marginLeft: 12, color: 'var(--text-muted)' }}>
+          {formatSize(fileSize, 'short')}
+          {estimatedTotalLines > 0 && ` | ${allLoadedRef.current ? '' : '~'}${estimatedTotalLines.toLocaleString()} lines`}
+          {isBinary ? ' | Binary' : ''}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+          <input
+            data-search-input
+            placeholder="Search (Ctrl+F)"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className={styles.searchInput}
+          />
+          <button
+            onClick={() => setViewMode('text')}
+            className={`${styles.modeBtn} ${viewMode === 'text' ? styles.modeBtnActive : ''}`}
+          >
+            Text
+          </button>
+          <button
+            onClick={() => setViewMode('hex')}
+            className={`${styles.modeBtn} ${viewMode === 'hex' ? styles.modeBtnActive : ''}`}
+          >
+            Hex
+          </button>
+          <span style={{ marginLeft: 8 }}>Esc close</span>
+        </div>
       </div>
     </div>
   )

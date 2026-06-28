@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import type { Entry } from '@shared/types'
 import type { PanelId } from '../../stores/app-store'
 import { formatSize, formatDate } from '../../utils/format'
@@ -8,12 +8,13 @@ import { useDragStore } from '../../stores/drag-store'
 import { usePanelStore } from '../../stores/panel-store'
 import styles from '../../styles/file-list.module.css'
 
-function DriveSizeBar({ driveId }: { driveId: string }): React.JSX.Element | null {
+function DriveSizeBar({ driveId, pluginId }: { driveId: string; pluginId?: string }): React.JSX.Element | null {
   const [space, setSpace] = useState<{ free: number; total: number } | null>(null)
 
   useEffect(() => {
-    window.api.util.getDiskSpace(driveId).then(setSpace)
-  }, [driveId])
+    const pid = pluginId || 'local-filesystem'
+    window.api.util.getDiskSpace(pid, driveId).then(setSpace)
+  }, [driveId, pluginId])
 
   if (!space || space.total <= 0) return null
 
@@ -29,27 +30,35 @@ function DriveSizeBar({ driveId }: { driveId: string }): React.JSX.Element | nul
 interface EntryRowProps {
   entry: Entry
   panelId: PanelId
+  pluginId?: string
   isCursor: boolean
   isPanelActive?: boolean
   isSelected: boolean
   isCalculating?: boolean
   isError?: boolean
+  isRenaming?: boolean
   onClick: () => void
   onDoubleClick: () => void
   onContextMenu?: (e: React.MouseEvent) => void
+  onRenameCommit?: (newName: string) => void | Promise<void>
+  onRenameCancel?: () => void
 }
 
 export const EntryRow = React.memo(function EntryRow({
   entry,
   panelId,
+  pluginId,
   isCursor,
   isPanelActive = true,
   isSelected,
   isCalculating,
   isError,
+  isRenaming = false,
   onClick,
   onDoubleClick,
-  onContextMenu
+  onContextMenu,
+  onRenameCommit,
+  onRenameCancel
 }: EntryRowProps): React.JSX.Element {
   const sizeFormat = useSettingsStore((s) => s.sizeFormat)
   const dateFormat = useSettingsStore((s) => s.dateFormat)
@@ -131,7 +140,7 @@ export const EntryRow = React.memo(function EntryRow({
 
   const renderSize = (): React.ReactNode => {
     if (isDrive) {
-      return <DriveSizeBar driveId={entry.id} />
+      return <DriveSizeBar driveId={entry.id} pluginId={pluginId} />
     }
     if (entry.isContainer) {
       if (isCalculating) {
@@ -154,7 +163,16 @@ export const EntryRow = React.memo(function EntryRow({
     >
       <div className={styles.colName}>
         <span className={styles.icon}>{getIconForHint(entry.iconHint)}</span>
-        <span className={styles.fileName}>{entry.name}</span>
+        {isRenaming ? (
+          <RenameInput
+            initialName={entry.name}
+            isContainer={!!entry.isContainer}
+            onCommit={onRenameCommit}
+            onCancel={onRenameCancel}
+          />
+        ) : (
+          <span className={styles.fileName}>{entry.name}</span>
+        )}
       </div>
       <div className={styles.colExt}>
         {entry.isContainer ? (isDrive ? '' : '<DIR>') : ((entry.meta.extension as string) || '')}
@@ -164,3 +182,68 @@ export const EntryRow = React.memo(function EntryRow({
     </div>
   )
 })
+
+interface RenameInputProps {
+  initialName: string
+  isContainer: boolean
+  onCommit?: (newName: string) => void | Promise<void>
+  onCancel?: () => void
+}
+
+function RenameInput({ initialName, isContainer, onCommit, onCancel }: RenameInputProps): React.JSX.Element {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const cancelledRef = useRef(false)
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+    input.focus()
+    // Select basename (everything before last dot for files)
+    let end = initialName.length
+    if (!isContainer) {
+      const dot = initialName.lastIndexOf('.')
+      if (dot > 0) end = dot
+    }
+    input.setSelectionRange(0, end)
+  }, [initialName, isContainer])
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      cancelledRef.current = true
+      const val = inputRef.current?.value.trim() ?? ''
+      if (val) {
+        onCommit?.(val)
+      } else {
+        onCancel?.()
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      cancelledRef.current = true
+      onCancel?.()
+    }
+  }
+
+  const handleBlur = () => {
+    if (cancelledRef.current) return
+    const val = inputRef.current?.value.trim() ?? ''
+    if (val) {
+      onCommit?.(val)
+    } else {
+      onCancel?.()
+    }
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      className={styles.renameInput}
+      defaultValue={initialName}
+      onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      spellCheck={false}
+    />
+  )
+}

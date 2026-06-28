@@ -44,8 +44,9 @@
   --bar-fill-success: var(--success);
 
   /* Typography */
-  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+  --font-family: 'Cascadia Code', 'Consolas', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  --font-ui: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Cascadia Code', 'Consolas', 'Fira Code', 'Menlo', 'Monaco', monospace;
   --font-size: 13px;
   --font-size-small: 11px;
 }

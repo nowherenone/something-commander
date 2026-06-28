@@ -13,10 +13,10 @@ export function InfoView({ pluginId, locationId, locationDisplay }: InfoViewProp
 
   useEffect(() => {
     if (locationId) {
-      window.api.util.getDiskSpace(locationId).then(setDiskSpace)
+      window.api.util.getDiskSpace(pluginId, locationId).then(setDiskSpace)
     }
     window.api.plugins.list().then(setPlugins)
-  }, [locationId])
+  }, [pluginId, locationId])
 
   const usedPct = diskSpace && diskSpace.total > 0
     ? Math.round(((diskSpace.total - diskSpace.free) / diskSpace.total) * 100)

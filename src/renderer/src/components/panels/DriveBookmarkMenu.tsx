@@ -84,13 +84,14 @@ export function DriveBookmarkMenu({
       window.api.store.get('smb-connections').then((saved) => {
         const active = results.flat()
         if (Array.isArray(saved)) {
-          for (const conn of saved as Array<{ host: string; share: string; username: string; label: string }>) {
-            const connId = `${conn.username}@${conn.host}/${conn.share}`
+          for (const conn of saved as Array<{ host: string; share?: string; username: string; label: string }>) {
+            const connId = conn.share ? `${conn.username}@${conn.host}/${conn.share}` : `${conn.username}@${conn.host}`
+            const label = conn.label || (conn.share ? `\\\\${conn.host}\\${conn.share}` : `\\\\${conn.host}`)
             const alreadyActive = active.some((a) => a.pluginId === 'smb' && a.locationId === `${connId}/`)
             if (!alreadyActive) {
               active.push({
                 pluginId: 'smb',
-                label: `${conn.label || `\\\\${conn.host}\\${conn.share}`} (saved)`,
+                label: `${label} (saved)`,
                 locationId: `${connId}/`
               })
             }
@@ -119,19 +120,32 @@ export function DriveBookmarkMenu({
         // For saved (not yet connected) SMB connections, auto-connect first
         if (item.pluginId === 'smb' && item.label?.endsWith('(saved)')) {
           const saved = (await window.api.store.get('smb-connections')) as Array<{
-            host: string; share: string; username: string; password: string; domain: string; label: string
+            host: string; share?: string; username: string; password: string; domain: string; label: string; passwordEncrypted?: boolean
           }> | null
           if (saved) {
             const connIdPart = item.locationId.replace(/\/+$/, '')
-            const match = connIdPart.match(/^(.+)@(.+)\/(.+)$/)
-            if (match) {
-              const conn = saved.find((c) => c.username === match[1] && c.host === match[2] && c.share === match[3])
-              if (conn) {
+            // support both user@host/share and user@host
+            const matchWithShare = connIdPart.match(/^(.+)@(.+)\/(.+)$/)
+            const matchServer = connIdPart.match(/^(.+)@(.+)$/)
+            let conn: any = null
+            if (matchWithShare) {
+              conn = saved.find((c) => c.username === matchWithShare[1] && c.host === matchWithShare[2] && c.share === matchWithShare[3])
+            } else if (matchServer) {
+              conn = saved.find((c) => c.username === matchServer[1] && c.host === matchServer[2] && !c.share)
+            }
+            if (conn) {
+              let pass = conn.password || ''
+              if (conn.passwordEncrypted && pass) {
                 try {
-                  await window.api.util.smbConnect(conn.host, conn.share, conn.username, conn.password, conn.domain || undefined, conn.label || undefined)
+                  pass = await window.api.util.decryptString(pass)
                 } catch {
-                  // Connection failed — still navigate, plugin will show error
+                  // use as-is
                 }
+              }
+              try {
+                await window.api.util.smbConnect(conn.host, conn.share || undefined, conn.username, pass, conn.domain || undefined, conn.label || undefined)
+              } catch {
+                // Connection failed — still navigate, plugin will show error
               }
             }
           }

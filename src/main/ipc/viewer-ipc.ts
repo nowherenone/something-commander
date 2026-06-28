@@ -8,17 +8,18 @@ import { pluginManager } from '../plugins/plugin-manager'
 type UtilWindowKind = 'viewer' | 'editor'
 
 function openUtilWindow(kind: UtilWindowKind, filePath: string, fileName: string): void {
-  const titlePrefix = kind === 'viewer' ? 'View' : 'Edit'
   const win = new BrowserWindow({
     width: 900,
     height: 700,
-    title: `${titlePrefix}: ${fileName}`,
+    title: fileName,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
+  // Ensure no menu at all (top menu not needed for viewer/editor)
+  win.setMenu(null)
 
   const query = `file=${encodeURIComponent(filePath)}&name=${encodeURIComponent(fileName)}`
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

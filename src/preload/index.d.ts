@@ -53,13 +53,15 @@ interface UtilAPI {
   readEntryContent(pluginId: string, entryId: string, offset?: number, length?: number): Promise<{ data: string | Buffer; totalSize: number; isBinary: boolean; error?: string }>
   saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
-  getDiskSpace(dirPath: string): Promise<{ free: number; total: number }>
+  getDiskSpace(pluginId: string, locationId: string): Promise<{ free: number; total: number }>
+  encryptString(plainText: string): Promise<string>
+  decryptString(encrypted: string): Promise<string>
   sftpConnect(host: string, port: number, username: string, password?: string): Promise<string>
   sftpDisconnect(connId: string): Promise<void>
   sftpListConnections(): Promise<string[]>
   s3Connect(bucket: string, region: string, accessKeyId: string, secretAccessKey: string, label?: string): Promise<string>
   s3Disconnect(connId: string): Promise<void>
-  smbConnect(host: string, share: string, username: string, password: string, domain?: string, label?: string): Promise<string>
+  smbConnect(host: string, share: string | undefined, username: string, password: string, domain?: string, label?: string): Promise<string>
   smbDisconnect(connId: string): Promise<void>
   pluginScan(): Promise<Array<{ id: string; name: string; version: string; description: string; path: string; enabled: boolean; error?: string }>>
   pluginLoad(pluginDir: string): Promise<{ success: boolean; error?: string }>

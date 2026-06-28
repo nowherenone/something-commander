@@ -7,7 +7,7 @@ interface EditorPageProps {
   fileName: string
 }
 
-export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.Element {
+export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   const [content, setContent] = useState('')
   const [originalContent, setOriginalContent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -139,41 +139,7 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
 
   return (
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)' }}>
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '6px 12px',
-        background: 'var(--bg-secondary)',
-        borderBottom: '1px solid var(--border-color)',
-        flexShrink: 0
-      }}>
-        <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {fileName}{modified ? ' *' : ''}
-        </span>
-        <span style={{ flex: 1 }} />
-        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-          {formatSize(fileSize)} | {lineCount} lines
-        </span>
-        <button
-          onClick={handleSave}
-          disabled={!modified || saving}
-          style={{
-            padding: '3px 12px',
-            background: modified ? 'var(--accent)' : 'var(--bg-tertiary)',
-            color: modified ? 'white' : 'var(--text-muted)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 3,
-            fontSize: 11,
-            cursor: modified ? 'pointer' : 'default'
-          }}
-        >
-          {saving ? 'Saving...' : 'Save (Ctrl+S)'}
-        </button>
-      </div>
-
-      {/* Editor */}
+      {/* Editor (no top menu/toolbar) */}
       {loading ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           Loading...
@@ -206,11 +172,12 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
         />
       )}
 
-      {/* Status bar */}
+      {/* Status bar (controls + info, no duplicate filename) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 12,
         padding: '4px 12px',
         background: 'var(--bg-secondary)',
         borderTop: '1px solid var(--border-color)',
@@ -218,8 +185,27 @@ export function EditorPage({ filePath, fileName }: EditorPageProps): React.JSX.E
         color: 'var(--text-muted)',
         flexShrink: 0
       }}>
-        <span>{filePath}</span>
-        <span>Ctrl+S save | Esc close</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{filePath}</span>
+        <span style={{ color: 'var(--text-muted)' }}>
+          {formatSize(fileSize)} | {lineCount} lines
+        </span>
+        <button
+          onClick={handleSave}
+          disabled={!modified || saving}
+          style={{
+            padding: '2px 8px',
+            background: modified ? 'var(--accent)' : 'var(--bg-tertiary)',
+            color: modified ? 'white' : 'var(--text-muted)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 3,
+            fontSize: 11,
+            cursor: modified ? 'pointer' : 'default',
+            flexShrink: 0
+          }}
+        >
+          {saving ? 'Saving...' : 'Save (Ctrl+S)'}
+        </button>
+        <span>Esc close</span>
       </div>
     </div>
   )

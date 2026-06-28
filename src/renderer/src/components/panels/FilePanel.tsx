@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect } from 'react'
 import type { PanelId } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
-import { usePanelStore, hasParentEntry } from '../../stores/panel-store'
+import { usePanelStore, hasParentEntry, parentOffset } from '../../stores/panel-store'
 import type { SortConfig, SortField } from '../../utils/sort'
 import { TabBar } from './TabBar'
 import { DriveBookmarkMenu } from './DriveBookmarkMenu'
@@ -9,6 +9,7 @@ import { AddressBar } from './AddressBar'
 import { ColumnHeaders } from './ColumnHeaders'
 import { FileList } from './FileList'
 import { StatusBar } from './StatusBar'
+import { showToast } from '../layout/Toast'
 import { TreeView } from './TreeView'
 import { InfoView } from './InfoView'
 import { QuickView } from './QuickView'
@@ -49,6 +50,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const getActiveTab = usePanelStore((s) => s.getActiveTab)
 
   const tab = getActiveTab(panelId)
+  const renamingEntryId = tab.renamingEntryId
   const driveMenuOpenPanel = useAppStore((s) => s.driveMenuOpen)
   const openDriveMenu = useAppStore((s) => s.openDriveMenu)
   const closeDriveMenu = useAppStore((s) => s.closeDriveMenu)
@@ -260,18 +262,47 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
           ) : (
             <FileList
               panelId={panelId}
+              pluginId={tab.pluginId}
               entries={displayEntries}
               cursorIndex={tab.cursorIndex}
               selectedIds={tab.selectedEntryIds}
               calculatingIds={tab.calculatingFolderIds}
               errorFolderIds={tab.errorFolderIds}
               isActive={isActive}
+              renamingId={renamingEntryId}
               onCursorChange={(i) => setCursor(panelId, i)}
               onSelect={(id) => toggleSelect(panelId, id)}
               onActivate={handleEntryActivate}
+              onRenameCancel={() => usePanelStore.getState().clearInlineRename(panelId)}
+              onRenameCommit={async (entry, newName) => {
+                if (!newName || newName === entry.name) {
+                  usePanelStore.getState().clearInlineRename(panelId)
+                  return
+                }
+                const pluginId = tab.pluginId
+                try {
+                  await window.api.plugins.executeOperation(pluginId, {
+                    op: 'rename',
+                    entry,
+                    newName
+                  })
+                  usePanelStore.getState().clearInlineRename(panelId)
+                  await usePanelStore.getState().refresh(panelId)
+                  // Position cursor on the renamed entry
+                  const refreshedTab = usePanelStore.getState().getActiveTab(panelId)
+                  const off = parentOffset(refreshedTab)
+                  const newIdx = refreshedTab.entries.findIndex((e) => e.name === newName)
+                  if (newIdx >= 0) {
+                    usePanelStore.getState().setCursor(panelId, newIdx + off)
+                  }
+                } catch (err: any) {
+                  usePanelStore.getState().clearInlineRename(panelId)
+                  showToast('Rename failed: ' + (err?.message || err))
+                }
+              }}
             />
           )}
-          <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} />
+          <StatusBar entries={tab.entries} selectedIds={tab.selectedEntryIds} locationId={tab.locationId} pluginId={tab.pluginId} />
         </>
       )}
       {viewMode === 'tree' && (

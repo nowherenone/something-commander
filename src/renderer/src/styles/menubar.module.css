@@ -15,9 +15,10 @@
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .menuItem:hover {
@@ -34,7 +35,7 @@
   position: absolute;
   top: 100%;
   left: 0;
-  min-width: 200px;
+  min-width: 240px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 0 0 4px 4px;
@@ -52,10 +53,11 @@
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
   font-size: 12px;
   cursor: pointer;
   text-align: left;
+  white-space: nowrap;
 }
 
 .menuAction:hover {

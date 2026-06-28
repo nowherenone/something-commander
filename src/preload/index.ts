@@ -88,8 +88,14 @@ const utilAPI = {
   showContextMenu: (items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_CONTEXT_MENU, items),
 
-  getDiskSpace: (dirPath: string): Promise<{ free: number; total: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.GET_DISK_SPACE, dirPath),
+  getDiskSpace: (pluginId: string, locationId: string): Promise<{ free: number; total: number }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_DISK_SPACE, pluginId, locationId),
+
+  encryptString: (text: string): Promise<string> =>
+    ipcRenderer.invoke('util:encryptString', text),
+
+  decryptString: (data: string): Promise<string> =>
+    ipcRenderer.invoke('util:decryptString', data),
 
   sftpConnect: (host: string, port: number, username: string, password?: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.SFTP_CONNECT, host, port, username, password),
@@ -106,7 +112,7 @@ const utilAPI = {
   s3Disconnect: (connId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.S3_DISCONNECT, connId),
 
-  smbConnect: (host: string, share: string, username: string, password: string, domain?: string, label?: string): Promise<string> =>
+  smbConnect: (host: string, share: string | undefined, username: string, password: string, domain?: string, label?: string): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.SMB_CONNECT, host, share, username, password, domain, label),
 
   smbDisconnect: (connId: string): Promise<void> =>

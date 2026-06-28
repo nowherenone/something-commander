@@ -44,7 +44,7 @@ export function registerConnectionIPC(): void {
   // SMB
   ipcMain.handle(
     IPC_CHANNELS.SMB_CONNECT,
-    (_event, host: string, share: string, username: string, password: string, domain?: string, label?: string) =>
+    (_event, host: string, share: string | undefined, username: string, password: string, domain?: string, label?: string) =>
       requirePlugin<SmbPlugin>('smb')
         .connect(host, share, username, password, domain, label)
         .catch((err: unknown) => { throw smbError(err) })

@@ -91,4 +91,7 @@ export interface BrowsePlugin {
   /** Optional plugin level stat/exists for overwrite and preflight. */
   statEntry?(entryId: string): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null>
   exists?(entryId: string): Promise<boolean>
+
+  /** Optional: report disk space for a location (used for drive bars and status). Return null if unknown. */
+  getDiskSpace?(locationId: string): Promise<{ free: number; total: number } | null>
 }

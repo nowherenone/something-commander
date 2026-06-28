@@ -7,9 +7,10 @@ interface StatusBarProps {
   entries: Entry[]
   selectedIds: Set<string>
   locationId: string | null
+  pluginId?: string
 }
 
-export function StatusBar({ entries, selectedIds, locationId }: StatusBarProps): React.JSX.Element {
+export function StatusBar({ entries, selectedIds, locationId, pluginId }: StatusBarProps): React.JSX.Element {
   const [diskSpace, setDiskSpace] = useState<{ free: number; total: number } | null>(null)
 
   useEffect(() => {
@@ -17,8 +18,9 @@ export function StatusBar({ entries, selectedIds, locationId }: StatusBarProps):
       setDiskSpace(null)
       return
     }
-    window.api.util.getDiskSpace(locationId).then(setDiskSpace)
-  }, [locationId])
+    const pid = pluginId || 'local-filesystem'
+    window.api.util.getDiskSpace(pid, locationId).then(setDiskSpace)
+  }, [pluginId, locationId])
 
   const fileCount = entries.filter((e) => !e.isContainer).length
   const dirCount = entries.filter((e) => e.isContainer).length

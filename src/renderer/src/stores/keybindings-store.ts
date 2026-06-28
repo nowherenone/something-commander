@@ -28,6 +28,7 @@ const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: 'F6', action: 'move' },
   { key: 'F7', action: 'mkdir' },
   { key: 'F7', alt: true, action: 'search' },
+  { key: 'F2', action: 'rename' },
   { key: 'F8', action: 'delete' },
   { key: 'Delete', action: 'delete' },
   { key: 'F9', action: 'settings' },

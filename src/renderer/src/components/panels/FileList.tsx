@@ -11,28 +11,36 @@ import styles from '../../styles/file-list.module.css'
 
 interface FileListProps {
   panelId: PanelId
+  pluginId: string
   entries: Entry[]
   cursorIndex: number
   selectedIds: Set<string>
   calculatingIds: Set<string>
   errorFolderIds: Set<string>
   isActive: boolean
+  renamingId?: string | null
   onCursorChange: (index: number) => void
   onSelect: (entryId: string) => void
   onActivate: (entry: Entry) => void
+  onRenameCommit?: (entry: Entry, newName: string) => void | Promise<void>
+  onRenameCancel?: () => void
 }
 
 export function FileList({
   panelId,
+  pluginId,
   entries,
   cursorIndex,
   selectedIds,
   calculatingIds,
   errorFolderIds,
   isActive,
+  renamingId,
   onCursorChange,
   onSelect: _onSelect,
-  onActivate
+  onActivate,
+  onRenameCommit,
+  onRenameCancel
 }: FileListProps): React.JSX.Element {
   const listRef = useRef<HTMLDivElement>(null)
   const isDropTarget = useDragStore((s) => s.isDragging && s.dropTargetPanelId === panelId)
@@ -155,7 +163,7 @@ export function FileList({
           dispatchCommand('delete')
           break
         case 'rename':
-          dispatchCommand('multiRename')
+          dispatchCommand('rename')
           break
       }
     },
@@ -179,17 +187,21 @@ export function FileList({
           key={entry.id}
           entry={entry}
           panelId={panelId}
+          pluginId={pluginId}
           isCursor={index === cursorIndex}
           isPanelActive={isActive}
           isSelected={selectedIds.has(entry.id)}
           isCalculating={calculatingIds.has(entry.id)}
           isError={errorFolderIds.has(entry.id)}
+          isRenaming={renamingId === entry.id}
           onClick={() => handleClick(index)}
           onDoubleClick={() => handleDoubleClick(entry)}
           onContextMenu={(e) => {
             e.preventDefault()
             handleContextMenu(entry, index)
           }}
+          onRenameCommit={onRenameCommit ? (name) => onRenameCommit(entry, name) : undefined}
+          onRenameCancel={onRenameCancel}
         />
       ))}
     </div>

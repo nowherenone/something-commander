@@ -19,6 +19,7 @@ interface SavedSmb {
   password: string
   domain: string
   label: string
+  passwordEncrypted?: boolean
 }
 
 interface NetworkConnectionsProps {
@@ -102,9 +103,19 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
           locationId = `${connId}::`
           break
         case 'smb': {
-          // Save before connecting
+          // Save before connecting - store password encrypted when possible
           if (saveConnection) {
-            const entry: SavedSmb = { host, share, username, password, domain, label }
+            let storedPassword = password
+            let encrypted = false
+            if (password) {
+              try {
+                storedPassword = await window.api.util.encryptString(password)
+                encrypted = true
+              } catch {
+                storedPassword = password
+              }
+            }
+            const entry: SavedSmb = { host, share, username, password: storedPassword, domain, label, passwordEncrypted: encrypted }
             const existing = savedSmb.findIndex((c) => c.host === host && c.share === share && c.username === username)
             const updated = existing >= 0
               ? savedSmb.map((c, i) => i === existing ? entry : c)
@@ -112,8 +123,8 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
             setSavedSmb(updated)
             await window.api.store.set('smb-connections', updated)
           }
-          connId = await window.api.util.smbConnect(host, share, username, password, domain || undefined, label || undefined)
-          locationId = `${connId}/`
+          connId = await window.api.util.smbConnect(host, share || undefined, username, password, domain || undefined, label || undefined)
+          locationId = share ? `${connId}/${share}/` : `${connId}/`
           break
         }
         default:
@@ -152,18 +163,32 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
     await window.api.store.set('smb-connections', updated)
   }, [savedSmb])
 
-  const handleLoadSaved = useCallback((conn: SavedSmb) => {
-    setHost(conn.host); setShare(conn.share); setUsername(conn.username)
-    setPassword(conn.password); setDomain(conn.domain); setLabel(conn.label)
-    setAddingType('smb')
-  }, [])
+  const handleDirectConnectSaved = useCallback(async (conn: SavedSmb) => {
+    setConnecting(true)
+    setError(null)
+    try {
+      let pass = conn.password || ''
+      if (conn.passwordEncrypted && pass) {
+        try {
+          pass = await window.api.util.decryptString(pass)
+        } catch {}
+      }
+      const serverConnId = await window.api.util.smbConnect(conn.host, conn.share || undefined, conn.username, pass, conn.domain || undefined, conn.label || undefined)
+      const locationId = conn.share ? `${serverConnId}/${conn.share}/` : `${serverConnId}/`
+      await loadConnections()
+      onConnected('smb', locationId)
+    } catch (err) {
+      setError(String(err))
+    }
+    setConnecting(false)
+  }, [loadConnections, onConnected])
 
   const pluginLabel = (id: string): string =>
     id === 'sftp' ? 'SFTP' : id === 's3' ? 'S3' : id === 'smb' ? 'SMB' : id.toUpperCase()
 
   const canConnect = addingType === 'sftp' ? !!(host && username)
     : addingType === 's3' ? !!(bucket && accessKeyId && secretAccessKey)
-    : addingType === 'smb' ? !!(host && share && username)
+    : addingType === 'smb' ? !!(host && username)
     : false
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -208,23 +233,23 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
       )}
 
       {/* Saved SMB connections (not currently active) */}
-      {savedSmb.filter((s) => !activeConns.some((a) => a.pluginId === 'smb' && a.connId === `${s.username}@${s.host}/${s.share}`)).length > 0 && (
+      {savedSmb.filter((s) => !activeConns.some((a) => a.pluginId === 'smb' && a.connId === (s.share ? `${s.username}@${s.host}/${s.share}` : `${s.username}@${s.host}` ))).length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Saved Connections</div>
           {savedSmb.map((conn, i) => {
-            const connId = `${conn.username}@${conn.host}/${conn.share}`
+            const connId = conn.share ? `${conn.username}@${conn.host}/${conn.share}` : `${conn.username}@${conn.host}`
             const isActive = activeConns.some((a) => a.pluginId === 'smb' && a.connId === connId)
             if (isActive) return null
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 36 }}>SMB</span>
                 <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>
-                  {conn.label || `\\\\${conn.host}\\${conn.share}`}
+                  {conn.label || (conn.share ? `\\\\${conn.host}\\${conn.share}` : `\\\\${conn.host}`)}
                 </span>
                 <button
                   className={`${styles.btn} ${styles.btnSecondary}`}
                   style={{ padding: '2px 8px', fontSize: 11 }}
-                  onClick={() => handleLoadSaved(conn)}
+                  onClick={() => handleDirectConnectSaved(conn)}
                 >Connect</button>
                 <button
                   className={`${styles.btn} ${styles.btnSecondary}`}
@@ -271,7 +296,7 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
             {addingType === 'smb' && (
               <>
                 <FormRow label="Host:" value={host} onChange={setHost} onKeyDown={onKeyDown} autoFocus placeholder="192.168.1.100" />
-                <FormRow label="Share:" value={share} onChange={setShare} onKeyDown={onKeyDown} placeholder="shared-folder" />
+                <FormRow label="Share:" value={share} onChange={setShare} onKeyDown={onKeyDown} placeholder="optional (e.g. public) — leave blank to connect to server" />
                 <FormRow label="Username:" value={username} onChange={setUsername} onKeyDown={onKeyDown} placeholder="user" />
                 <FormRow label="Password:" value={password} onChange={setPassword} onKeyDown={onKeyDown} placeholder="password" type="password" />
                 <FormRow label="Domain:" value={domain} onChange={setDomain} onKeyDown={onKeyDown} placeholder="optional" />

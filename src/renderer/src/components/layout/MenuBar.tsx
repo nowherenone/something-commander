@@ -67,7 +67,6 @@ const MENUS: MenuDef[] = [
       { label: '', action: '', separator: true },
       { label: 'Command Line', action: 'toggleCommandLine' },
       { label: 'Function Key Bar', action: 'setBottomFnkeys' },
-      { label: 'Hide Bottom Bar', action: 'setBottomNone' },
       { label: '', action: '', separator: true },
       { label: 'New Tab', shortcut: 'Ctrl+T', action: 'newTab' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: 'closeTab' },
@@ -113,7 +112,6 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
       case 'toggleHidden': return showHidden
       case 'toggleCommandLine': return showCommandLine
       case 'setBottomFnkeys': return bottomBar === 'fnkeys'
-      case 'setBottomNone': return bottomBar === 'none'
       default: return false
     }
   }, [viewMode, showHidden, showCommandLine, bottomBar])

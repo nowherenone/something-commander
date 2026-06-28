@@ -1,9 +1,10 @@
-import { ipcMain, BrowserWindow, Menu, nativeImage, shell } from 'electron'
+import { ipcMain, BrowserWindow, Menu, nativeImage, shell, safeStorage } from 'electron'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as os from 'os'
 import { exec } from 'child_process'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
+import { pluginManager } from '../plugins/plugin-manager'
 
 let dragIconCache: Electron.NativeImage | null = null
 
@@ -42,11 +43,37 @@ export function registerSystemIPC(): void {
     }
   )
 
-  ipcMain.handle(IPC_CHANNELS.GET_DISK_SPACE, async (_event, dirPath: string) => {
+  ipcMain.handle(IPC_CHANNELS.GET_DISK_SPACE, async (_event, pluginIdOrPath: string, maybeLocationId?: string) => {
+    // Support new signature getDiskSpace(pluginId, locationId) and old getDiskSpace(path)
+    let pluginId: string | undefined
+    let locationId: string
+    if (maybeLocationId !== undefined) {
+      pluginId = pluginIdOrPath
+      locationId = maybeLocationId
+    } else {
+      locationId = pluginIdOrPath
+    }
+
+    // Let the owning plugin provide disk space if it implements it
+    if (pluginId) {
+      try {
+        const plugin = pluginManager.get(pluginId)
+        if (plugin && typeof plugin.getDiskSpace === 'function') {
+          const result = await plugin.getDiskSpace(locationId)
+          if (result && typeof result.total === 'number' && result.total > 0) {
+            return result
+          }
+        }
+      } catch {
+        // fall through to legacy local logic
+      }
+    }
+
+    // Legacy local filesystem behavior (used for local drives/paths)
     try {
       if (process.platform === 'win32') {
         // PowerShell gives the most accurate numbers for mapped drives
-        const driveLetter = dirPath.charAt(0).toUpperCase()
+        const driveLetter = locationId.charAt(0).toUpperCase()
         return new Promise<{ free: number; total: number }>((resolve) => {
           exec(
             `powershell -Command "(Get-PSDrive ${driveLetter}).Free,(Get-PSDrive ${driveLetter}).Used"`,
@@ -61,13 +88,39 @@ export function registerSystemIPC(): void {
           )
         })
       }
-      const stats = await fs.statfs(dirPath)
+      const stats = await fs.statfs(locationId)
       return {
         free: Number(stats.bavail) * Number(stats.bsize),
         total: Number(stats.blocks) * Number(stats.bsize)
       }
     } catch {
       return { free: 0, total: 0 }
+    }
+  })
+
+  // Secure string storage for passwords/credentials using OS keychain/credential vault
+  ipcMain.handle('util:encryptString', async (_event, text: string) => {
+    try {
+      if (!safeStorage.isEncryptionAvailable()) {
+        return text || ''
+      }
+      const buf = safeStorage.encryptString(text || '')
+      return buf.toString('base64')
+    } catch {
+      return text || ''
+    }
+  })
+
+  ipcMain.handle('util:decryptString', async (_event, data: string) => {
+    try {
+      if (!safeStorage.isEncryptionAvailable() || !data) {
+        return data || ''
+      }
+      const buf = Buffer.from(data, 'base64')
+      return safeStorage.decryptString(buf)
+    } catch {
+      // Decryption failed (e.g. data was plain text or from different machine) -> return as-is
+      return data || ''
     }
   })
 
