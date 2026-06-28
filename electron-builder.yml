@@ -49,6 +49,7 @@ mac:
 dmg:
   artifactName: Something-Commander-${version}.${ext}
   title: SomethingCommander
+  format: UDBZ
 
 # Linux
 linux:
