@@ -17,7 +17,7 @@ jobs:
         include:
           - os: windows-latest
             platform: win
-          - os: macos-latest
+          - os: ubuntu-latest
             platform: mac
           - os: ubuntu-latest
             platform: linux
@@ -52,6 +52,7 @@ jobs:
             dist/*.dmg
             dist/*.deb
             dist/*.AppImage
+            dist/*.zip
             dist/latest*.yml
             dist/*.blockmap
           if-no-files-found: ignore
@@ -79,6 +80,7 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.deb
             artifacts/**/*.AppImage
+            artifacts/**/*.zip
             artifacts/**/latest*.yml
             artifacts/**/*.blockmap
           generate_release_notes: true
