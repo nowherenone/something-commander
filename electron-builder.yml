@@ -43,13 +43,12 @@ mac:
   icon: build/icon.icns
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
+  artifactName: Something-Commander-${version}-mac.${ext}
   target:
     - target: zip
       arch:
         - x64
         - arm64
-zip:
-  artifactName: Something-Commander-${version}-mac.${ext}
 
 # Linux
 linux:
