@@ -132,4 +132,27 @@ describe('7z archive support', () => {
     const resolved = await plugin.resolveLocation(archivePath)
     expect(resolved).toBe(`${archivePath}::`)
   })
+
+  it('rejects invalid 7z files with a clear error', async () => {
+    const fakePath = path.join(tmpDir, 'not-a-7z.7z')
+    await fs.writeFile(fakePath, Buffer.alloc(1024))
+
+    await expect(plugin.readDirectory(`${fakePath}::`)).rejects.toThrow(
+      'Cannot open not-a-7z.7z: file is not a valid 7z archive'
+    )
+  })
+
+  it('rejects GoodN64-style placeholder 7z files when present', async () => {
+    const goodN64Path =
+      '/home/nowhere/Downloads/[N64] - GoodN64 3.27/N64Merge/Mario Kart 64.7z'
+    try {
+      await fs.access(goodN64Path)
+    } catch {
+      return
+    }
+
+    await expect(plugin.readDirectory(`${goodN64Path}::`)).rejects.toThrow(
+      'Cannot open Mario Kart 64.7z: file is not a valid 7z archive'
+    )
+  })
 })

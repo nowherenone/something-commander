@@ -203,7 +203,7 @@ function App(): React.JSX.Element {
     if (entry.isContainer) {
       usePanelStore.getState().navigate(activePanel, entry.id)
     } else {
-      const isArchive = await window.api.util.isArchive(entry.name || entry.id)
+      const isArchive = await window.api.util.isArchive(entry.id || entry.name || '')
       if (isArchive) {
         const archiveRef = tab.pluginId === 'local-filesystem'
           ? entry.id

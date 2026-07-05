@@ -84,7 +84,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
         navigate(panelId, entry.id)
       } else {
         // Check if it's an archive — works for any plugin
-        const isArchive = await window.api.util.isArchive(entry.name || entry.id)
+        const isArchive = await window.api.util.isArchive(entry.id || entry.name || '')
         if (isArchive) {
           // Encode the source plugin in the archive path for non-local plugins
           const archiveRef = tab.pluginId === 'local-filesystem'

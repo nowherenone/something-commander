@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { usePanelStore } from '../renderer/src/stores/panel-store'
+import { showToast } from '../renderer/src/components/layout/Toast'
 import type { Entry } from '../shared/types/entry'
+
+vi.mock('../renderer/src/components/layout/Toast', () => ({
+  showToast: vi.fn()
+}))
 
 function makeEntry(overrides: Partial<Entry> = {}): Entry {
   return {
@@ -45,6 +50,7 @@ function freshPanel() {
 
 describe('panel-store', () => {
   beforeEach(() => {
+    vi.mocked(showToast).mockClear()
     usePanelStore.setState({
       left: freshPanel(),
       right: freshPanel()
@@ -149,6 +155,64 @@ describe('panel-store', () => {
       expect(tab.error).toBeNull()
       // The folder should be marked as error
       expect(tab.errorFolderIds.has('/forbidden')).toBe(true)
+    })
+  })
+
+  describe('navigateWithPlugin', () => {
+    it('switches plugin only after readDirectory succeeds', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/archive.zip::readme.txt', name: 'readme.txt' })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '[archive.zip]',
+        parentId: null,
+        extraColumns: []
+      })
+
+      await usePanelStore.getState().navigateWithPlugin('left', 'archive', '/archive.zip::')
+
+      const tab = usePanelStore.getState().getActiveTab('left')
+      expect(tab.pluginId).toBe('archive')
+      expect(tab.locationId).toBe('/archive.zip::')
+      expect(tab.entries).toHaveLength(1)
+      expect(tab.isLoading).toBe(false)
+    })
+
+    it('shows a toast and keeps the current view when opening fails', async () => {
+      usePanelStore.setState({
+        left: {
+          ...freshPanel(),
+          tabs: [{
+            ...freshPanel().tabs[0],
+            pluginId: 'local-filesystem',
+            locationId: '/downloads',
+            locationDisplay: '/downloads',
+            entries: [makeEntry({ id: '/downloads/game.7z', name: 'game.7z' })]
+          }]
+        }
+      })
+
+      vi.mocked(window.api.plugins.readDirectory).mockRejectedValueOnce(
+        new Error('Cannot open game.7z: file is not a valid 7z archive')
+      )
+
+      await usePanelStore.getState().navigateWithPlugin(
+        'left',
+        'archive',
+        '/downloads/game.7z::'
+      )
+
+      const tab = usePanelStore.getState().getActiveTab('left')
+      expect(tab.pluginId).toBe('local-filesystem')
+      expect(tab.locationId).toBe('/downloads')
+      expect(tab.entries[0].name).toBe('game.7z')
+      expect(tab.isLoading).toBe(false)
+      expect(tab.error).toBeNull()
+      expect(showToast).toHaveBeenCalledWith(
+        'Cannot open game.7z: file is not a valid 7z archive'
+      )
     })
   })
 

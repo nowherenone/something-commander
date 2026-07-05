@@ -235,7 +235,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           errorFolderIds: errorSet
         }))
       })
-      showToast(String(err))
+      showToast(err instanceof Error ? err.message : String(err))
     }
   },
 
@@ -244,10 +244,10 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     const tab = getActiveTab(panel)
     const previousLocationId = tab.locationId
 
+    // Only show loading — keep plugin/location/entries until readDirectory succeeds.
     set({
       [panelId]: updateTab(panel, tab.id, (t) => ({
         ...t,
-        pluginId,
         isLoading: true,
         error: null
       }))
@@ -291,9 +291,10 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
           isLoading: false,
-          error: String(err)
+          error: null
         }))
       })
+      showToast(err instanceof Error ? err.message : String(err))
     }
   },
 

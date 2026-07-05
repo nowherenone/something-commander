@@ -13,6 +13,37 @@ interface ResolvedArchive {
   cleanup: () => Promise<void>
 }
 
+const SEVENZ_MAGIC = Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+
+function formatSevenZError(err: unknown, archivePath: string): Error {
+  const message = String(err)
+  if (message.startsWith('Cannot open ')) {
+    return err instanceof Error ? err : new Error(message)
+  }
+  const name = path.basename(archivePath)
+  const stderr =
+    err && typeof err === 'object' && 'stderr' in err
+      ? String((err as { stderr?: string }).stderr ?? '')
+      : ''
+  if (stderr.includes('Is not archive') || stderr.includes('Cannot open the file as [7z]')) {
+    return new Error(`Cannot open ${name}: file is not a valid 7z archive`)
+  }
+  return new Error(`Cannot open ${name}: ${message}`)
+}
+
+async function assertSevenZSignature(filePath: string): Promise<void> {
+  const fd = await fs.open(filePath, 'r')
+  try {
+    const header = Buffer.alloc(SEVENZ_MAGIC.length)
+    const { bytesRead } = await fd.read(header, 0, header.length, 0)
+    if (bytesRead < SEVENZ_MAGIC.length || !header.equals(SEVENZ_MAGIC)) {
+      throw new Error(`Cannot open ${path.basename(filePath)}: file is not a valid 7z archive`)
+    }
+  } finally {
+    await fd.close()
+  }
+}
+
 /** Ensure the archive is available as a local file path for 7za. */
 async function resolveLocalArchive(source: SourceAccess): Promise<ResolvedArchive> {
   if (source.localPath) {
@@ -59,8 +90,11 @@ function listItemToArchiveEntry(item: ListItem): ArchiveEntry {
 async function sevenZReadEntries(source: SourceAccess): Promise<ArchiveEntry[]> {
   const resolved = await resolveLocalArchive(source)
   try {
+    await assertSevenZSignature(resolved.path)
     const items = await _7z.list(resolved.path)
     return items.map(listItemToArchiveEntry)
+  } catch (err) {
+    throw formatSevenZError(err, resolved.path)
   } finally {
     await resolved.cleanup()
   }
