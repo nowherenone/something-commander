@@ -7,6 +7,11 @@ import _7z from '7zip-min'
 import type { ListItem } from '7zip-min'
 import type { ArchiveDriver, ArchiveEntry } from '../driver'
 import type { SourceAccess } from '../plugin-reader'
+import { ensure7zaExecutable, resolve7zaBinaryPath } from '../sevenz-binary'
+
+const sevenZBinaryPath = resolve7zaBinaryPath()
+ensure7zaExecutable(sevenZBinaryPath)
+_7z.config({ binaryPath: sevenZBinaryPath })
 
 interface ResolvedArchive {
   path: string
@@ -16,11 +21,14 @@ interface ResolvedArchive {
 const SEVENZ_MAGIC = Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
 
 function formatSevenZError(err: unknown, archivePath: string): Error {
-  const message = String(err)
+  const message = err instanceof Error ? err.message : String(err)
   if (message.startsWith('Cannot open ')) {
     return err instanceof Error ? err : new Error(message)
   }
   const name = path.basename(archivePath)
+  if (message.includes('ENOTDIR') || message.includes('ENOENT')) {
+    return new Error(`Cannot open ${name}: 7-Zip binary is unavailable`)
+  }
   const stderr =
     err && typeof err === 'object' && 'stderr' in err
       ? String((err as { stderr?: string }).stderr ?? '')
