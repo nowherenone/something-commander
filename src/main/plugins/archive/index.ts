@@ -12,6 +12,7 @@ import type { ArchiveDriver, ArchiveEntry } from './driver'
 import type { SourceAccess } from './plugin-reader'
 import { ZipDriver } from './drivers/zip'
 import { TarDriver, TarReadOnlyDriver } from './drivers/tar'
+import { SevenZDriver } from './drivers/sevenz'
 import {
   parseLocation,
   getArchiveExtension,
@@ -39,6 +40,7 @@ function getDriver(archivePath: string): ArchiveDriver | null {
 registerDriver(new ZipDriver())
 registerDriver(new TarDriver())
 registerDriver(new TarReadOnlyDriver())
+registerDriver(new SevenZDriver())
 
 // ─── Public format query ───────────────────────────────────────────────────────
 
@@ -91,6 +93,7 @@ export async function extractFromZip(
 function localSourceAccess(filePath: string): SourceAccess {
   let cachedSize: number | null = null
   return {
+    localPath: filePath,
     async readAt(offset: number, length: number): Promise<Buffer> {
       const fd = await fs.open(filePath, 'r')
       try {

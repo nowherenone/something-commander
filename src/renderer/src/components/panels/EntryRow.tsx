@@ -73,7 +73,8 @@ export const EntryRow = React.memo(function EntryRow({
     isSelected ? styles.selected : '',
     entry.isContainer ? styles.container : '',
     isError ? styles.errorEntry : '',
-    isDragging ? styles.dragging : ''
+    isDragging ? styles.dragging : '',
+    isRenaming ? styles.renaming : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -157,8 +158,8 @@ export const EntryRow = React.memo(function EntryRow({
       draggable={canDrag}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onClick={isRenaming ? undefined : onClick}
+      onDoubleClick={isRenaming ? undefined : onDoubleClick}
       onContextMenu={onContextMenu}
     >
       <div className={styles.colName}>
@@ -208,6 +209,7 @@ function RenameInput({ initialName, isContainer, onCommit, onCancel }: RenameInp
   }, [initialName, isContainer])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation()
     if (e.key === 'Enter') {
       e.preventDefault()
       cancelledRef.current = true
@@ -237,7 +239,7 @@ function RenameInput({ initialName, isContainer, onCommit, onCancel }: RenameInp
   return (
     <input
       ref={inputRef}
-      className={styles.renameInput}
+      className={`inline-rename-input ${styles.renameInput}`}
       defaultValue={initialName}
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}

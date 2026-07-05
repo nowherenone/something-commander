@@ -26,12 +26,26 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
       const store = usePanelStore.getState()
       const tab = store.getActiveTab(activePanel)
 
-      // Don't handle keyboard when an input is focused.
+      // Inline rename: let the input handle keys; Escape cancels rename.
+      if (tab.renamingEntryId) {
+        if (
+          document.activeElement instanceof HTMLInputElement &&
+          document.activeElement.classList.contains('inline-rename-input')
+        ) {
+          return
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          store.clearInlineRename(activePanel)
+          return
+        }
+      }
+
+      // Don't handle keyboard when another input is focused.
       if (
         document.activeElement instanceof HTMLInputElement ||
         document.activeElement instanceof HTMLTextAreaElement
       ) {
-        // But allow Escape to blur.
         if (e.key === 'Escape') {
           ;(document.activeElement as HTMLElement).blur()
           e.preventDefault()
@@ -111,6 +125,10 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
 
         case 'Enter': {
           e.preventDefault()
+          if (e.ctrlKey) {
+            dispatchCommand('rename')
+            return
+          }
           const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
           if (tab.cursorIndex === 0 && hasParentEntry(tab)) {

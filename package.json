@@ -1,6 +1,6 @@
 {
   "name": "something-commander",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "A modern orthodox two-panel file manager",
   "main": "./out/main/index.js",
   "author": "Something Commander Contributors",
@@ -29,6 +29,7 @@
     "@aws-sdk/lib-storage": "^3.1009.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^4.0.0",
+    "7zip-min": "^3.0.1",
     "date-fns": "^4.0.0",
     "electron-updater": "^6.8.9",
     "filesize": "^10.0.0",

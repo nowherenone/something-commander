@@ -22,6 +22,7 @@ interface FileListProps {
   onCursorChange: (index: number) => void
   onSelect: (entryId: string) => void
   onActivate: (entry: Entry) => void
+  onStartRename?: (entry: Entry) => void
   onRenameCommit?: (entry: Entry, newName: string) => void | Promise<void>
   onRenameCancel?: () => void
 }
@@ -39,6 +40,7 @@ export function FileList({
   onCursorChange,
   onSelect: _onSelect,
   onActivate,
+  onStartRename,
   onRenameCommit,
   onRenameCancel
 }: FileListProps): React.JSX.Element {
@@ -131,7 +133,7 @@ export function FileList({
         { label: '', id: '', separator: true },
         { label: 'Copy (F5)', id: 'copy' },
         { label: 'Move (F6)', id: 'move' },
-        { label: 'Rename', id: 'rename' },
+        { label: 'Rename (F2)', id: 'rename' },
         { label: '', id: '', separator: true },
         { label: 'Delete (F8)', id: 'delete' }
       ]
@@ -163,11 +165,11 @@ export function FileList({
           dispatchCommand('delete')
           break
         case 'rename':
-          dispatchCommand('rename')
+          onStartRename?.(entry)
           break
       }
     },
-    [onCursorChange, onActivate]
+    [onCursorChange, onActivate, onStartRename, panelId]
   )
 
   const listClassName = `${styles.fileList}${isDropTarget ? ` ${styles.dropTarget}` : ''}`

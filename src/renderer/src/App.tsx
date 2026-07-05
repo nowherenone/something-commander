@@ -19,6 +19,8 @@ import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
 import { usePanelStore, parentOffset } from './stores/panel-store'
+import { useBookmarksStore } from './stores/bookmarks-store'
+import { bookmarkDisplayEntries, getCursorDisplayEntry, isRenamableEntry } from './utils/display-entries'
 import { useOperationsStore } from './stores/operations-store'
 import { useSettingsStore, loadSettings } from './stores/settings-store'
 import { loadBookmarks } from './stores/bookmarks-store'
@@ -183,14 +185,10 @@ function App(): React.JSX.Element {
     const activePanel = useAppStore.getState().activePanel
     const state = usePanelStore.getState()
     const tab = state.getActiveTab(activePanel)
-    const offset = parentOffset(tab)
-    const idx = tab.cursorIndex - offset
-    if (idx < 0 || idx >= tab.entries.length) return
-    const entry = tab.entries[idx]
-    const isDrive = entry.iconHint === 'drive' || entry.iconHint === 'network'
-    if (entry.id === '__parent__' || isDrive) {
-      return
-    }
+    const bookmarks = useBookmarksStore.getState().bookmarks
+    const extras = tab.locationId === null ? bookmarkDisplayEntries(bookmarks) : []
+    const entry = getCursorDisplayEntry(tab, extras)
+    if (!entry || !isRenamableEntry(entry)) return
     state.startInlineRename(activePanel, entry.id)
   }, [])
 

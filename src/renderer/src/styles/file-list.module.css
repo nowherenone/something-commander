@@ -187,20 +187,26 @@
   background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
-/* Inline rename input (F2) */
+/* Inline rename (F2 / Ctrl+Enter) */
+.entryRow.renaming {
+  z-index: 1;
+}
+
 .renameInput {
   flex: 1;
-  min-width: 20px;
-  background: var(--bg-tertiary);
+  min-width: 0;
+  width: 100%;
+  background: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--accent);
   border-radius: 2px;
   padding: 0 4px;
-  margin-left: 2px;
+  margin: -1px 0;
   font: inherit;
   font-size: inherit;
   line-height: inherit;
   outline: none;
+  box-sizing: border-box;
 }
 
 .renameInput:focus {

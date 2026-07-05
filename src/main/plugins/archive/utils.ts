@@ -81,7 +81,7 @@ export function parseLocation(locationId: string): [string, string] {
 
 /** Set of known archive extensions for location parsing. */
 const ARCHIVE_EXTENSIONS = new Set([
-  '.zip', '.jar', '.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz'
+  '.zip', '.jar', '.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz', '.7z'
 ])
 
 // ─── Internal path helpers ─────────────────────────────────────────────────────

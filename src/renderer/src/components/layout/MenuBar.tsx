@@ -33,6 +33,7 @@ const MENUS: MenuDef[] = [
       { label: 'Copy', shortcut: 'F5', action: 'copy' },
       { label: 'Move', shortcut: 'F6', action: 'move' },
       { label: 'New Folder', shortcut: 'F7', action: 'mkdir' },
+      { label: 'Rename', shortcut: 'F2', action: 'rename' },
       { label: 'Delete', shortcut: 'F8', action: 'delete' },
       { label: '', action: '', separator: true },
       { label: 'Pack to ZIP', shortcut: 'Alt+F5', action: 'pack' },

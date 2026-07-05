@@ -9,6 +9,8 @@ export interface SourceAccess {
   readAt(offset: number, length: number): Promise<Buffer>
   createReadStream(): NodeJS.ReadableStream
   totalSize: number
+  /** When set, the archive is already on disk at this path (avoids temp copy). */
+  localPath?: string
 }
 
 /**

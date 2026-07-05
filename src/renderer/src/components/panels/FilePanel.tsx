@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect } from 'react'
 import type { PanelId } from '../../stores/app-store'
 import { useAppStore } from '../../stores/app-store'
-import { usePanelStore, hasParentEntry, parentOffset } from '../../stores/panel-store'
+import { usePanelStore, parentOffset } from '../../stores/panel-store'
 import type { SortConfig, SortField } from '../../utils/sort'
 import { TabBar } from './TabBar'
 import { DriveBookmarkMenu } from './DriveBookmarkMenu'
@@ -14,6 +14,7 @@ import { TreeView } from './TreeView'
 import { InfoView } from './InfoView'
 import { QuickView } from './QuickView'
 import { useBookmarksStore } from '../../stores/bookmarks-store'
+import { bookmarkDisplayEntries, buildDisplayEntries, isRenamableEntry } from '../../utils/display-entries'
 import styles from '../../styles/panels.module.css'
 
 /** Reactive bridge: subscribes to opposite panel's cursor for QuickView */
@@ -50,7 +51,11 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const getActiveTab = usePanelStore((s) => s.getActiveTab)
 
   const tab = getActiveTab(panelId)
-  const renamingEntryId = tab.renamingEntryId
+  const renamingEntryId = usePanelStore((s) => {
+    const p = s[panelId]
+    const t = p.tabs.find((x) => x.id === p.activeTabId) || p.tabs[0]
+    return t.renamingEntryId
+  })
   const driveMenuOpenPanel = useAppStore((s) => s.driveMenuOpen)
   const openDriveMenu = useAppStore((s) => s.openDriveMenu)
   const closeDriveMenu = useAppStore((s) => s.closeDriveMenu)
@@ -161,7 +166,6 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
     }
   }, [panelId, tab.parentId, tab.pluginId, tab.locationId, navigate])
 
-  const showParentEntry = hasParentEntry(tab)
   const bookmarks = useBookmarksStore((s) => s.bookmarks)
   const isHome = tab.locationId === null
 
@@ -174,37 +178,8 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
     setCursor(panelId, tab.entries.length) // first bookmark index in displayEntries
   }, [isHome, tab.entries.length, bookmarks.length, panelId, setCursor])
 
-  // At home view, append bookmarks as navigable entries
-  const homeBookmarkEntries = isHome ? bookmarks.map((bm) => ({
-    id: bm.path,
-    name: `\u2605 ${bm.name}`,
-    isContainer: true,
-    size: -1,
-    modifiedAt: 0,
-    mimeType: 'inode/directory',
-    iconHint: 'folder',
-    meta: { bookmark: true, pluginId: bm.pluginId },
-    attributes: { readonly: false, hidden: false, symlink: false }
-  })) : []
-
-  const displayEntries =
-    showParentEntry
-      ? [
-          {
-            id: '__parent__',
-            name: '..',
-            isContainer: true,
-            size: -1,
-            modifiedAt: 0,
-            mimeType: 'inode/directory',
-            iconHint: 'folder',
-            meta: {},
-            attributes: { readonly: true, hidden: false, symlink: false }
-          },
-          ...tab.entries,
-          ...homeBookmarkEntries
-        ]
-      : [...tab.entries, ...homeBookmarkEntries]
+  const homeBookmarkEntries = isHome ? bookmarkDisplayEntries(bookmarks) : []
+  const displayEntries = buildDisplayEntries(tab, homeBookmarkEntries)
 
   const handleEntryActivate = useCallback(
     (entry: { id: string; isContainer: boolean }) => {
@@ -273,6 +248,10 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
               onCursorChange={(i) => setCursor(panelId, i)}
               onSelect={(id) => toggleSelect(panelId, id)}
               onActivate={handleEntryActivate}
+              onStartRename={(entry) => {
+                if (!isRenamableEntry(entry)) return
+                usePanelStore.getState().startInlineRename(panelId, entry.id)
+              }}
               onRenameCancel={() => usePanelStore.getState().clearInlineRename(panelId)}
               onRenameCommit={async (entry, newName) => {
                 if (!newName || newName === entry.name) {
