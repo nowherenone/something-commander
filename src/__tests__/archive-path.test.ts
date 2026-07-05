@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   isArchivePath,
   parseArchivePath,
+  parseArchiveLocation,
   joinArchivePath,
   toArchivePathForInternalFile
 } from '../renderer/src/utils/archive-path'
@@ -51,6 +52,15 @@ describe('archive-path', () => {
 
     it('drops a leading slash in the internal part', () => {
       expect(joinArchivePath('/a.zip', '/x/y')).toBe('/a.zip::x/y')
+    })
+  })
+
+  describe('parseArchiveLocation', () => {
+    it('splits remote archive refs at the archive extension boundary', () => {
+      expect(parseArchiveLocation('sftp:user@host:22::remote/file.zip::src/main.ts')).toEqual({
+        archive: 'sftp:user@host:22::remote/file.zip',
+        internal: 'src/main.ts'
+      })
     })
   })
 

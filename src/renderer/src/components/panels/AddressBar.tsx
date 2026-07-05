@@ -1,17 +1,27 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
+import type { BreadcrumbSegment } from '../../utils/breadcrumb-segments'
 import styles from '../../styles/panels.module.css'
 
 interface AddressBarProps {
   location: string
+  segments: BreadcrumbSegment[]
   onNavigate: (path: string) => void
-  onSegmentClick: (path: string) => void
+  onSegmentClick: (locationId: string | null) => void
 }
 
-export function AddressBar({ location, onNavigate, onSegmentClick }: AddressBarProps): React.JSX.Element {
+export function AddressBar({
+  location,
+  segments,
+  onNavigate,
+  onSegmentClick
+}: AddressBarProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
 
-  const segments = parseSegments(location)
+  const sep = useMemo(
+    () => (navigator.platform.startsWith('Win') ? ' \\ ' : ' / '),
+    []
+  )
 
   const startEdit = useCallback(() => {
     setEditValue(location)
@@ -46,11 +56,11 @@ export function AddressBar({ location, onNavigate, onSegmentClick }: AddressBarP
   return (
     <div className={styles.addressBar} onDoubleClick={startEdit}>
       {segments.map((seg, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <span className={styles.addressSep}>{navigator.platform.startsWith('Win') ? ' \\ ' : ' / '}</span>}
+        <React.Fragment key={`${seg.locationId ?? 'root'}-${i}`}>
+          {i > 0 && <span className={styles.addressSep}>{sep}</span>}
           <span
             className={styles.addressSegment}
-            onClick={() => onSegmentClick(seg.path)}
+            onClick={() => onSegmentClick(seg.locationId)}
           >
             {seg.label}
           </span>
@@ -58,43 +68,4 @@ export function AddressBar({ location, onNavigate, onSegmentClick }: AddressBarP
       ))}
     </div>
   )
-}
-
-interface Segment {
-  label: string
-  path: string
-}
-
-function parseSegments(location: string): Segment[] {
-  if (!location) return []
-
-  // Handle "My Computer" or similar virtual roots
-  if (!location.includes('/') && !location.includes('\\')) {
-    return [{ label: location, path: '' }]
-  }
-
-  const normalized = location.replace(/\\/g, '/')
-  const parts = normalized.split('/').filter(Boolean)
-  const segments: Segment[] = []
-
-  // Handle drive letter on Windows (e.g., "C:")
-  let accumulated = ''
-  for (let i = 0; i < parts.length; i++) {
-    if (i === 0 && parts[0].endsWith(':')) {
-      accumulated = parts[0] + '/'
-    } else {
-      accumulated += parts[i] + '/'
-    }
-    segments.push({
-      label: parts[i],
-      path: accumulated.replace(/\/$/, '') || '/'
-    })
-  }
-
-  // If path starts with /, add root
-  if (normalized.startsWith('/') && segments.length > 0 && segments[0].label !== '/') {
-    segments.unshift({ label: '/', path: '/' })
-  }
-
-  return segments
 }

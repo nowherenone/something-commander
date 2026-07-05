@@ -21,11 +21,51 @@ export interface ArchivePathParts {
 }
 
 export function parseArchivePath(locationId: string): ArchivePathParts {
-  const idx = locationId.indexOf(SEP)
-  if (idx < 0) return { archive: locationId, internal: '' }
-  const archive = locationId.slice(0, idx)
-  const internal = locationId.slice(idx + SEP.length).replace(/\\/g, '/').replace(/^\//, '')
+  const [archive, internal] = parseArchiveLocationParts(locationId)
   return { archive, internal }
+}
+
+const ARCHIVE_EXTENSIONS = new Set([
+  '.zip', '.jar', '.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz', '.7z'
+])
+
+function getArchiveExtension(filePath: string): string {
+  const lower = filePath.toLowerCase()
+  const compound = ['.tar.gz', '.tar.bz2', '.tar.xz', '.tar.zst', '.tar.lz4'] as const
+  const aliases: Record<string, string> = { '.tgz': '.tar.gz', '.tbz2': '.tar.bz2', '.txz': '.tar.xz' }
+  const simple = lower.slice(lower.lastIndexOf('.'))
+  if (aliases[simple]) return aliases[simple]
+  for (const ext of compound) {
+    if (lower.endsWith(ext)) return ext
+  }
+  return simple
+}
+
+/**
+ * Split an archive location id into archive file path + internal path.
+ * Handles remote refs like `sftp:conn::remote/file.zip::folder/`.
+ */
+export function parseArchiveLocation(locationId: string): ArchivePathParts {
+  const [archive, internal] = parseArchiveLocationParts(locationId)
+  return { archive, internal }
+}
+
+function parseArchiveLocationParts(locationId: string): [string, string] {
+  const parts = locationId.split(SEP)
+  if (parts.length <= 1) return [locationId, '']
+
+  for (let i = 0; i < parts.length - 1; i++) {
+    const candidate = parts.slice(0, i + 1).join(SEP)
+    const ext = getArchiveExtension(candidate)
+    if (ext && ARCHIVE_EXTENSIONS.has(ext)) {
+      const internal = parts.slice(i + 1).join(SEP).replace(/\\/g, '/').replace(/^\//, '')
+      return [candidate, internal]
+    }
+  }
+
+  const archive = parts[0]
+  const internal = parts.slice(1).join(SEP).replace(/\\/g, '/').replace(/^\//, '')
+  return [archive, internal]
 }
 
 export function joinArchivePath(archive: string, internal: string): string {

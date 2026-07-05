@@ -15,6 +15,7 @@ import { InfoView } from './InfoView'
 import { QuickView } from './QuickView'
 import { useBookmarksStore } from '../../stores/bookmarks-store'
 import { bookmarkDisplayEntries, buildDisplayEntries, isRenamableEntry } from '../../utils/display-entries'
+import { buildBreadcrumbSegments } from '../../utils/breadcrumb-segments'
 import styles from '../../styles/panels.module.css'
 
 /** Reactive bridge: subscribes to opposite panel's cursor for QuickView */
@@ -124,15 +125,13 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   )
 
   const handleSegmentClick = useCallback(
-    (path: string) => {
-      if (path === '') {
-        navigate(panelId, null)
-      } else {
-        navigate(panelId, path)
-      }
+    (targetLocationId: string | null) => {
+      navigate(panelId, targetLocationId)
     },
     [panelId, navigate]
   )
+
+  const breadcrumbSegments = buildBreadcrumbSegments(tab.pluginId, tab.locationId, tab.locationDisplay)
 
   const handleGoUp = useCallback(() => {
     if (tab.parentId !== null) {
@@ -226,6 +225,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       </div>
       <AddressBar
         location={tab.locationDisplay}
+        segments={breadcrumbSegments}
         onNavigate={handleNavigateAddress}
         onSegmentClick={handleSegmentClick}
       />
