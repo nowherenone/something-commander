@@ -6,6 +6,8 @@ import {
   type ThemeName
 } from '../../stores/settings-store'
 import { Modal } from '../primitives/Modal'
+import { showToast } from '../layout/Toast'
+import { notifyUpdateCheckResult, downloadUpdateWithNotify } from '../../utils/update-notifications'
 import styles from '../../styles/dialogs.module.css'
 
 interface SettingsDialogProps {
@@ -339,18 +341,16 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                     <button
                       className={`${styles.btn} ${styles.btnPrimary}`}
                       onClick={async () => {
+                        const api = (window as any).api
+                        if (!api?.update?.checkForUpdates) return
                         try {
-                          const api = (window as any).api
-                          const res = await api?.update?.checkForUpdates?.()
-                          if (res?.updateAvailable) {
-                            console.log('[Update] Available:', res.version)
-                          } else if (res?.error) {
-                            alert('Update check failed: ' + res.error)
-                          } else {
-                            alert('You are running the latest version.')
+                          const res = await api.update.checkForUpdates()
+                          notifyUpdateCheckResult(res)
+                          if (res?.updateAvailable && settings.autoDownloadUpdates) {
+                            await downloadUpdateWithNotify(() => api.update.downloadUpdate())
                           }
-                        } catch (e: any) {
-                          alert('Update check error: ' + (e?.message || e))
+                        } catch {
+                          showToast('Failed to check for updates', 8000)
                         }
                       }}
                     >

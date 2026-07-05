@@ -4,25 +4,63 @@
   right: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   z-index: 300;
   pointer-events: none;
+  max-width: min(480px, calc(100vw - 24px));
 }
 
 .toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   background: var(--bg-secondary);
   border: 1px solid var(--danger);
   border-radius: 4px;
-  padding: 8px 14px;
+  padding: 10px 10px 10px 12px;
   font-size: 12px;
   color: var(--danger);
-  max-width: 400px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   animation: toastIn 0.2s ease-out, toastOut 0.4s ease-in forwards;
   pointer-events: auto;
+  cursor: pointer;
+}
+
+.toastBody {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
+}
+
+.copyBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: -2px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.copyBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-primary));
+}
+
+.copyBtnCopied {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 @keyframes toastIn {

@@ -11,6 +11,7 @@ import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
 import { ToastContainer, showToast } from './components/layout/Toast'
+import { notifyUpdateCheckResult, downloadUpdateWithNotify } from './utils/update-notifications'
 import { NetworkConnections } from './components/dialogs/NetworkConnections'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
@@ -55,40 +56,35 @@ function App(): React.JSX.Element {
     const api = (window as any).api
     if (!api?.update) return
 
-    // Listen for update status changes
+    // Lifecycle events only — check results are handled via notifyUpdateCheckResult.
     const unsubscribe = api.update.onUpdateStatus((status: { type: string; data?: any }) => {
-      if (status.type === 'available') {
-        const ver = status.data?.version
-        showToast(`Update ${ver} available. Downloading...`, 8000)
-        // Auto download if setting allows
-        const autoDownload = useSettingsStore.getState().autoDownloadUpdates
-        if (autoDownload) {
-          api.update.downloadUpdate()
-        }
-      } else if (status.type === 'downloaded') {
+      if (status.type === 'downloaded') {
         showToast('Update downloaded. Restart to install.', 15000)
-        // Could show a restart button, for now user can use settings or restart manually
-      } else if (status.type === 'download-progress') {
-        // Could update a progress toast, but keep simple
       } else if (status.type === 'error') {
         console.warn('[Updater]', status.data)
-        showToast('Update failed: ' + (status.data || 'unknown error'), 10000)
       }
     })
+
+    const runUpdateCheck = async (autoDownload: boolean): Promise<void> => {
+      try {
+        const res = await api.update.checkForUpdates()
+        notifyUpdateCheckResult(res)
+        if (res.updateAvailable && autoDownload) {
+          await downloadUpdateWithNotify(() => api.update.downloadUpdate())
+        }
+      } catch {
+        showToast('Failed to check for updates', 8000)
+      }
+    }
 
     // Check on startup if enabled (after a short delay to let settings load)
     const timer = setTimeout(() => {
       const shouldCheck = useSettingsStore.getState().autoCheckForUpdates
       const autoDl = useSettingsStore.getState().autoDownloadUpdates
-      if (api.update) {
-        // Tell main the preference
-        ;(window as any).api?.util?.[''] // no-op placeholder
-      }
-      if (shouldCheck) {
-        api.update.checkForUpdates().catch(() => {})
-      }
-      // sync auto download preference to main
       api.update.setAutoDownload?.(autoDl)
+      if (shouldCheck) {
+        void runUpdateCheck(autoDl)
+      }
     }, 2500)
 
     return () => {
@@ -256,22 +252,19 @@ function App(): React.JSX.Element {
   const showCommandLine = useSettingsStore((s) => s.showCommandLine)
 
   const handleCheckForUpdates = useCallback(async () => {
+    const api = (window as any).api
+    if (!api?.update?.checkForUpdates) {
+      showToast('Update system not available')
+      return
+    }
     try {
-      const api = (window as any).api
-      if (!api?.update?.checkForUpdates) {
-        showToast('Update system not available')
-        return
-      }
       const res = await api.update.checkForUpdates()
-      if (res?.updateAvailable) {
-        showToast(`Update ${res.version} available`)
-      } else if (res?.error) {
-        showToast('Update check failed: ' + res.error)
-      } else {
-        showToast('You are running the latest version.')
+      notifyUpdateCheckResult(res)
+      if (res?.updateAvailable && useSettingsStore.getState().autoDownloadUpdates) {
+        await downloadUpdateWithNotify(() => api.update.downloadUpdate())
       }
-    } catch (e: any) {
-      showToast('Failed to check for updates')
+    } catch {
+      showToast('Failed to check for updates', 8000)
     }
   }, [])
 
