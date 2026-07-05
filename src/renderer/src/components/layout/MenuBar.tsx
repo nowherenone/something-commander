@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/app-store'
-import { usePanelStore } from '../../stores/panel-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import styles from '../../styles/menubar.module.css'
 
@@ -100,9 +99,7 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
 
   const activePanel = useAppStore((s) => s.activePanel)
   const viewMode = useAppStore((s) => activePanel === 'left' ? s.leftViewMode : s.rightViewMode)
-  const tab = usePanelStore((s) => s.getActiveTab(activePanel))
-  const showHidden = tab.showHidden
-  const { showCommandLine, bottomBar } = useSettingsStore()
+  const { showHiddenFiles, showCommandLine, bottomBar } = useSettingsStore()
 
   const getChecked = useCallback((action: string): boolean => {
     switch (action) {
@@ -110,12 +107,12 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
       case 'viewTree': return viewMode === 'tree'
       case 'viewInfo': return viewMode === 'info'
       case 'viewQuickview': return viewMode === 'quickview'
-      case 'toggleHidden': return showHidden
+      case 'toggleHidden': return showHiddenFiles
       case 'toggleCommandLine': return showCommandLine
       case 'setBottomFnkeys': return bottomBar === 'fnkeys'
       default: return false
     }
-  }, [viewMode, showHidden, showCommandLine, bottomBar])
+  }, [viewMode, showHiddenFiles, showCommandLine, bottomBar])
 
   const handleMenuClick = useCallback((label: string) => {
     setOpenMenu((prev) => (prev === label ? null : label))

@@ -5,6 +5,11 @@ import { isArchivePath, parseArchivePath } from '../utils/archive-path'
 import { getExtension } from '../utils/entry-helpers'
 import { buildDirView, findEntryIndexById, findEntryIndexByName } from './panel-store-helpers'
 import { showToast } from '../components/layout/Toast'
+import { useSettingsStore } from './settings-store'
+
+function showHiddenFiles(): boolean {
+  return useSettingsStore.getState().showHiddenFiles
+}
 
 const DEFAULT_PLUGIN = 'local-filesystem'
 
@@ -100,6 +105,7 @@ interface PanelStoreState {
   navigate: (panelId: 'left' | 'right', locationId: string | null) => Promise<void>
   navigateWithPlugin: (panelId: 'left' | 'right', pluginId: string, locationId: string | null) => Promise<void>
   refresh: (panelId: 'left' | 'right') => Promise<void>
+  refreshAllPanels: () => Promise<void>
   setSort: (panelId: 'left' | 'right', config: SortConfig) => void
   toggleHidden: (panelId: 'left' | 'right') => void
   setCursor: (panelId: 'left' | 'right', index: number) => void
@@ -200,7 +206,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       const currentTab = getActiveTab(get()[panelId])
 
       const view = buildDirView(result, {
-        showHidden: currentTab.showHidden,
+        showHidden: showHiddenFiles(),
         sortConfig: currentTab.sortConfig,
         hasParentRow: locationId !== null,
         findCursor: previousLocationId
@@ -212,6 +218,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
           ...view,
+          showHidden: showHiddenFiles(),
           locationId,
           locationDisplay: result.location,
           selectedEntryIds: new Set(),
@@ -264,7 +271,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         : previousLocationId
 
       const view = buildDirView(result, {
-        showHidden: currentTab.showHidden,
+        showHidden: showHiddenFiles(),
         sortConfig: currentTab.sortConfig,
         hasParentRow: locationId !== null,
         findCursor: searchId ? (entries) => findEntryIndexById(entries, searchId) : undefined
@@ -274,6 +281,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
           ...view,
+          showHidden: showHiddenFiles(),
           pluginId,
           locationId,
           locationDisplay: result.location,
@@ -298,6 +306,10 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     }
   },
 
+  refreshAllPanels: async () => {
+    await Promise.all([get().refresh('left'), get().refresh('right')])
+  },
+
   refresh: async (panelId) => {
     const panel = get()[panelId]
     const tab = getActiveTab(panel)
@@ -311,7 +323,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
       const currentTab = getActiveTab(get()[panelId])
 
       const view = buildDirView(result, {
-        showHidden: currentTab.showHidden,
+        showHidden: showHiddenFiles(),
         sortConfig: currentTab.sortConfig,
         hasParentRow: tab.locationId !== null,
         findCursor: oldEntryName ? (entries) => findEntryIndexByName(entries, oldEntryName) : undefined,
@@ -323,6 +335,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
         [panelId]: updateTab(get()[panelId], tab.id, (t) => ({
           ...t,
           ...view,
+          showHidden: showHiddenFiles(),
           isLoading: false,
           error: null
         }))
@@ -339,13 +352,10 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
     set({ [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, sortConfig: config, entries })) })
   },
 
-  toggleHidden: (panelId) => {
-    const panel = get()[panelId]
-    const tab = getActiveTab(panel)
-    set({
-      [panelId]: updateTab(panel, tab.id, (t) => ({ ...t, showHidden: !t.showHidden }))
-    })
-    get().refresh(panelId)
+  toggleHidden: (_panelId) => {
+    const next = !useSettingsStore.getState().showHiddenFiles
+    useSettingsStore.getState().updateSettings({ showHiddenFiles: next })
+    get().refreshAllPanels()
   },
 
   setCursor: (panelId, index) => {

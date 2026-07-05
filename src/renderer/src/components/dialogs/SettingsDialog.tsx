@@ -7,6 +7,7 @@ import {
 } from '../../stores/settings-store'
 import { Modal } from '../primitives/Modal'
 import { showToast } from '../layout/Toast'
+import { usePanelStore } from '../../stores/panel-store'
 import { notifyUpdateCheckResult, downloadUpdateWithNotify } from '../../utils/update-notifications'
 import styles from '../../styles/dialogs.module.css'
 
@@ -130,7 +131,10 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                       <input
                         type="checkbox"
                         checked={settings.showHiddenFiles}
-                        onChange={(e) => update({ showHiddenFiles: e.target.checked })}
+                        onChange={(e) => {
+                          update({ showHiddenFiles: e.target.checked })
+                          usePanelStore.getState().refreshAllPanels()
+                        }}
                       />
                       <span className={styles.settingsLabel}>Show hidden files</span>
                     </label>

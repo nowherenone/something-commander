@@ -47,7 +47,11 @@ function App(): React.JSX.Element {
 
   // Load persisted user data from disk on first mount
   useEffect(() => {
-    loadSettings()
+    void loadSettings().then(() => {
+      if (useSettingsStore.getState().showHiddenFiles) {
+        void usePanelStore.getState().refreshAllPanels()
+      }
+    })
     loadBookmarks()
   }, [])
 

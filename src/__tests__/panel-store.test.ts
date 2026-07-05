@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { usePanelStore } from '../renderer/src/stores/panel-store'
+import { useSettingsStore } from '../renderer/src/stores/settings-store'
 import { showToast } from '../renderer/src/components/layout/Toast'
 import type { Entry } from '../shared/types/entry'
 
@@ -51,6 +52,7 @@ function freshPanel() {
 describe('panel-store', () => {
   beforeEach(() => {
     vi.mocked(showToast).mockClear()
+    useSettingsStore.setState({ showHiddenFiles: false })
     usePanelStore.setState({
       left: freshPanel(),
       right: freshPanel()
@@ -213,6 +215,43 @@ describe('panel-store', () => {
       expect(showToast).toHaveBeenCalledWith(
         'Cannot open game.7z: file is not a valid 7z archive'
       )
+    })
+  })
+
+  describe('toggleHidden', () => {
+    it('toggles global showHiddenFiles and reveals dotfiles on refresh', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/test/visible.txt', name: 'visible.txt' }),
+        makeEntry({
+          id: '/test/.bashrc',
+          name: '.bashrc',
+          attributes: { readonly: false, hidden: true, symlink: false }
+        })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory)
+        .mockResolvedValueOnce({
+          entries: mockEntries,
+          location: '/test',
+          parentId: null
+        })
+        .mockResolvedValueOnce({
+          entries: mockEntries,
+          location: '/test',
+          parentId: null
+        })
+        .mockResolvedValueOnce({
+          entries: mockEntries,
+          location: '/test',
+          parentId: null
+        })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      expect(usePanelStore.getState().getActiveTab('left').entries.map((e) => e.name)).toEqual(['visible.txt'])
+
+      await usePanelStore.getState().toggleHidden('left')
+      expect(useSettingsStore.getState().showHiddenFiles).toBe(true)
+      expect(usePanelStore.getState().getActiveTab('left').entries.map((e) => e.name)).toEqual(['.bashrc', 'visible.txt'])
     })
   })
 
