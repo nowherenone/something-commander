@@ -128,11 +128,9 @@ export function FileList({
       onCursorChange(index)
       const items = [
         { label: 'Open', id: 'open' },
-        { label: 'View (F3)', id: 'view' },
-        { label: 'Edit (F4)', id: 'edit' },
+        { label: 'Copy path', id: 'copyPath' },
+        { label: 'Properties', id: 'properties' },
         { label: '', id: '', separator: true },
-        { label: 'Copy (F5)', id: 'copy' },
-        { label: 'Move (F6)', id: 'move' },
         { label: 'Rename (F2)', id: 'rename' },
         { label: '', id: '', separator: true },
         { label: 'Delete (F8)', id: 'delete' }
@@ -143,23 +141,25 @@ export function FileList({
         case 'open':
           onActivate(entry)
           break
-        case 'view':
-          if (!entry.isContainer) {
-            const tab = usePanelStore.getState().getActiveTab(panelId)
-            window.api.util.openViewerWindow(tab.pluginId, entry.id, entry.name)
+        case 'copyPath':
+          try {
+            await navigator.clipboard.writeText(entry.id)
+            showToast('Path copied')
+          } catch {
+            showToast('Could not copy to clipboard')
           }
           break
-        case 'edit':
-          if (!entry.isContainer) {
-            const tab = usePanelStore.getState().getActiveTab(panelId)
-            window.api.util.openEditorWindow(tab.pluginId, entry.id, entry.name)
+        case 'properties':
+          if (pluginId !== 'local-filesystem') {
+            showToast('Properties are only available for local files')
+            break
           }
-          break
-        case 'copy':
-          dispatchCommand('copy')
-          break
-        case 'move':
-          dispatchCommand('move')
+          {
+            const result = await window.api.util.showFileProperties(entry.id)
+            if (!result.success) {
+              showToast(result.error || 'Could not open file properties')
+            }
+          }
           break
         case 'delete':
           dispatchCommand('delete')
@@ -169,7 +169,7 @@ export function FileList({
           break
       }
     },
-    [onCursorChange, onActivate, onStartRename, panelId]
+    [onCursorChange, onActivate, onStartRename, pluginId]
   )
 
   const listClassName = `${styles.fileList}${isDropTarget ? ` ${styles.dropTarget}` : ''}`

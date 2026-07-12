@@ -2,7 +2,8 @@ import { ipcMain, BrowserWindow, Menu, nativeImage, shell, safeStorage } from 'e
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as os from 'os'
-import { exec } from 'child_process'
+import * as path from 'path'
+import { exec, spawn } from 'child_process'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 
@@ -23,6 +24,10 @@ function getDragIcon(): Electron.NativeImage {
 export function registerSystemIPC(): void {
   ipcMain.handle(IPC_CHANNELS.OPEN_FILE, async (_event, filePath: string) => {
     return shell.openPath(filePath) // empty string = success, otherwise error message
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SHOW_FILE_PROPERTIES, async (_event, filePath: string) => {
+    return showFileProperties(filePath)
   })
 
   ipcMain.handle(
@@ -155,6 +160,97 @@ export function registerSystemIPC(): void {
   })
 
   setupDriveWatchers()
+}
+
+function commandExists(cmd: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    exec(`command -v ${cmd}`, (err) => resolve(!err))
+  })
+}
+
+function spawnDetached(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(cmd, args, { detached: true, stdio: 'ignore' })
+      child.on('error', () => resolve(false))
+      child.unref()
+      resolve(true)
+    } catch {
+      resolve(false)
+    }
+  })
+}
+
+async function showFilePropertiesWindows(filePath: string): Promise<{ success: boolean; error?: string }> {
+  const escaped = filePath.replace(/'/g, "''")
+  return new Promise((resolve) => {
+    exec(
+      `powershell -NoProfile -Command "$shell = New-Object -ComObject Shell.Application; $item = Get-Item -LiteralPath '${escaped}'; $folder = $shell.Namespace($item.DirectoryName); $folderItem = $folder.ParseName($item.Name); $folderItem.InvokeVerb('properties')"`,
+      { timeout: 10000 },
+      (err) => {
+        if (err) resolve({ success: false, error: String(err) })
+        else resolve({ success: true })
+      }
+    )
+  })
+}
+
+async function showFilePropertiesMac(filePath: string): Promise<{ success: boolean; error?: string }> {
+  const escaped = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return new Promise((resolve) => {
+    exec(
+      `osascript -e 'tell application "Finder" to open information window of (POSIX file "${escaped}" as alias)'`,
+      { timeout: 10000 },
+      (err) => {
+        if (err) resolve({ success: false, error: String(err) })
+        else resolve({ success: true })
+      }
+    )
+  })
+}
+
+async function showFilePropertiesLinux(filePath: string): Promise<{ success: boolean; error?: string }> {
+  const uri = `file://${encodeURI(filePath)}`
+  const attempts: Array<[string, string[]]> = [
+    ['nautilus', ['--show-properties', uri]],
+    ['nemo', ['--show-properties', uri]],
+    ['caja', ['--show-properties', uri]],
+    ['pcmanfm-qt', ['--show-properties', filePath]],
+    ['pcmanfm', ['--show-properties', filePath]]
+  ]
+
+  for (const [cmd, args] of attempts) {
+    if (await commandExists(cmd)) {
+      const ok = await spawnDetached(cmd, args)
+      if (ok) return { success: true }
+    }
+  }
+
+  if (await commandExists('dbus-send')) {
+    const ok = await spawnDetached('dbus-send', [
+      '--print-reply',
+      '--dest=org.kde.dolphin',
+      '/dolphin',
+      'org.kde.dolphin.showItemInfo',
+      `string:${uri}`
+    ])
+    if (ok) return { success: true }
+  }
+
+  return { success: false, error: 'No supported file manager found' }
+}
+
+async function showFileProperties(filePath: string): Promise<{ success: boolean; error?: string }> {
+  const resolved = path.resolve(filePath)
+  try {
+    await fs.access(resolved)
+  } catch {
+    return { success: false, error: 'File not found' }
+  }
+
+  if (process.platform === 'win32') return showFilePropertiesWindows(resolved)
+  if (process.platform === 'darwin') return showFilePropertiesMac(resolved)
+  return showFilePropertiesLinux(resolved)
 }
 
 let driveWatchersSetup = false

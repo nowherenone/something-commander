@@ -27,6 +27,7 @@ export const IPC_CHANNELS = {
   SAVE_FILE: 'util:saveFile',
   READ_ENTRY_CONTENT: 'util:readEntryContent',
   SHOW_CONTEXT_MENU: 'util:showContextMenu',
+  SHOW_FILE_PROPERTIES: 'util:showFileProperties',
   GET_DISK_SPACE: 'util:getDiskSpace',
   SFTP_CONNECT: 'sftp:connect',
   SFTP_DISCONNECT: 'sftp:disconnect',

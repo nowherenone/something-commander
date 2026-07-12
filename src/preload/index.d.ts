@@ -53,6 +53,7 @@ interface UtilAPI {
   readEntryContent(pluginId: string, entryId: string, offset?: number, length?: number): Promise<{ data: string | Buffer; totalSize: number; isBinary: boolean; error?: string }>
   saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
+  showFileProperties(filePath: string): Promise<{ success: boolean; error?: string }>
   getDiskSpace(pluginId: string, locationId: string): Promise<{ free: number; total: number }>
   encryptString(plainText: string): Promise<string>
   decryptString(encrypted: string): Promise<string>
