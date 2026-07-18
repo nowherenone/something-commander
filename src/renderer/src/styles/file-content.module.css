@@ -2,14 +2,13 @@
   flex: 1;
   overflow: auto;
   position: relative;
+  background: var(--bg-panel);
 }
 
-/* Dynamic height set inline: height = totalLines * lineHeight */
 .spacer {
   position: relative;
 }
 
-/* Dynamic top set inline: top = startLine * lineHeight */
 .slice {
   position: absolute;
   left: 0;
@@ -17,27 +16,29 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-small);
   color: var(--text-secondary);
-  padding: 0 12px;
+  padding: 0 var(--space-5);
   white-space: pre;
+  line-height: 1.45;
 }
 
-/* Dynamic height set inline: height = lineHeight */
 .line {
   display: flex;
 }
 
 .lineHighlight {
-  background: rgba(45, 114, 210, 0.2);
+  background: var(--accent-tint);
 }
 
 .lineNumber {
-  width: 60px;
+  width: 56px;
   text-align: right;
-  padding-right: 12px;
+  padding-right: var(--space-5);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-tiny);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   user-select: none;
+  opacity: 0.75;
 }
 
 .lineText {

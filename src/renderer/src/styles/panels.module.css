@@ -3,92 +3,120 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
-  border: 2px solid var(--border-color);
+  border: none;
+  border-right: var(--border-width) solid var(--border-subtle);
   overflow: hidden;
-  opacity: 0.85;
+  opacity: 1;
+  min-width: 0;
+  position: relative;
 }
 
+/* Inactive: slightly quieter header text via cascade; no dim whole panel */
+.panel:not(.active) .addressBar,
+.panel:not(.active) .statusBar {
+  color: var(--text-muted);
+}
+
+/* Active: soft left accent rail + full contrast */
 .panel.active {
-  border-color: var(--border-focus);
-  opacity: 1;
+  border-right-color: var(--border-subtle);
+  box-shadow: inset 2px 0 0 0 var(--accent);
+  z-index: 1;
+}
+
+.panel:last-child {
+  border-right: none;
 }
 
 .addressBar {
   height: var(--addressbar-height);
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 var(--chrome-padding-x);
   background: var(--bg-header);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  font-family: var(--font-ui);
   font-size: var(--font-size-small);
   overflow: hidden;
   white-space: nowrap;
+  gap: var(--space-1);
 }
 
 .addressInput {
   width: 100%;
-  background: var(--bg-tertiary);
+  height: 24px;
+  background: var(--bg-input);
   color: var(--text-primary);
-  border: 1px solid var(--border-focus);
-  padding: 2px 6px;
-  font-family: var(--font-family);
+  border: var(--border-width) solid var(--border-focus);
+  border-radius: var(--radius-xs);
+  padding: 0 var(--space-3);
+  font-family: var(--font-mono);
   font-size: var(--font-size-small);
   outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .addressSegment {
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0 2px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  transition: background 0.1s ease, color 0.1s ease;
 }
 
 .addressSegment:hover {
-  color: var(--accent-hover);
-  text-decoration: underline;
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  text-decoration: none;
 }
 
 .addressSep {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-tiny);
+  opacity: 0.7;
+  user-select: none;
 }
 
 .statusBar {
   height: var(--statusbar-height);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  gap: var(--space-5);
+  padding: 0 var(--chrome-padding-x);
   background: var(--bg-header);
-  border-top: 1px solid var(--border-color);
-  font-size: var(--font-size-small);
+  border-top: var(--border-width) solid var(--border-subtle);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-tiny);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .diskSpace {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-3);
   margin-left: auto;
 }
 
 .diskBar {
-  width: 60px;
+  width: 64px;
   height: var(--bar-height);
-  margin-top: 1px;
   background: var(--bar-bg);
   border-radius: var(--bar-radius);
   overflow: hidden;
-  border: var(--bar-border);
+  border: none;
 }
 
 .diskBarFill {
   display: block;
   height: 100%;
   background: var(--bar-fill);
+  border-radius: var(--bar-radius);
 }
 
 .statusSelected {
   color: var(--accent);
+  font-weight: var(--font-weight-medium);
 }
 
 .loading {
@@ -97,6 +125,8 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
 }
 
 .error {
@@ -105,6 +135,8 @@
   align-items: center;
   justify-content: center;
   color: var(--danger);
-  padding: 16px;
+  padding: var(--space-6);
   text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
 }

@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '../stores/app-store'
 import { usePanelStore, parentOffset } from '../stores/panel-store'
 import { useOperationsStore } from '../stores/operations-store'
-import { getBaseName } from '../utils/entry-helpers'
+import {
+  defaultCopyMoveDestPath,
+  getBaseName,
+  parseCopyMoveDestInput,
+  wouldCopyIntoSelf
+} from '../utils/entry-helpers'
 import { startOperationQueue, resolveOverwriteAction } from '../services/file-operation-service'
 import { showToast } from '../components/layout/Toast'
 import type { Entry } from '@shared/types'
@@ -59,20 +64,23 @@ export function useFileOperations() {
         return
       }
 
-      // Preflight: prevent copy into self or descendant (basic)
-      const srcRoot = tab.locationId || ''
-      const dst = destTab.locationId
-      if (srcRoot && dst && (dst === srcRoot || dst.startsWith(srcRoot + '/'))) {
+      // Preflight: only block when a *selected folder* would be copied into
+      // itself or a descendant. Dest under the source listing path is fine
+      // (e.g. files from /work → /work/out). Same-folder file copy is allowed.
+      if (wouldCopyIntoSelf(selected, destTab.locationId)) {
         showToast('Cannot copy into self or subfolder')
         return
       }
+
+      // Single file → confirm field is full path (dir + name) so rename-on-copy works.
+      const destDir = defaultCopyMoveDestPath(destTab.locationId, selected)
 
       setPendingOp({
         type,
         entries: selected,
         sourceDir: tab.locationDisplay,
         sourcePluginId: tab.pluginId,
-        destDir: destTab.locationId,
+        destDir,
         destPluginId: destTab.pluginId
       })
     },
@@ -99,18 +107,18 @@ export function useFileOperations() {
     })
   }, [getSelectedEntries])
 
-  const confirmOperation = useCallback((destDir: string) => {
+  const confirmOperation = useCallback((destInput: string) => {
     if (!pendingOp) return
     setPendingOp(null)
 
     if (pendingOp.type === 'pack') {
-      // destDir is the full archive path (e.g. D:\dest\archive.zip)
+      // destInput is the full archive path (e.g. D:\dest\archive.zip)
       useOperationsStore.getState().enqueue({
         type: 'copy',
         sourceEntries: pendingOp.entries,
         sourcePluginId: pendingOp.sourcePluginId,
-        destinationDisplay: destDir,
-        destinationLocationId: destDir + '::',
+        destinationDisplay: destInput,
+        destinationLocationId: destInput + '::',
         destinationPluginId: 'archive'
       })
     } else if (pendingOp.type === 'unpack') {
@@ -120,18 +128,38 @@ export function useFileOperations() {
         type: 'copy',
         sourceEntries: archiveRootEntries,
         sourcePluginId: 'archive',
-        destinationDisplay: destDir,
-        destinationLocationId: destDir,
+        destinationDisplay: destInput,
+        destinationLocationId: destInput,
         destinationPluginId: pendingOp.destPluginId
       })
     } else {
+      // copy / move — single file may include a renamed destination file name
+      const isSingleFile =
+        pendingOp.entries.length === 1 && !pendingOp.entries[0].isContainer
+      const parsed = parseCopyMoveDestInput(destInput, {
+        isSingleFile,
+        originalFileName: isSingleFile ? pendingOp.entries[0].name : ''
+      })
+      if (!parsed.destDir) {
+        showToast('Destination path is empty')
+        return
+      }
+      if (wouldCopyIntoSelf(pendingOp.entries, parsed.destDir)) {
+        showToast('Cannot copy into self or subfolder')
+        return
+      }
+      const display =
+        isSingleFile && parsed.destFileName
+          ? `${parsed.destDir}${parsed.destDir.includes('\\') ? '\\' : '/'}${parsed.destFileName}`
+          : parsed.destDir
       useOperationsStore.getState().enqueue({
         type: pendingOp.type,
         sourceEntries: pendingOp.entries,
         sourcePluginId: pendingOp.sourcePluginId,
-        destinationDisplay: destDir,
-        destinationLocationId: destDir,
-        destinationPluginId: pendingOp.destPluginId
+        destinationDisplay: display,
+        destinationLocationId: parsed.destDir,
+        destinationPluginId: pendingOp.destPluginId,
+        destinationFileName: isSingleFile ? parsed.destFileName : undefined
       })
     }
   }, [pendingOp])

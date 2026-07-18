@@ -1,26 +1,27 @@
 .container {
   position: fixed;
-  bottom: 40px;
-  right: 12px;
+  bottom: calc(var(--fnbar-height) + var(--space-5));
+  right: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
   z-index: 300;
   pointer-events: none;
-  max-width: min(480px, calc(100vw - 24px));
+  max-width: min(420px, calc(100vw - 24px));
 }
 
 .toast {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--space-4);
   background: var(--bg-secondary);
-  border: 1px solid var(--danger);
-  border-radius: 4px;
-  padding: 10px 10px 10px 12px;
-  font-size: 12px;
-  color: var(--danger);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border: var(--border-width) solid color-mix(in srgb, var(--danger) 55%, var(--border-color));
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  font-size: var(--font-size-small);
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-toast);
   animation: toastIn 0.2s ease-out, toastOut 0.4s ease-in forwards;
   pointer-events: auto;
   cursor: pointer;
@@ -34,6 +35,17 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   user-select: text;
+  color: var(--text-secondary);
+}
+
+.toastBody::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+  margin-bottom: var(--space-2);
 }
 
 .copyBtn {
@@ -41,21 +53,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   margin-top: -2px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
+  transition: border-color 0.1s ease, color 0.1s ease, background 0.1s ease;
 }
 
 .copyBtn:hover {
   color: var(--text-primary);
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--bg-primary));
+  background: var(--accent-soft);
 }
 
 .copyBtnCopied {
@@ -64,8 +77,8 @@
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes toastOut {

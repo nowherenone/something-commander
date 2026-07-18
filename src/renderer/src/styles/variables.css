@@ -1,124 +1,245 @@
 :root {
-  /* Base palette (BlueprintJS Dark inspired) */
-  --bg-primary: #1c2127;
-  --bg-secondary: #252a31;
-  --bg-tertiary: #2f343c;
-  --bg-panel: #1c2127;
-  --bg-header: #252a31;
-  --bg-selected: #184a90;
-  --bg-cursor: #2d72d2;
-  --bg-hover: #2f343c;
+  /*
+   * Something Commander — unified cool-gray chrome (macOS-inspired).
+   * Surfaces step by elevation; one hairline gray for structure;
+   * one blue for focus/selection. Status colors only for true status.
+   */
 
-  /* Text */
-  --text-primary: #f6f7f9;
-  --text-secondary: #c5cbd3;
-  --text-muted: #9aa5b4;
+  /* ── Surfaces ── */
+  --bg-primary: #161617;
+  --bg-secondary: #232325;
+  --bg-tertiary: #2e2e31;
+  --bg-elevated: #3a3a3e;
+  --bg-panel: #1a1a1c;
+  --bg-header: #222224;
+  --bg-selected: color-mix(in srgb, #0a84ff 28%, #1a1a1c);
+  --bg-cursor: #0a84ff;
+  --bg-hover: color-mix(in srgb, #ffffff 6%, transparent);
+  --bg-cursor-inactive: color-mix(in srgb, #ffffff 10%, transparent);
+  --bg-input: #0f0f10;
 
-  /* Borders */
-  --border-color: #404854;
-  --border-focus: #2d72d2;
+  /* ── Text ── */
+  --text-primary: #f5f5f7;
+  --text-secondary: #a8a8ae;
+  --text-muted: #6e6e73;
+  --text-on-accent: #ffffff;
+  --text-selected: #f5f5f7;
+  --text-error: #ff6961;
 
-  /* Accent */
-  --accent: #2d72d2;
-  --accent-hover: #3d8fff;
-  --danger: #cd4246;
-  --success: #238551;
+  /* ── Structure (one gray, not rainbow) ── */
+  --border-color: #3d3d41;
+  --border-subtle: #2c2c2e;
+  --border-focus: #0a84ff;
+  --border-width: 1px;
+  --panel-border-width: 1px;
+  --separator: var(--border-subtle);
 
-  /* Spacing */
-  --row-height: 24px;
-  --panel-padding: 4px;
-  --header-height: 28px;
-  --statusbar-height: 24px;
-  --addressbar-height: 28px;
-  --tabbar-height: 26px;
-  --fnbar-height: 32px;
-  --splitter-width: 4px;
+  /* ── Accent & semantic status only ── */
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --accent-soft: color-mix(in srgb, #0a84ff 18%, transparent);
+  --danger: #ff453a;
+  --success: #32d74b;
+  --warning: #ffd60a;
+  --info: #64d2ff;
 
-  /* Progress bars */
-  --bar-height: 9px;
-  --bar-bg: var(--border-color);
-  --bar-radius: 2px;
-  --bar-border: 1px solid var(--border-color);
+  --compare-newer: var(--success);
+  --compare-older: var(--warning);
+  --compare-only-left: var(--info);
+  --compare-only-right: #ff375f;
+  --compare-tint-opacity: 0.1;
+
+  /* ── Chrome density (every bar/header/footer uses these) ── */
+  --chrome-height: 32px;
+  --row-height: 26px;
+  --header-height: var(--chrome-height);
+  --statusbar-height: 26px;
+  --addressbar-height: var(--chrome-height);
+  --tabbar-height: 30px;
+  --fnbar-height: 34px;
+  --menubar-height: 30px;
+  --commandline-height: 32px;
+  --dialog-header-height: 44px;
+  --dialog-footer-height: 52px;
+  --splitter-width: 5px;
+  --panel-padding: 0px;
+  --panel-gap: 0px;
+
+  /* ── Spacing ── */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --chrome-padding-x: 10px;
+  --control-padding-y: 5px;
+  --control-padding-x: 12px;
+  --dialog-padding: 18px;
+  --dialog-padding-y: 14px;
+
+  /* ── Radius (softer, mac-like) ── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* ── Progress ── */
+  --bar-height: 6px;
+  --bar-bg: var(--bg-elevated);
+  --bar-radius: var(--radius-pill);
+  --bar-border: none;
   --bar-fill: var(--accent);
   --bar-fill-error: var(--danger);
   --bar-fill-success: var(--success);
 
-  /* Typography */
-  --font-family: 'Cascadia Code', 'Consolas', 'Fira Code', 'Menlo', 'Monaco', monospace;
-  --font-ui: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'Cascadia Code', 'Consolas', 'Fira Code', 'Menlo', 'Monaco', monospace;
+  /* ── Overlay & elevation ── */
+  --overlay-bg: rgba(0, 0, 0, 0.48);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-dropdown: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.4);
+  --danger-tint: color-mix(in srgb, var(--danger) 12%, transparent);
+  --accent-tint: color-mix(in srgb, var(--accent) 22%, transparent);
+  --accent-tint-soft: color-mix(in srgb, var(--accent) 8%, transparent);
+  --row-stripe: color-mix(in srgb, #ffffff 2.5%, transparent);
+
+  /* ── Typography: system UI for chrome, mono for lists/paths ── */
+  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', 'Fira Code', ui-monospace, monospace;
   --font-size: 13px;
-  --font-size-small: 11px;
+  --font-size-small: 12px;
+  --font-size-ui: 13px;
+  --font-size-title: 14px;
+  --font-size-tiny: 11px;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --letter-spacing-ui: -0.01em;
+  --line-height-ui: 1.3;
 }
 
-/* Light theme */
+/* Light — same structure, airy grays */
 :root[data-theme='light'] {
-  --bg-primary: #f5f8fa;
-  --bg-secondary: #ebf1f5;
-  --bg-tertiary: #e1e8ed;
+  --bg-primary: #ececef;
+  --bg-secondary: #f6f6f7;
+  --bg-tertiary: #e4e4e7;
+  --bg-elevated: #ffffff;
   --bg-panel: #ffffff;
-  --bg-header: #ebf1f5;
-  --bg-selected: #c8ddf0;
-  --bg-cursor: #2d72d2;
-  --bg-hover: #e1e8ed;
+  --bg-header: #f0f0f2;
+  --bg-selected: color-mix(in srgb, #0071e3 18%, #ffffff);
+  --bg-cursor: #0071e3;
+  --bg-hover: color-mix(in srgb, #000000 5%, transparent);
+  --bg-cursor-inactive: color-mix(in srgb, #000000 8%, transparent);
+  --bg-input: #ffffff;
 
-  --text-primary: #1c2127;
-  --text-secondary: #4a6070;
-  --text-muted: #6a7d8a;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --text-on-accent: #ffffff;
+  --text-selected: #1d1d1f;
+  --text-error: #d70015;
 
-  --border-color: #d8dee4;
-  --border-focus: #2d72d2;
+  --border-color: #d2d2d7;
+  --border-subtle: #e5e5ea;
+  --border-focus: #0071e3;
 
-  --accent: #2d72d2;
-  --accent-hover: #215db0;
-  --danger: #cd4246;
-  --success: #238551;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: color-mix(in srgb, #0071e3 14%, transparent);
+  --danger: #ff3b30;
+  --success: #34c759;
+  --warning: #ff9500;
+  --info: #5ac8fa;
+  --compare-only-right: #ff2d55;
+
+  --bar-bg: var(--bg-tertiary);
+  --overlay-bg: rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-dropdown: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.12);
+  --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.1);
+  --row-stripe: color-mix(in srgb, #000000 2%, transparent);
 }
 
-/* Monokai */
+/* Monokai skin — color only; density/radius from :root */
 :root[data-theme='monokai'] {
-  --bg-primary: #272822;
-  --bg-secondary: #1e1f1c;
-  --bg-tertiary: #3e3d32;
+  --bg-primary: #1b1c18;
+  --bg-secondary: #23241e;
+  --bg-tertiary: #2f3028;
+  --bg-elevated: #3e3d32;
   --bg-panel: #272822;
   --bg-header: #1e1f1c;
-  --bg-selected: #49483e;
+  --bg-selected: color-mix(in srgb, #28639a 40%, #272822);
   --bg-cursor: #28639a;
-  --bg-hover: #3e3d32;
+  --bg-hover: color-mix(in srgb, #ffffff 6%, transparent);
+  --bg-cursor-inactive: #3e3d32;
+  --bg-input: #1e1f1c;
 
   --text-primary: #f8f8f2;
   --text-secondary: #cfcfc2;
   --text-muted: #75715e;
+  --text-on-accent: #ffffff;
+  --text-selected: #f8f8f2;
+  --text-error: #f92672;
 
   --border-color: #49483e;
+  --border-subtle: #3e3d32;
   --border-focus: #28639a;
 
-  --accent: #28639a;
-  --accent-hover: #3a7fb8;
+  --accent: #66d9ef;
+  --accent-hover: #a1efe4;
+  --accent-soft: color-mix(in srgb, #66d9ef 16%, transparent);
   --danger: #f92672;
   --success: #a6e22e;
+  --warning: #e6db74;
+  --info: #66d9ef;
+  --compare-only-right: #f92672;
 }
 
-/* Classic blue (Norton Commander style) */
+/* Classic Norton skin — color only */
 :root[data-theme='classic'] {
   --bg-primary: #0000aa;
   --bg-secondary: #0000aa;
   --bg-tertiary: #000088;
+  --bg-elevated: #0000cc;
   --bg-panel: #0000aa;
   --bg-header: #000088;
   --bg-selected: #008888;
   --bg-cursor: #00aaaa;
   --bg-hover: #000088;
+  --bg-cursor-inactive: #000088;
+  --bg-input: #000088;
 
   --text-primary: #ffff55;
   --text-secondary: #55ffff;
   --text-muted: #aaaaaa;
+  --text-on-accent: #000000;
+  --text-selected: #ffff55;
+  --text-error: #ff5555;
 
   --border-color: #55ffff;
+  --border-subtle: #000088;
   --border-focus: #ffffff;
 
   --accent: #55ffff;
   --accent-hover: #ffffff;
+  --accent-soft: color-mix(in srgb, #55ffff 20%, transparent);
   --danger: #ff5555;
   --success: #55ff55;
+  --warning: #ffff55;
+  --info: #55ffff;
+  --compare-only-right: #ff55ff;
+
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --shadow-dropdown: none;
+  --shadow-dialog: none;
 }

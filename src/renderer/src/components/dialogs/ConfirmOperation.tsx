@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize } from '../../utils/format'
 import { useOverlayStore } from '../../stores/overlay-store'
@@ -31,10 +31,16 @@ export function ConfirmOperation({
   const [editDest, setEditDest] = useState(destDir)
   const [writableFormats, setWritableFormats] = useState<ArchiveFormat[]>([])
   const [selectedFormat, setSelectedFormat] = useState<string>('')
+  const destInputRef = useRef<HTMLInputElement>(null)
 
   const totalSize = entries.reduce((sum, e) => sum + (e.size > 0 ? e.size : 0), 0)
   const fileCount = entries.filter((e) => !e.isContainer).length
   const dirCount = entries.filter((e) => e.isContainer).length
+  // Single non-folder file: dest field is full path (dir + name) for rename-on-copy
+  const isSingleFileRename =
+    (type === 'copy' || type === 'move') &&
+    entries.length === 1 &&
+    !entries[0].isContainer
 
   // Load writable archive formats for the pack dialog
   useEffect(() => {
@@ -66,7 +72,30 @@ export function ConfirmOperation({
     : type === 'delete' ? 'Delete'
     : type === 'pack' ? 'Pack'
     : 'Unpack'
-  const destLabel = type === 'pack' ? 'Archive:' : type === 'unpack' ? 'Extract to:' : 'To:'
+  const destLabel = type === 'pack'
+    ? 'Archive:'
+    : type === 'unpack'
+      ? 'Extract to:'
+      : isSingleFileRename
+        ? 'To (edit path or file name):'
+        : 'To:'
+
+  // Select only the file name portion so typing renames quickly (TC-style)
+  useEffect(() => {
+    if (!isSingleFileRename) return
+    const el = destInputRef.current
+    if (!el) return
+    const v = el.value
+    const slash = Math.max(v.lastIndexOf('/'), v.lastIndexOf('\\'))
+    const start = slash >= 0 ? slash + 1 : 0
+    const dot = v.lastIndexOf('.')
+    const end = dot > start ? dot : v.length
+    // Defer so autofocus has settled
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(start, end)
+    })
+  }, [isSingleFileRename])
 
   // Capture keyboard: Enter confirms, Escape cancels, block everything else from panels
   useEffect(() => {
@@ -182,6 +211,7 @@ export function ConfirmOperation({
             <div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{destLabel}</div>
               <input
+                ref={destInputRef}
                 autoFocus
                 value={editDest}
                 onChange={(e) => setEditDest(e.target.value)}
@@ -196,6 +226,11 @@ export function ConfirmOperation({
                   fontSize: 12
                 }}
               />
+              {isSingleFileRename && (
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Change the file name to copy/move as a new name (same folder is fine).
+                </div>
+              )}
             </div>
           )}
 

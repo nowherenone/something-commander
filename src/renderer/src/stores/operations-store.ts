@@ -29,6 +29,11 @@ export interface FileOperation {
   destinationDisplay: string
   destinationLocationId: string
   destinationPluginId: string
+  /**
+   * Optional single-file destination name (rename-on-copy/move). When set,
+   * the first non-directory enumerated item is written under this name.
+   */
+  destinationFileName?: string
   status: 'enumerating' | 'queued' | 'running' | 'done' | 'error' | 'cancelled'
   // File tree (populated after enumeration)
   fileList: FileItem[]
@@ -50,7 +55,17 @@ interface OperationsState {
   operations: FileOperation[]
   showDialog: boolean
 
-  enqueue: (op: Pick<FileOperation, 'type' | 'sourceEntries' | 'sourcePluginId' | 'destinationDisplay' | 'destinationLocationId' | 'destinationPluginId'>) => string
+  enqueue: (
+    op: Pick<
+      FileOperation,
+      | 'type'
+      | 'sourceEntries'
+      | 'sourcePluginId'
+      | 'destinationDisplay'
+      | 'destinationLocationId'
+      | 'destinationPluginId'
+    > & { destinationFileName?: string }
+  ) => string
   updateOperation: (id: string, update: Partial<FileOperation>) => void
   removeOperation: (id: string) => void
   cancelOperation: (id: string) => void

@@ -79,22 +79,22 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
           {/* Built-in plugins */}
           <div className={styles.settingsGroup}>
             <div className={styles.settingsGroupTitle}>Built-in Plugins</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <table className={styles.dataTable}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>Name</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>ID</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>Version</th>
-                  <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>Schemes</th>
+                  <th>Name</th>
+                  <th>ID</th>
+                  <th>Version</th>
+                  <th>Schemes</th>
                 </tr>
               </thead>
               <tbody>
                 {registeredPlugins.map((p) => (
                   <tr key={p.id}>
-                    <td style={{ padding: '3px 8px', color: 'var(--text-primary)' }}>{p.displayName}</td>
-                    <td style={{ padding: '3px 8px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>{p.id}</td>
-                    <td style={{ padding: '3px 8px', color: 'var(--text-muted)' }}>{p.version}</td>
-                    <td style={{ padding: '3px 8px', color: 'var(--accent)', fontSize: 11 }}>{p.schemes.join(', ')}</td>
+                    <td>{p.displayName}</td>
+                    <td className={styles.tinyText} style={{ fontFamily: 'var(--font-mono)' }}>{p.id}</td>
+                    <td className={styles.mutedText}>{p.version}</td>
+                    <td style={{ color: 'var(--accent)' }}>{p.schemes.join(', ')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -102,12 +102,11 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
           </div>
 
           {/* External plugins */}
-          <div className={styles.settingsGroup} style={{ marginTop: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className={styles.settingsGroup} style={{ marginTop: 'var(--space-6)' }}>
+            <div className={styles.formRow} style={{ justifyContent: 'space-between' }}>
               <div className={styles.settingsGroupTitle}>External Plugins</div>
               <button
-                className={`${styles.btn} ${styles.btnSecondary}`}
-                style={{ fontSize: 10, padding: '2px 8px' }}
+                className={`${styles.btn} ${styles.btnSecondary} ${styles.btnCompact}`}
                 onClick={handleOpenDir}
               >
                 Open plugins folder
@@ -115,53 +114,51 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
             </div>
 
             {loading ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: 8 }}>Loading...</div>
+              <div className={styles.mutedText} style={{ padding: 'var(--space-4)' }}>Loading...</div>
             ) : externalPlugins.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: 8 }}>
+              <div className={styles.mutedText} style={{ padding: 'var(--space-4)' }}>
                 No external plugins found.
                 <br />
-                <span style={{ fontSize: 11 }}>
+                <span className={styles.tinyText}>
                   Place plugin folders in: <code style={{ color: 'var(--accent)' }}>{pluginsDir}</code>
                 </span>
               </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table className={styles.dataTable}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>Name</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>Version</th>
-                    <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-secondary)' }}>Status</th>
-                    <th style={{ textAlign: 'right', padding: '4px 8px', color: 'var(--text-secondary)' }}>Actions</th>
+                    <th>Name</th>
+                    <th>Version</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {externalPlugins.map((p) => (
                     <tr key={p.id}>
-                      <td style={{ padding: '3px 8px' }}>
-                        <div style={{ color: 'var(--text-primary)' }}>{p.name}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.description}</div>
+                      <td>
+                        <div>{p.name}</div>
+                        <div className={styles.tinyText}>{p.description}</div>
                       </td>
-                      <td style={{ padding: '3px 8px', color: 'var(--text-muted)' }}>{p.version}</td>
-                      <td style={{ padding: '3px 8px' }}>
+                      <td className={styles.mutedText}>{p.version}</td>
+                      <td>
                         {p.enabled ? (
                           <span style={{ color: 'var(--success)' }}>Loaded</span>
                         ) : (
                           <span style={{ color: 'var(--danger)' }}>{p.error || 'Disabled'}</span>
                         )}
                       </td>
-                      <td style={{ padding: '3px 8px', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         {p.enabled ? (
                           <button
-                            className={`${styles.btn} ${styles.btnSecondary}`}
-                            style={{ fontSize: 10, padding: '2px 8px' }}
+                            className={`${styles.btn} ${styles.btnSecondary} ${styles.btnCompact}`}
                             onClick={() => handleUnload(p.id)}
                           >
                             Unload
                           </button>
                         ) : (
                           <button
-                            className={`${styles.btn} ${styles.btnPrimary}`}
-                            style={{ fontSize: 10, padding: '2px 8px' }}
+                            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnCompact}`}
                             onClick={() => handleLoad(p.path)}
                           >
                             Load
@@ -176,19 +173,11 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
           </div>
 
           {/* How to create a plugin */}
-          <div className={styles.settingsGroup} style={{ marginTop: 16 }}>
+          <div className={styles.settingsGroup} style={{ marginTop: 'var(--space-6)' }}>
             <div className={styles.settingsGroupTitle}>Creating a Plugin</div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            <div className={styles.mutedText} style={{ lineHeight: 1.6 }}>
               <p>Create a folder in the plugins directory with:</p>
-              <pre style={{
-                background: 'var(--bg-tertiary)',
-                padding: 8,
-                borderRadius: 3,
-                fontSize: 10,
-                fontFamily: 'var(--font-mono)',
-                color: 'var(--text-primary)',
-                overflow: 'auto'
-              }}>{`my-plugin/
+              <pre className={styles.codeBlock}>{`my-plugin/
   package.json   // "main": "index.js"
   index.js       // module.exports = class MyPlugin {
                  //   manifest = { id, displayName, version, iconHint, schemes }

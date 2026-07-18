@@ -37,15 +37,20 @@ export function Splitter(): React.JSX.Element {
   return (
     <div
       onMouseDown={onMouseDown}
+      className="splitter"
       style={{
         width: 'var(--splitter-width)',
         cursor: 'col-resize',
-        background: 'var(--border-color)',
+        background: 'var(--border-subtle)',
         flexShrink: 0,
-        transition: 'background 0.15s',
+        transition: 'background 0.15s ease',
       }}
-      onMouseEnter={(e) => ((e.target as HTMLElement).style.background = 'var(--accent)')}
-      onMouseLeave={(e) => ((e.target as HTMLElement).style.background = 'var(--border-color)')}
+      onMouseEnter={(e) => {
+        ;(e.currentTarget as HTMLElement).style.background = 'var(--accent)'
+      }}
+      onMouseLeave={(e) => {
+        ;(e.currentTarget as HTMLElement).style.background = 'var(--border-subtle)'
+      }}
     />
   )
 }

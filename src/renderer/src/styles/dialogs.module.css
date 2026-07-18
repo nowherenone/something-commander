@@ -1,177 +1,326 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .dialog {
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  min-width: 320px;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  min-width: 360px;
   max-width: 90vw;
   max-height: 85vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-dialog);
 }
 
 .dialogWide {
-  width: 640px;
+  width: 680px;
 }
 
 .dialogTitle {
-  padding: 12px 16px;
-  font-size: 14px;
-  font-weight: 600;
+  min-height: var(--dialog-header-height);
+  padding: 0 var(--dialog-padding);
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-ui);
+  letter-spacing: var(--letter-spacing-ui);
   color: var(--text-primary);
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-tertiary);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  background: var(--bg-header);
 }
 
 .dialogBody {
-  padding: 16px;
+  padding: var(--dialog-padding);
   overflow-y: auto;
   flex: 1;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-ui);
 }
 
 .dialogFooter {
-  padding: 12px 16px;
+  min-height: var(--dialog-footer-height);
+  padding: 0 var(--dialog-padding);
   display: flex;
-  gap: 8px;
+  gap: var(--space-3);
+  align-items: center;
   justify-content: flex-end;
-  border-top: 1px solid var(--border-color);
+  border-top: var(--border-width) solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-header) 70%, transparent);
 }
 
-/* Settings dialog specific */
+/* Settings */
 .settingsLayout {
   display: flex;
-  gap: 16px;
-  min-height: 360px;
+  gap: var(--space-6);
+  min-height: 380px;
 }
 
 .settingsSidebar {
-  width: 140px;
+  width: 148px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--border-subtle);
 }
 
 .settingsTab {
-  padding: 6px 10px;
+  padding: var(--space-3) var(--control-padding-x);
   text-align: left;
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
   font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
+  transition: background 0.1s ease, color 0.1s ease;
 }
 
 .settingsTab:hover {
   background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .settingsTabActive {
   background: var(--accent) !important;
-  color: white;
+  color: var(--text-on-accent) !important;
 }
 
 .settingsContent {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-6);
+  min-width: 0;
 }
 
 .settingsGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
 }
 
 .settingsGroupTitle {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--font-size-tiny);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
 }
 
 .settingsRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-5);
 }
 
 .settingsLabel {
-  font-size: var(--font-size);
+  font-size: var(--font-size-ui);
   color: var(--text-secondary);
 }
 
-.settingsInput {
-  width: 120px;
-  padding: 3px 6px;
-  background: var(--bg-tertiary);
+.settingsInput,
+.settingsSelect {
+  width: 140px;
+  height: 28px;
+  padding: 0 var(--space-3);
+  background: var(--bg-input);
   color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
-  font-family: var(--font-family);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-ui);
   font-size: var(--font-size-small);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-.settingsInput:focus {
+.settingsInput:focus,
+.settingsSelect:focus {
   border-color: var(--border-focus);
   outline: none;
-}
-
-.settingsSelect {
-  width: 120px;
-  padding: 3px 6px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
-  font-family: var(--font-family);
-  font-size: var(--font-size-small);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .settingsCheckbox {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   cursor: pointer;
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
 }
 
 .settingsCheckbox input {
   accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
 }
 
-/* Buttons */
-.btn {
-  padding: 5px 16px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-family: var(--font-family);
+/* Shared form / table primitives (replace ad-hoc inline styles) */
+.formToolbar {
+  padding: var(--dialog-padding-y) var(--dialog-padding);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--bg-header);
+}
+
+.formRow {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.formLabel {
+  width: 88px;
+  flex-shrink: 0;
   font-size: var(--font-size-small);
-  border: 1px solid var(--border-color);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+}
+
+.formInput {
+  flex: 1;
+  height: 28px;
+  padding: 0 var(--space-4);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  outline: none;
+  min-width: 0;
+}
+
+.formInput:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.formCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.formCheck input {
+  accent-color: var(--accent);
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
+}
+
+.dataTable th {
+  text-align: left;
+  padding: var(--space-3) var(--space-5);
+  color: var(--text-muted);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--bg-header);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dataTable td {
+  padding: var(--space-3) var(--space-5);
+  color: var(--text-primary);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.dataTable tr:hover td {
+  background: var(--bg-hover);
+}
+
+.rowChanged {
+  background: var(--accent-tint-soft);
+}
+
+.mutedText {
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+}
+
+.tinyText {
+  color: var(--text-muted);
+  font-size: var(--font-size-tiny);
+}
+
+.codeBlock {
+  background: var(--bg-primary);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-tiny);
+  color: var(--text-primary);
+  overflow: auto;
+  line-height: 1.45;
+}
+
+/* Buttons — unified pill-ish controls */
+.btn {
+  height: 28px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  border: var(--border-width) solid var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 .btnPrimary {
   background: var(--accent);
-  color: white;
+  color: var(--text-on-accent);
   border-color: var(--accent);
 }
 
 .btnPrimary:hover {
   background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .btnSecondary {
@@ -180,12 +329,22 @@
 }
 
 .btnSecondary:hover {
-  background: var(--bg-hover);
+  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
 .btnDanger {
   background: var(--danger);
-  color: white;
+  color: var(--text-on-accent);
   border-color: var(--danger);
+}
+
+.btnDanger:hover {
+  filter: brightness(1.08);
+}
+
+.btnCompact {
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-tiny);
 }

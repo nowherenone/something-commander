@@ -347,7 +347,7 @@ function App(): React.JSX.Element {
   }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="appShell">
       <MenuBar onAction={handleMenuAction} />
       <DualPanel />
       {showCommandLine && <CommandLine />}

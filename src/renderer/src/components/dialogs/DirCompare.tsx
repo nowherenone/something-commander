@@ -171,16 +171,16 @@ export function DirCompare({
 
           <div className={styles.legend}>
             <span className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: '#4caf50' }} /> Newer
+              <span className={styles.legendDot} style={{ background: 'var(--compare-newer)' }} /> Newer
             </span>
             <span className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: '#ff9800' }} /> Older
+              <span className={styles.legendDot} style={{ background: 'var(--compare-older)' }} /> Older
             </span>
             <span className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: '#2196f3' }} /> Left only
+              <span className={styles.legendDot} style={{ background: 'var(--compare-only-left)' }} /> Left only
             </span>
             <span className={styles.legendItem}>
-              <span className={styles.legendDot} style={{ background: '#e91e63' }} /> Right only
+              <span className={styles.legendDot} style={{ background: 'var(--compare-only-right)' }} /> Right only
             </span>
           </div>
         </div>
@@ -188,10 +188,10 @@ export function DirCompare({
         <div className={styles.stats}>
           <span>Total: {stats.total}</span>
           <span>Equal: {stats.equal}</span>
-          <span style={{ color: '#4caf50' }}>Newer left: {stats.newerLeft}</span>
-          <span style={{ color: '#ff9800' }}>Newer right: {stats.newerRight}</span>
-          <span style={{ color: '#2196f3' }}>Only left: {stats.onlyLeft}</span>
-          <span style={{ color: '#e91e63' }}>Only right: {stats.onlyRight}</span>
+          <span style={{ color: 'var(--compare-newer)' }}>Newer left: {stats.newerLeft}</span>
+          <span style={{ color: 'var(--compare-older)' }}>Newer right: {stats.newerRight}</span>
+          <span style={{ color: 'var(--compare-only-left)' }}>Only left: {stats.onlyLeft}</span>
+          <span style={{ color: 'var(--compare-only-right)' }}>Only right: {stats.onlyRight}</span>
         </div>
 
         <div
@@ -216,7 +216,7 @@ export function DirCompare({
                     {item.isContainer ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 '}
                     {item.name}
                   </td>
-                  <td style={{ fontSize: 10 }}>
+                  <td className={styles.statusCell}>
                     {item.status === 'equal' && '='}
                     {item.status === 'newer-left' && '\u2190 newer'}
                     {item.status === 'newer-right' && 'newer \u2192'}
@@ -238,7 +238,7 @@ export function DirCompare({
         </div>
 
         <div className={dialogStyles.dialogFooter}>
-          <span style={{ flex: 1, color: 'var(--text-muted)', fontSize: 11 }}>
+          <span className={styles.pathFooter}>
             Left: {leftPath} | Right: {rightPath}
           </span>
           <button className={`${dialogStyles.btn} ${dialogStyles.btnPrimary}`} onClick={onClose}>

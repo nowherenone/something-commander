@@ -138,14 +138,13 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   const lineCount = content.split('\n').length
 
   return (
-    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)' }}>
-      {/* Editor (no top menu/toolbar) */}
+    <div ref={rootRef} className="appShell" style={{ background: 'var(--bg-primary)' }}>
       {loading ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+        <div className="panelSlot" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           Loading...
         </div>
       ) : error ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', padding: 20, textAlign: 'center' }}>
+        <div className="panelSlot" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', padding: 'var(--space-6)', textAlign: 'center' }}>
           {error}
         </div>
       ) : (
@@ -159,12 +158,12 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
           style={{
             flex: 1,
             resize: 'none',
-            background: 'var(--bg-primary)',
+            background: 'var(--bg-panel)',
             color: 'var(--text-primary)',
             border: 'none',
-            padding: '8px 12px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 13,
+            padding: 'var(--space-4) var(--space-5)',
+            fontFamily: 'var(--font-family)',
+            fontSize: 'var(--font-size)',
             lineHeight: 1.5,
             outline: 'none',
             tabSize: 4
@@ -172,33 +171,38 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
         />
       )}
 
-      {/* Status bar (controls + info, no duplicate filename) */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        padding: '4px 12px',
-        background: 'var(--bg-secondary)',
-        borderTop: '1px solid var(--border-color)',
-        fontSize: 11,
-        color: 'var(--text-muted)',
-        flexShrink: 0
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 'var(--space-5)',
+          height: 'var(--statusbar-height)',
+          padding: '0 var(--space-5)',
+          background: 'var(--bg-secondary)',
+          borderTop: 'var(--border-width) solid var(--border-subtle)',
+          fontSize: 'var(--font-size-tiny)',
+          fontFamily: 'var(--font-ui)',
+          color: 'var(--text-muted)',
+          flexShrink: 0
+        }}
+      >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{filePath}</span>
-        <span style={{ color: 'var(--text-muted)' }}>
+        <span>
           {formatSize(fileSize)} | {lineCount} lines
         </span>
         <button
           onClick={handleSave}
           disabled={!modified || saving}
           style={{
-            padding: '2px 8px',
+            height: 24,
+            padding: '0 var(--space-3)',
             background: modified ? 'var(--accent)' : 'var(--bg-tertiary)',
-            color: modified ? 'white' : 'var(--text-muted)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 3,
-            fontSize: 11,
+            color: modified ? 'var(--text-on-accent)' : 'var(--text-muted)',
+            border: 'var(--border-width) solid var(--border-color)',
+            borderRadius: 'var(--radius-xs)',
+            fontSize: 'var(--font-size-tiny)',
+            fontFamily: 'var(--font-ui)',
             cursor: modified ? 'pointer' : 'default',
             flexShrink: 0
           }}

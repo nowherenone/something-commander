@@ -2,8 +2,10 @@
   display: flex;
   height: var(--fnbar-height);
   background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
+  border-top: var(--border-width) solid var(--border-subtle);
   flex-shrink: 0;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-1);
 }
 
 .fnButton {
@@ -11,36 +13,61 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  border: none;
+  gap: var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-secondary);
-  font-family: var(--font-family);
+  font-family: var(--font-ui);
   font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  padding: 0 2px;
-  border-right: 1px solid var(--border-color);
+  padding: 0 var(--space-2);
+  min-width: 0;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .fnButton:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-subtle);
 }
 
 .fnButton:active {
   background: var(--accent);
-  color: white;
+  color: var(--text-on-accent);
+  border-color: var(--accent);
 }
 
-.fnButton:last-child {
-  border-right: none;
+.fnButton:active .fnKey,
+.fnButton:active .fnLabel {
+  color: var(--text-on-accent);
 }
 
 .fnKey {
-  color: var(--accent);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-tiny);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
+
+.fnButton:hover .fnKey {
+  background: var(--bg-elevated);
 }
 
 .fnLabel {
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

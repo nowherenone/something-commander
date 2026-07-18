@@ -1,33 +1,39 @@
 .tabBar {
   display: flex;
+  align-items: flex-end;
   height: var(--tabbar-height);
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-bottom: var(--border-width) solid var(--border-subtle);
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
+  padding: 0 var(--space-2);
+  gap: var(--space-1);
 }
 
 .tabBar::-webkit-scrollbar {
-  height: 2px;
+  height: 0;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 10px;
-  height: 100%;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  height: calc(var(--tabbar-height) - 6px);
+  margin-bottom: 0;
   background: transparent;
   border: none;
-  border-right: 1px solid var(--border-color);
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
   color: var(--text-muted);
-  font-family: var(--font-family);
-  font-size: var(--font-size-small);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-tiny);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   white-space: nowrap;
   max-width: 160px;
-  min-width: 40px;
+  min-width: 48px;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .tab:hover {
@@ -38,7 +44,8 @@
 .tabActive {
   background: var(--bg-panel) !important;
   color: var(--text-primary) !important;
-  border-bottom: 2px solid var(--accent);
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+  font-weight: var(--font-weight-semibold);
 }
 
 .tabName {
@@ -50,23 +57,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: 2px;
-  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-tiny);
   line-height: 1;
   opacity: 0;
   flex-shrink: 0;
+  transition: opacity 0.1s ease, background 0.1s ease;
 }
 
 .tab:hover .tabClose {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 .tabClose:hover {
   opacity: 1 !important;
   background: var(--danger);
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .tabNew {
@@ -74,13 +82,15 @@
   align-items: center;
   justify-content: center;
   width: 26px;
-  height: 100%;
+  height: calc(var(--tabbar-height) - 6px);
   background: transparent;
   border: none;
+  border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-ui);
   flex-shrink: 0;
+  transition: background 0.1s ease, color 0.1s ease;
 }
 
 .tabNew:hover {

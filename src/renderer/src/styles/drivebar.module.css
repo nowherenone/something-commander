@@ -2,16 +2,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 28px;
   height: 100%;
   background: transparent;
   border: none;
-  border-right: 1px solid var(--border-color);
+  border-right: var(--border-width) solid var(--border-subtle);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   flex-shrink: 0;
   position: relative;
+  transition: background 0.1s ease, color 0.1s ease;
 }
 
 .driveButton:hover {
@@ -21,26 +22,27 @@
 
 .driveButtonOpen {
   background: var(--accent) !important;
-  color: white !important;
+  color: var(--text-on-accent) !important;
 }
 
 .dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 2px);
   left: 0;
-  min-width: 220px;
-  max-height: 400px;
+  min-width: 240px;
+  max-height: 420px;
   overflow-y: auto;
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 0 0 4px 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-dropdown);
   z-index: 150;
+  padding: var(--space-2);
 }
 
 .section {
-  padding: 2px 0;
-  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-1) 0;
+  border-bottom: var(--border-width) solid var(--border-subtle);
 }
 
 .section:last-child {
@@ -48,27 +50,30 @@
 }
 
 .sectionTitle {
-  padding: 4px 10px;
-  font-size: 9px;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  font-size: var(--font-size-tiny);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-ui);
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-small);
   color: var(--text-secondary);
   width: 100%;
   background: transparent;
   border: none;
-  font-family: var(--font-family);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-ui);
   text-align: left;
+  transition: background 0.1s ease, color 0.1s ease;
 }
 
 .item:hover {
@@ -78,14 +83,14 @@
 
 .itemActive {
   background: var(--accent) !important;
-  color: white !important;
+  color: var(--text-on-accent) !important;
 }
 
 .itemIcon {
   width: 16px;
   text-align: center;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--font-size-small);
 }
 
 .itemName {
@@ -93,31 +98,34 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: var(--font-weight-medium);
 }
 
 .itemPath {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-tiny);
   font-family: var(--font-mono);
 }
 
 .addBookmark {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--font-size-small);
   color: var(--accent);
   width: 100%;
   background: transparent;
   border: none;
-  font-family: var(--font-family);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-medium);
   text-align: left;
 }
 
 .addBookmark:hover {
-  background: var(--bg-hover);
+  background: var(--accent-soft);
 }
 
 .removeBtn {
@@ -125,17 +133,19 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 10px;
-  padding: 0 4px;
+  font-size: var(--font-size-tiny);
+  padding: 0 var(--space-2);
   opacity: 0;
   flex-shrink: 0;
+  border-radius: var(--radius-xs);
 }
 
 .item:hover .removeBtn {
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .removeBtn:hover {
   opacity: 1 !important;
   color: var(--danger);
+  background: var(--danger-tint);
 }

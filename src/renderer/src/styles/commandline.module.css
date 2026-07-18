@@ -1,11 +1,11 @@
 .commandLine {
   display: flex;
   align-items: center;
-  height: 28px;
+  height: var(--commandline-height);
   background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-  padding: 0 8px;
-  gap: 6px;
+  border-top: var(--border-width) solid var(--border-subtle);
+  padding: 0 var(--chrome-padding-x);
+  gap: var(--space-4);
   flex-shrink: 0;
 }
 
@@ -13,20 +13,31 @@
   color: var(--accent);
   font-family: var(--font-mono);
   font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 240px;
+  flex-shrink: 0;
 }
 
 .input {
   flex: 1;
-  background: transparent;
-  border: none;
+  height: 24px;
+  background: var(--bg-input);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xs);
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: var(--font-size-small);
   outline: none;
+  padding: 0 var(--space-4);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .input::placeholder {
@@ -35,16 +46,17 @@
 
 .outputOverlay {
   position: fixed;
-  bottom: 62px;
-  left: 16px;
-  right: 16px;
+  bottom: calc(var(--fnbar-height) + var(--commandline-height) + var(--space-4));
+  left: var(--space-6);
+  right: var(--space-6);
   max-height: 300px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  background: var(--bg-secondary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
   overflow: auto;
   z-index: 50;
-  padding: 8px;
+  padding: var(--space-5);
+  box-shadow: var(--shadow-dropdown);
 }
 
 .output {
@@ -53,6 +65,7 @@
   color: var(--text-secondary);
   white-space: pre-wrap;
   word-break: break-all;
+  line-height: 1.45;
 }
 
 .outputError {
@@ -61,15 +74,22 @@
 
 .closeOutput {
   position: absolute;
-  top: 4px;
-  right: 8px;
+  top: var(--space-3);
+  right: var(--space-4);
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
+  border-radius: var(--radius-xs);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-title);
 }
 
 .closeOutput:hover {
   color: var(--text-primary);
+  background: var(--bg-hover);
 }

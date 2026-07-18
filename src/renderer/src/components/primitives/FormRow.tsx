@@ -27,11 +27,11 @@ export function FormRow({
   disabled
 }: FormRowProps): React.JSX.Element {
   const inputStyle: React.CSSProperties =
-    inputWidth !== undefined ? { width: inputWidth } : { flex: 1, width: 'auto' }
+    inputWidth !== undefined ? { width: inputWidth, flex: 'none' } : { flex: 1, width: 'auto' }
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <label style={{ width: labelWidth, fontSize: 12, color: 'var(--text-secondary)' }}>
+    <div className={styles.formRow}>
+      <label className={styles.formLabel} style={{ width: labelWidth }}>
         {label}
       </label>
       <input
@@ -41,7 +41,7 @@ export function FormRow({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className={styles.settingsInput}
+        className={styles.formInput}
         style={inputStyle}
         disabled={disabled}
       />

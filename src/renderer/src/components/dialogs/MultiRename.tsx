@@ -97,83 +97,50 @@ export function MultiRename({
       >
         <div className={styles.dialogTitle}>Multi-Rename Tool (Ctrl+M)</div>
 
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--border-color)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8
-          }}
-        >
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12, width: 80 }}>
-              Search:
-            </label>
+        <div className={styles.formToolbar}>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Search:</label>
             <input
               autoFocus
               value={searchPattern}
               onChange={(e) => setSearchPattern(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
               placeholder="Text to find"
-              style={{
-                flex: 1,
-                padding: '4px 8px',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 3,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12
-              }}
+              className={styles.formInput}
             />
-            <label style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', gap: 4, alignItems: 'center' }}>
+            <label className={styles.formCheck}>
               <input
                 type="checkbox"
                 checked={useRegex}
                 onChange={(e) => setUseRegex(e.target.checked)}
-                style={{ accentColor: 'var(--accent)' }}
               />
               Regex
             </label>
           </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12, width: 80 }}>
-              Replace:
-            </label>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Replace:</label>
             <input
               value={replacePattern}
               onChange={(e) => setReplacePattern(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
               placeholder="Replacement ([C] = counter)"
-              style={{
-                flex: 1,
-                padding: '4px 8px',
-                background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 3,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 12
-              }}
+              className={styles.formInput}
             />
           </div>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12, width: 80 }}>
-              Case:
-            </label>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Case:</label>
             <select
               value={caseMode}
               onChange={(e) => setCaseMode(e.target.value as typeof caseMode)}
               className={styles.settingsSelect}
-              style={{ width: 100 }}
+              style={{ width: 120 }}
             >
               <option value="none">No change</option>
               <option value="upper">UPPER</option>
               <option value="lower">lower</option>
               <option value="title">Title Case</option>
             </select>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12, marginLeft: 16 }}>
+            <label className={styles.formLabel} style={{ width: 'auto', marginLeft: 'var(--space-4)' }}>
               Counter start:
             </label>
             <input
@@ -181,16 +148,16 @@ export function MultiRename({
               value={counter}
               onChange={(e) => setCounter(Number(e.target.value))}
               className={styles.settingsInput}
-              style={{ width: 60 }}
+              style={{ width: 64 }}
               min={0}
             />
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Digits:</label>
+            <label className={styles.formLabel} style={{ width: 'auto' }}>Digits:</label>
             <input
               type="number"
               value={counterPad}
               onChange={(e) => setCounterPad(Number(e.target.value))}
               className={styles.settingsInput}
-              style={{ width: 50 }}
+              style={{ width: 56 }}
               min={1}
               max={10}
             />
@@ -198,49 +165,18 @@ export function MultiRename({
         </div>
 
         <div className={styles.dialogBody} style={{ padding: 0, overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <table className={styles.dataTable}>
             <thead>
-              <tr style={{ background: 'var(--bg-header)', position: 'sticky', top: 0 }}>
-                <th
-                  style={{
-                    textAlign: 'left',
-                    padding: '4px 12px',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 600,
-                    width: '45%'
-                  }}
-                >
-                  Old Name
-                </th>
-                <th style={{ width: 20 }}></th>
-                <th
-                  style={{
-                    textAlign: 'left',
-                    padding: '4px 12px',
-                    color: 'var(--text-secondary)',
-                    fontWeight: 600,
-                    width: '45%'
-                  }}
-                >
-                  New Name
-                </th>
+              <tr>
+                <th style={{ width: '45%' }}>Old Name</th>
+                <th style={{ width: 28 }} />
+                <th style={{ width: '45%' }}>New Name</th>
               </tr>
             </thead>
             <tbody>
               {previews.map((p, i) => (
-                <tr
-                  key={i}
-                  style={{
-                    background: p.changed ? 'rgba(45, 114, 210, 0.1)' : 'transparent'
-                  }}
-                >
-                  <td
-                    style={{
-                      padding: '3px 12px',
-                      color: 'var(--text-secondary)',
-                      fontFamily: 'var(--font-mono)'
-                    }}
-                  >
+                <tr key={i} className={p.changed ? styles.rowChanged : undefined}>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                     {p.oldName}
                   </td>
                   <td style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
@@ -248,9 +184,8 @@ export function MultiRename({
                   </td>
                   <td
                     style={{
-                      padding: '3px 12px',
-                      color: p.changed ? 'var(--accent)' : 'var(--text-muted)',
                       fontFamily: 'var(--font-mono)',
+                      color: p.changed ? 'var(--accent)' : 'var(--text-muted)',
                       fontWeight: p.changed ? 600 : 400
                     }}
                   >
@@ -263,7 +198,7 @@ export function MultiRename({
         </div>
 
         <div className={styles.dialogFooter}>
-          <span style={{ color: 'var(--text-muted)', fontSize: 11, flex: 1 }}>
+          <span className={styles.mutedText} style={{ flex: 1 }}>
             {changedCount} of {entries.length} file{entries.length !== 1 ? 's' : ''} will be renamed
           </span>
           <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose}>

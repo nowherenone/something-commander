@@ -323,6 +323,29 @@ function joinLocalPath(parent: string, name: string): string {
 }
 
 /**
+ * Apply optional single-file rename from the confirm dialog onto enumerated items.
+ * Only rewrites the top-level file when destinationFileName is set.
+ */
+export function applyDestinationFileName(
+  fileList: FileItem[],
+  destinationFileName: string | undefined
+): FileItem[] {
+  if (!destinationFileName) return fileList
+  const idx = fileList.findIndex((f) => !f.isDirectory)
+  if (idx < 0) return fileList
+  const item = fileList[idx]
+  const { parent } = splitPathTail(item.destPath)
+  const newDest = parent ? joinLocalPath(parent, destinationFileName) : destinationFileName
+  const next = fileList.slice()
+  next[idx] = {
+    ...item,
+    destPath: newDest,
+    relativePath: destinationFileName
+  }
+  return next
+}
+
+/**
  * Same-volume local move: use fs.rename (via moveSingleFile) on each top-level
  * selection instead of stream-copy + delete. Instant on one disk; EXDEV still
  * falls back to copy+delete inside moveSingleFile.
@@ -364,9 +387,11 @@ async function tryLocalFsRenameMove(
       return true
     }
 
-    const destPath = joinLocalPath(op.destinationLocationId, entry.name)
+    const destName =
+      op.destinationFileName && entries.length === 1 ? op.destinationFileName : entry.name
+    const destPath = joinLocalPath(op.destinationLocationId, destName)
     store().updateOperation(opId, {
-      currentFile: entry.name,
+      currentFile: destName,
       currentFileSize: Math.max(0, entry.size || 0),
       currentFileCopied: 0
     })
@@ -412,7 +437,7 @@ async function tryLocalFsRenameMove(
             op: 'delete',
             entries: [{
               id: destPath,
-              name: entry.name,
+              name: destName,
               isContainer: entry.isContainer,
               size: destInfo?.size || 0,
               modifiedAt: 0,
@@ -429,7 +454,7 @@ async function tryLocalFsRenameMove(
             op: 'delete',
             entries: [{
               id: destPath,
-              name: entry.name,
+              name: destName,
               isContainer: entry.isContainer,
               size: 0,
               modifiedAt: 0,
@@ -514,6 +539,9 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
       })
       return
     }
+
+    // Single-file rename-on-copy/move from confirm dialog
+    fileList = applyDestinationFileName(fileList, op.destinationFileName)
 
     if (isCancelled(opId)) {
       // Explicitly mark as cancelled so UI and queue treat it as terminal

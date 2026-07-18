@@ -2,37 +2,46 @@
   display: flex;
   height: var(--header-height);
   background: var(--bg-header);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: var(--border-width) solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .headerCell {
   display: flex;
   align-items: center;
-  padding: 0 8px;
-  font-size: var(--font-size);
-  font-weight: 600;
-  color: var(--text-secondary);
+  padding: 0 var(--chrome-padding-x);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-tiny);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
   overflow: hidden;
   white-space: nowrap;
+  transition: color 0.1s ease, background 0.1s ease;
 }
 
 .headerCell:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
 }
 
 .sortArrow {
   font-size: 9px;
-  margin-left: 2px;
+  margin-left: var(--space-2);
+  color: var(--accent);
 }
 
 .fileList {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  /* --font-family is the user-set list font (mono by default) */
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  background: var(--bg-panel);
 }
 
 .empty {
@@ -41,6 +50,8 @@
   justify-content: center;
   height: 100%;
   color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
 }
 
 .entryRow {
@@ -48,37 +59,51 @@
   height: var(--row-height);
   align-items: center;
   cursor: default;
+  border-radius: 0;
+  color: var(--text-primary);
+  transition: background 0.06s ease;
 }
 
-.entryRow:hover {
+/* Subtle zebra for scanability */
+.entryRow:nth-child(even):not(.cursor):not(.selected):not(.cursorInactive) {
+  background: var(--row-stripe);
+}
+
+.entryRow:hover:not(.cursor):not(.selected) {
   background: var(--bg-hover);
 }
 
 .entryRow.cursor {
-  background: color-mix(in srgb, var(--bg-cursor) 60%, transparent);
-  color: white;
+  background: color-mix(in srgb, var(--bg-cursor) 55%, transparent);
+  color: var(--text-on-accent);
 }
 
-
 .entryRow.cursorInactive {
-  background: #3a3f47;
+  background: var(--bg-cursor-inactive);
   color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 
 .entryRow.selected {
   background: var(--bg-selected);
-  color: #ffcc00;
+  color: var(--text-selected);
 }
 
 .entryRow.selected .colExt,
 .entryRow.selected .colSize,
 .entryRow.selected .colDate {
-  color: #ffcc00;
+  color: color-mix(in srgb, var(--text-selected) 85%, transparent);
 }
 
 .entryRow.cursor.selected {
   background: var(--bg-cursor);
-  color: #ffcc00;
+  color: var(--text-on-accent);
+}
+
+.entryRow.cursor.selected .colExt,
+.entryRow.cursor.selected .colSize,
+.entryRow.cursor.selected .colDate {
+  color: color-mix(in srgb, var(--text-on-accent) 85%, transparent);
 }
 
 .sizeLoading {
@@ -93,25 +118,25 @@
 }
 
 .entryRow.container .fileName {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .entryRow.errorEntry {
-  color: #e57373;
+  color: var(--text-error);
 }
 
 .entryRow.errorEntry .colExt,
 .entryRow.errorEntry .colSize,
 .entryRow.errorEntry .colDate {
-  color: #e57373;
+  color: var(--text-error);
 }
 
 .colName {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: var(--space-3);
+  padding: 0 var(--chrome-padding-x);
   min-width: 0;
   overflow: hidden;
 }
@@ -127,12 +152,14 @@
   flex-shrink: 0;
   width: 18px;
   text-align: center;
+  opacity: 0.9;
 }
 
 .colExt {
   width: 5em;
-  padding: 0 8px;
-  font-size: var(--font-size);
+  padding: 0 var(--chrome-padding-x);
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
   text-align: left;
   flex-shrink: 0;
   overflow: hidden;
@@ -141,53 +168,58 @@
 }
 
 .colSize {
-  width: 7em;
-  padding: 0 8px;
+  width: 7.5em;
+  padding: 0 var(--chrome-padding-x);
   text-align: right;
-  font-size: var(--font-size);
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Drive size bar in home view */
 .driveBar {
   display: inline-block;
-  width: 74px;
+  width: 72px;
   height: var(--bar-height);
   background: var(--bar-bg);
   border-radius: var(--bar-radius);
-  border: var(--bar-border);
+  border: none;
   overflow: hidden;
+  vertical-align: middle;
 }
 
 .driveBarFill {
   background: var(--bar-fill);
+  height: 100%;
+  display: block;
+  border-radius: var(--bar-radius);
 }
 
 .colDate {
   width: 11em;
-  padding: 0 8px;
-  font-size: var(--font-size);
+  padding: 0 var(--chrome-padding-x);
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Drag and drop */
 .entryRow.dragging {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .fileList.dropTarget {
   outline: 2px dashed var(--accent);
-  outline-offset: -2px;
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  outline-offset: -3px;
+  background: var(--accent-tint-soft);
 }
 
-/* Inline rename (F2 / Ctrl+Enter) */
 .entryRow.renaming {
   z-index: 1;
 }
@@ -196,19 +228,21 @@
   flex: 1;
   min-width: 0;
   width: 100%;
-  background: var(--bg-primary);
+  height: calc(var(--row-height) - 4px);
+  background: var(--bg-input);
   color: var(--text-primary);
-  border: 1px solid var(--accent);
-  border-radius: 2px;
-  padding: 0 4px;
-  margin: -1px 0;
+  border: var(--border-width) solid var(--accent);
+  border-radius: var(--radius-xs);
+  padding: 0 var(--space-3);
+  margin: 0;
   font: inherit;
   font-size: inherit;
   line-height: inherit;
   outline: none;
   box-sizing: border-box;
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .renameInput:focus {
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }

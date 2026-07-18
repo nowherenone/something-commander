@@ -3,6 +3,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--bg-panel);
 }
 
 .empty {
@@ -12,6 +13,7 @@
   justify-content: center;
   color: var(--text-muted);
   font-size: var(--font-size-small);
+  font-family: var(--font-ui);
 }
 
 .dirState {
@@ -22,24 +24,28 @@
   justify-content: center;
   color: var(--text-muted);
   font-size: var(--font-size-small);
-  gap: 4px;
+  font-family: var(--font-ui);
+  gap: var(--space-3);
 }
 
 .dirIcon {
-  font-size: 24px;
+  font-size: 28px;
+  opacity: 0.85;
 }
 
 .dirName {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
+  font-size: var(--font-size-ui);
 }
 
 .header {
   height: var(--header-height);
-  padding: 0 8px;
+  padding: 0 var(--chrome-padding-x);
   background: var(--bg-header);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: var(--border-width) solid var(--border-subtle);
   font-size: var(--font-size-small);
+  font-family: var(--font-ui);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -49,7 +55,7 @@
 
 .headerName {
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -57,5 +63,7 @@
 
 .headerMeta {
   flex-shrink: 0;
-  margin-left: 8px;
+  margin-left: var(--space-4);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-size-tiny);
 }

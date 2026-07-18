@@ -7,12 +7,12 @@ export function DualPanel(): React.JSX.Element {
   const splitRatio = useAppStore((s) => s.splitRatio)
 
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-      <div style={{ width: `${splitRatio * 100}%`, display: 'flex', overflow: 'hidden' }}>
+    <div className="panelRow">
+      <div className="panelSlot" style={{ width: `${splitRatio * 100}%` }}>
         <FilePanel panelId="left" />
       </div>
       <Splitter />
-      <div style={{ width: `${(1 - splitRatio) * 100}%`, display: 'flex', overflow: 'hidden' }}>
+      <div className="panelSlot" style={{ width: `${(1 - splitRatio) * 100}%` }}>
         <FilePanel panelId="right" />
       </div>
     </div>
