@@ -74,9 +74,9 @@ interface UtilAPI {
     destPluginId: string,
     destLocationId: string,
     destFileName: string,
-    onProgress?: (bytes: number) => void,
-    signal?: AbortSignal
+    transferId?: string
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }>
+  cancelStreamCopy(transferId: string): Promise<void>
   extractFromArchive(archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   onExtractProgress(

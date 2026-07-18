@@ -166,8 +166,10 @@ export class ZipDriver implements ArchiveDriver {
           if (entry.fileName === entryPath) {
             zipfile.openReadStream(entry, (streamErr, readStream) => {
               if (streamErr || !readStream) { closeZip(); resolve(null); return }
+              // close on end/error/close so cancel (destroy) releases the zip handle
               readStream.on('end', closeZip)
               readStream.on('error', closeZip)
+              readStream.on('close', closeZip)
               resolve(readStream)
             })
           } else {

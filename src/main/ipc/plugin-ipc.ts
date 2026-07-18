@@ -54,21 +54,48 @@ export function registerPluginIPC(): void {
       sourceEntryId: string,
       destPluginId: string,
       destLocationId: string,
-      destFileName: string
+      destFileName: string,
+      transferId?: string
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender)
+      // Coalesce progress to the next tick so a tight zip-inflate loop cannot
+      // flood the renderer, while still delivering mid-copy after each yield.
+      let pendingBytes: number | null = null
+      let flushScheduled = false
+      const sendProgress = (bytesCopied: number): void => {
+        pendingBytes = bytesCopied
+        if (flushScheduled || !win) return
+        flushScheduled = true
+        setImmediate(() => {
+          flushScheduled = false
+          if (pendingBytes !== null && win && !win.isDestroyed()) {
+            win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, pendingBytes)
+            pendingBytes = null
+          }
+        })
+      }
       return pluginManager.streamCopyFile(
         sourcePluginId,
         sourceEntryId,
         destPluginId,
         destLocationId,
         destFileName,
-        (bytesCopied) => {
-          if (win) win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, bytesCopied)
+        sendProgress,
+        transferId
+      ).then((result) => {
+        // Final flush so the last byte count is never lost after unsub races
+        if (pendingBytes !== null && win && !win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, pendingBytes)
+          pendingBytes = null
         }
-      )
+        return result
+      })
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.CANCEL_STREAM_COPY, (_event, transferId: string) => {
+    pluginManager.cancelStreamCopy(transferId)
+  })
 
   // External plugin management
   ipcMain.handle(IPC_CHANNELS.PLUGIN_SCAN, () => scanPlugins())

@@ -4,9 +4,24 @@ import type { OperationRequest, OperationResult, PluginOperation } from '@shared
 
 export class PluginManager {
   private plugins: Map<string, BrowsePlugin> = new Map()
+  /** Active stream copies — cancelStreamCopy(transferId) destroys their pipes. */
+  private activeStreamCopies = new Map<string, () => void>()
+  /** Cancels that arrived before the transfer registered its abort handler. */
+  private pendingCancels = new Set<string>()
 
   register(plugin: BrowsePlugin): void {
     this.plugins.set(plugin.manifest.id, plugin)
+  }
+
+  /** Abort an in-flight streamCopyFile (renderer cancel). Safe if already finished. */
+  cancelStreamCopy(transferId: string): void {
+    const abort = this.activeStreamCopies.get(transferId)
+    if (abort) {
+      abort()
+      return
+    }
+    // Not registered yet (still opening source / zip entry) — remember for later
+    this.pendingCancels.add(transferId)
   }
 
   get(pluginId: string): BrowsePlugin | undefined {
@@ -219,6 +234,8 @@ export class PluginManager {
   /**
    * Stream-copy a single file between any two plugins.
    * Returns bytes written. Sends progress via onProgress callback.
+   * Pass transferId so the renderer can cancel via cancelStreamCopy (AbortSignal
+   * cannot cross Electron IPC).
    */
   async streamCopyFile(
     sourcePluginId: string,
@@ -227,54 +244,149 @@ export class PluginManager {
     destLocationId: string,
     destFileName: string,
     onProgress?: (bytesCopied: number) => void,
-    signal?: AbortSignal
+    transferId?: string
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
+    type CopyResult = { success: boolean; bytesWritten: number; error?: string }
+
     const sourcePlugin = this.get(sourcePluginId)
     const destPlugin = this.get(destPluginId)
     if (!sourcePlugin) return { success: false, bytesWritten: 0, error: `Unknown source plugin: ${sourcePluginId}` }
     if (!destPlugin) return { success: false, bytesWritten: 0, error: `Unknown dest plugin: ${destPluginId}` }
-    if (!sourcePlugin.createReadStream) return { success: false, bytesWritten: 0, error: `Source plugin ${sourcePluginId} does not support streaming` }
-    if (!destPlugin.writeFromStream) return { success: false, bytesWritten: 0, error: `Dest plugin ${destPluginId} does not support streaming` }
+    if (!sourcePlugin.createReadStream) {
+      return { success: false, bytesWritten: 0, error: `Source plugin ${sourcePluginId} does not support streaming` }
+    }
+    if (!destPlugin.writeFromStream) {
+      return { success: false, bytesWritten: 0, error: `Dest plugin ${destPluginId} does not support streaming` }
+    }
 
-    const readStream = await sourcePlugin.createReadStream(sourceEntryId)
-    if (!readStream) return { success: false, bytesWritten: 0, error: `Could not open read stream for ${sourceEntryId}` }
-
-    if (signal?.aborted) {
-      ;(readStream as any).destroy?.()
+    if (transferId && this.pendingCancels.has(transferId)) {
+      this.pendingCancels.delete(transferId)
       return { success: false, bytesWritten: 0, error: 'Cancelled' }
     }
 
-    // Progress via Transform so we don't put the source into flowing mode before the
-    // destination is ready to pipe (avoids lost chunks + silent zero progress).
+    let cancelled = false
     let bytesCopied = 0
-    let lastReport = 0
-    const progressStream = new Transform({
-      transform(chunk: Buffer, _enc, callback) {
-        bytesCopied += chunk.length
-        if (onProgress) {
-          const now = Date.now()
-          if (now - lastReport >= 250) {
-            onProgress(bytesCopied)
-            lastReport = now
-          }
-        }
-        callback(null, chunk)
-      }
+    let lastReportBytes = 0
+    let lastReportTime = 0
+    let readStream: NodeJS.ReadableStream | null = null
+    let progressStream: Transform | null = null
+    let settleCancel: ((r: CopyResult) => void) | null = null
+    const cancelRace = new Promise<CopyResult>((resolve) => {
+      settleCancel = resolve
     })
-    readStream.pipe(progressStream)
 
-    const abortHandler = () => {
-      ;(readStream as any).destroy?.()
-      progressStream.destroy()
+    const REPORT_EVERY_BYTES = 256 * 1024
+    const REPORT_EVERY_MS = 50
+
+    const destroyStreams = (): void => {
+      try {
+        if (readStream && progressStream) {
+          ;(readStream as NodeJS.ReadableStream & { unpipe?: (d?: unknown) => void }).unpipe?.(progressStream)
+        }
+      } catch { /* ignore */ }
+      try {
+        ;(readStream as { destroy?: (e?: Error) => void } | null)?.destroy?.(new Error('Cancelled'))
+      } catch { /* ignore */ }
+      try {
+        progressStream?.destroy(new Error('Cancelled'))
+      } catch { /* ignore */ }
     }
-    if (signal) signal.addEventListener('abort', abortHandler, { once: true })
 
-    const result = await destPlugin.writeFromStream(destLocationId, destFileName, progressStream)
-    if (signal) signal.removeEventListener('abort', abortHandler)
-    if (onProgress) onProgress(result.bytesWritten || bytesCopied)
-    if (signal?.aborted) return { success: false, bytesWritten: result.bytesWritten, error: 'Cancelled' }
-    return result
+    const abort = (): void => {
+      if (cancelled) return
+      cancelled = true
+      destroyStreams()
+      settleCancel?.({ success: false, bytesWritten: bytesCopied, error: 'Cancelled' })
+    }
+
+    // Register cancel handle BEFORE any await so cancel during zip open works
+    if (transferId) {
+      this.activeStreamCopies.set(transferId, abort)
+      if (this.pendingCancels.has(transferId)) {
+        this.pendingCancels.delete(transferId)
+        abort()
+        this.activeStreamCopies.delete(transferId)
+        return { success: false, bytesWritten: 0, error: 'Cancelled' }
+      }
+    }
+
+    try {
+      readStream = await sourcePlugin.createReadStream(sourceEntryId)
+      if (cancelled) {
+        ;(readStream as { destroy?: () => void } | null)?.destroy?.()
+        return { success: false, bytesWritten: 0, error: 'Cancelled' }
+      }
+      if (!readStream) {
+        return { success: false, bytesWritten: 0, error: `Could not open read stream for ${sourceEntryId}` }
+      }
+
+      // Progress transform: count bytes, report often, yield so cancel/IPC run mid-copy.
+      // Zip inflate is often a tight sync loop — without setImmediate the UI freezes and
+      // cancel never runs until the whole file is done.
+      // yauzl often emits multi‑MB chunks in one transform call. Slice them so we
+      // can report progress and honor cancel between pieces. Always yield via
+      // setImmediate (never wait on 'drain' here — that deadlocks with pipe).
+      const PIECE = 256 * 1024
+      progressStream = new Transform({
+        highWaterMark: PIECE,
+        transform(this: Transform, chunk: Buffer, _enc, callback) {
+          let offset = 0
+          const pump = (): void => {
+            if (cancelled) {
+              callback(new Error('Cancelled'))
+              return
+            }
+            if (offset >= chunk.length) {
+              callback()
+              return
+            }
+            const end = Math.min(offset + PIECE, chunk.length)
+            const piece = chunk.subarray(offset, end)
+            offset = end
+            bytesCopied += piece.length
+            const now = Date.now()
+            const byBytes = bytesCopied - lastReportBytes >= REPORT_EVERY_BYTES
+            const byTime = lastReportTime === 0 || now - lastReportTime >= REPORT_EVERY_MS
+            if (onProgress && (byBytes || byTime)) {
+              lastReportBytes = bytesCopied
+              lastReportTime = now
+              onProgress(bytesCopied)
+            }
+            this.push(piece)
+            setImmediate(pump)
+          }
+          pump()
+        }
+      })
+
+      const swallow = (): void => { /* cancel teardown */ }
+      ;(readStream as NodeJS.EventEmitter).on('error', swallow)
+      progressStream.on('error', swallow)
+
+      // Destination first so the transform always has a consumer
+      const writePromise = destPlugin.writeFromStream(destLocationId, destFileName, progressStream)
+      readStream.pipe(progressStream)
+
+      const result = await Promise.race([writePromise, cancelRace])
+
+      if (cancelled || result.error === 'Cancelled' || String(result.error || '').includes('Cancelled')) {
+        return { success: false, bytesWritten: bytesCopied || result.bytesWritten, error: 'Cancelled' }
+      }
+      if (onProgress) onProgress(result.bytesWritten || bytesCopied)
+      return result
+    } catch (err) {
+      if (cancelled || String(err).includes('Cancelled')) {
+        return { success: false, bytesWritten: bytesCopied, error: 'Cancelled' }
+      }
+      return { success: false, bytesWritten: bytesCopied, error: String(err) }
+    } finally {
+      if (transferId) {
+        this.activeStreamCopies.delete(transferId)
+        this.pendingCancels.delete(transferId)
+      }
+    }
   }
 }
+
 
 export const pluginManager = new PluginManager()

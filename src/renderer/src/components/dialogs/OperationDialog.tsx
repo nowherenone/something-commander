@@ -57,7 +57,8 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const setShowDialog = useOperationsStore((s) => s.setShowDialog)
 
   // Include the in-flight file so the total bar moves during large single files.
-  const effectiveBytes = op.processedBytes + Math.max(0, op.currentFileCopied || 0)
+  const copied = Math.max(0, op.currentFileCopied || 0)
+  const effectiveBytes = op.processedBytes + copied
   const totalPct = op.totalBytes > 0
     ? Math.min(100, Math.round((Math.min(effectiveBytes, op.totalBytes) / op.totalBytes) * 100))
     : op.totalFiles > 0
@@ -65,10 +66,11 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       : 0
 
   const filePct = op.currentFileSize > 0
-    ? Math.min(100, Math.round((Math.max(0, op.currentFileCopied) / op.currentFileSize) * 100))
+    ? Math.min(100, Math.round((copied / op.currentFileSize) * 100))
     : 0
 
   const isFileInProgress = op.status === 'running' && op.currentFile !== ''
+  const hasFileProgress = isFileInProgress && (op.currentFileSize > 0 || copied > 0)
   const isError = op.status === 'error'
   const isCancelled = op.status === 'cancelled'
   const isRunning = op.status === 'running'
@@ -79,7 +81,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const typeLabel = op.type === 'copy' ? 'Copying' : op.type === 'move' ? 'Moving' : 'Deleting'
   const elapsedMs = op.startTime > 0 ? Date.now() - op.startTime : 0
   const speed =
-    isRunning && elapsedMs > 1000
+    isRunning && elapsedMs > 1000 && effectiveBytes > 0
       ? formatSpeed((Math.min(effectiveBytes, op.totalBytes || effectiveBytes) / elapsedMs) * 1000)
       : ''
   const eta = isRunning
@@ -135,13 +137,18 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
           <span>Current file</span>
           <span data-testid="op-file-pct">
             {isFileInProgress && op.currentFileSize > 0
-              ? `${formatSize(op.currentFileCopied)} / ${formatSize(op.currentFileSize)}`
-              : '\u00A0'}
+              ? `${formatSize(copied)} / ${formatSize(op.currentFileSize)}`
+              : isFileInProgress && copied > 0
+                ? formatSize(copied)
+                : '\u00A0'}
           </span>
         </div>
         <div className={styles.opBar}>
-          {isFileInProgress && op.currentFileSize > 0 ? (
+          {hasFileProgress && op.currentFileSize > 0 ? (
             <div className={styles.opBarFill} style={{ width: `${filePct}%` }} data-testid="op-file-bar" />
+          ) : hasFileProgress && copied > 0 ? (
+            // Unknown total size: show a moving indeterminate bar (still better than frozen)
+            <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} data-testid="op-file-bar" />
           ) : isRunning || isEnumerating ? (
             <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
           ) : (
@@ -203,7 +210,19 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
 export function OperationDialog(): React.JSX.Element | null {
   const operations = useOperationsStore((s) => s.operations)
   const showDialog = useOperationsStore((s) => s.showDialog)
-  const current = useOperationsStore((s) => s.getCurrentOperation())
+  // Select the live op object from `operations` so currentFileCopied updates re-render.
+  // (Calling getCurrentOperation() is fine for identity, but reading fields from the
+  // operations array keeps the subscription tied to the data that progress mutates.)
+  const current = useOperationsStore((s) => {
+    const ops = s.operations
+    return (
+      ops.find((op) => op.status === 'running') ||
+      ops.find((op) => op.status === 'enumerating') ||
+      ops.find((op) => op.status === 'queued') ||
+      ops.find((op) => op.status === 'error') ||
+      ops[ops.length - 1]
+    )
+  })
   const cancel = useOperationsStore((s) => s.cancelOperation)
   const remove = useOperationsStore((s) => s.removeOperation)
 

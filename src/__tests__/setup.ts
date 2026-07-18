@@ -55,6 +55,7 @@ const mockUtilApi = {
   s3Connect: vi.fn().mockResolvedValue('s3-my-bucket'),
   s3Disconnect: vi.fn().mockResolvedValue(undefined),
   streamCopyFile: vi.fn().mockResolvedValue({ success: true, bytesWritten: 1000 }),
+  cancelStreamCopy: vi.fn().mockResolvedValue(undefined),
   extractFromArchive: vi.fn().mockResolvedValue({ success: true, extractedCount: 1 })
 }
 

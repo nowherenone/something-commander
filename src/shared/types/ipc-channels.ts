@@ -45,6 +45,7 @@ export const IPC_CHANNELS = {
   EXTRACT_FROM_ARCHIVE: 'ops:extractFromArchive',
   EXTRACT_PROGRESS: 'ops:extractProgress',
   STREAM_COPY_FILE: 'ops:streamCopyFile',
+  CANCEL_STREAM_COPY: 'ops:cancelStreamCopy',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
   // Persistent user data store (survives builds)

@@ -139,10 +139,20 @@ const utilAPI = {
     destPluginId: string,
     destLocationId: string,
     destFileName: string,
-    _onProgress?: any,
-    _signal?: AbortSignal
+    transferId?: string
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.STREAM_COPY_FILE, sourcePluginId, sourceEntryId, destPluginId, destLocationId, destFileName),
+    ipcRenderer.invoke(
+      IPC_CHANNELS.STREAM_COPY_FILE,
+      sourcePluginId,
+      sourceEntryId,
+      destPluginId,
+      destLocationId,
+      destFileName,
+      transferId
+    ),
+
+  cancelStreamCopy: (transferId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CANCEL_STREAM_COPY, transferId),
 
   extractFromArchive: (archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }> =>
     ipcRenderer.invoke(IPC_CHANNELS.EXTRACT_FROM_ARCHIVE, archivePath, internalPath, destDir),

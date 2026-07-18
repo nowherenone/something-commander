@@ -110,7 +110,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
     set((s) => ({
       operations: s.operations.map((op) =>
         op.id === id && (op.status === 'running' || op.status === 'enumerating' || op.status === 'queued')
-          ? { ...op, status: 'cancelled' as const }
+          ? { ...op, status: 'cancelled' as const, overwritePrompt: null }
           : op
       )
     }))

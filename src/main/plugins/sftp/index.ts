@@ -265,10 +265,20 @@ export class SftpPlugin implements BrowsePlugin {
       const writeStream = conn.client.createWriteStream(remotePath) as unknown as NodeJS.WritableStream
       return new Promise((resolve) => {
         let bytesWritten = 0
+        let settled = false
+        const done = (result: { success: boolean; bytesWritten: number; error?: string }): void => {
+          if (settled) return
+          settled = true
+          resolve(result)
+        }
         stream.on('data', (chunk: Buffer) => { bytesWritten += chunk.length })
+        stream.on('error', (err: Error) => {
+          ;(writeStream as NodeJS.WritableStream & { destroy?: () => void }).destroy?.()
+          done({ success: false, bytesWritten, error: String(err) })
+        })
         stream.pipe(writeStream)
-        writeStream.on('finish', () => resolve({ success: true, bytesWritten }))
-        writeStream.on('error', (err: Error) => resolve({ success: false, bytesWritten, error: String(err) }))
+        writeStream.on('finish', () => done({ success: true, bytesWritten }))
+        writeStream.on('error', (err: Error) => done({ success: false, bytesWritten, error: String(err) }))
       })
     } catch (err) {
       return { success: false, bytesWritten: 0, error: String(err) }

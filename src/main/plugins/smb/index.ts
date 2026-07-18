@@ -528,10 +528,22 @@ export class SmbPlugin implements BrowsePlugin {
       const writeStream = await tree.createFileWriteStream(remotePath)
       return new Promise((resolve) => {
         let bytesWritten = 0
-        ;(stream as Readable).on('data', (chunk: Buffer) => { bytesWritten += chunk.length })
-        ;(stream as Readable).pipe(writeStream as unknown as NodeJS.WritableStream)
-        ;(writeStream as unknown as NodeJS.WritableStream).on('finish', () => resolve({ success: true, bytesWritten }))
-        ;(writeStream as unknown as NodeJS.WritableStream).on('error', (err: Error) => resolve({ success: false, bytesWritten, error: String(err) }))
+        let settled = false
+        const done = (result: { success: boolean; bytesWritten: number; error?: string }): void => {
+          if (settled) return
+          settled = true
+          resolve(result)
+        }
+        const readable = stream as Readable
+        const writable = writeStream as unknown as NodeJS.WritableStream & { destroy?: () => void }
+        readable.on('data', (chunk: Buffer) => { bytesWritten += chunk.length })
+        readable.on('error', (err: Error) => {
+          writable.destroy?.()
+          done({ success: false, bytesWritten, error: String(err) })
+        })
+        readable.pipe(writable)
+        writable.on('finish', () => done({ success: true, bytesWritten }))
+        writable.on('error', (err: Error) => done({ success: false, bytesWritten, error: String(err) }))
       })
     } catch (err) {
       return { success: false, bytesWritten: 0, error: smbError(err).message }

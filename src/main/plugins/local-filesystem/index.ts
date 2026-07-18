@@ -447,13 +447,33 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
       await fs.mkdir(path.dirname(destPath), { recursive: true })
       return new Promise((resolve) => {
         let bytesWritten = 0
+        let settled = false
+        let failed = false
+        const done = (result: { success: boolean; bytesWritten: number; error?: string }): void => {
+          if (settled) return
+          settled = true
+          resolve(result)
+        }
         const writeStream = fsSync.createWriteStream(destPath)
         stream.on('data', (chunk: Buffer) => {
           bytesWritten += chunk.length
         })
+        stream.on('error', (err) => {
+          failed = true
+          writeStream.destroy()
+          try {
+            fsSync.unlinkSync(destPath)
+          } catch { /* partial file from cancelled copy */ }
+          done({ success: false, bytesWritten, error: String(err) })
+        })
         stream.pipe(writeStream)
-        writeStream.on('finish', () => resolve({ success: true, bytesWritten }))
-        writeStream.on('error', (err) => resolve({ success: false, bytesWritten, error: String(err) }))
+        writeStream.on('finish', () => {
+          if (!failed) done({ success: true, bytesWritten })
+        })
+        writeStream.on('error', (err) => {
+          failed = true
+          done({ success: false, bytesWritten, error: String(err) })
+        })
       })
     } catch (err) {
       return { success: false, bytesWritten: 0, error: String(err) }

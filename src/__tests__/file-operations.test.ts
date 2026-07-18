@@ -250,6 +250,61 @@ describe('file operations flow', () => {
       // Should remain 'done', not change to 'cancelled'
       expect(useOperationsStore.getState().operations[0].status).toBe('done')
     })
+
+    it('clears overwrite prompt when cancelled so executor is not stuck', () => {
+      const opId = useOperationsStore.getState().enqueue({
+        type: 'copy',
+        sourceEntries: [makeEntry('exists.txt')],
+        sourcePluginId: 'local-filesystem',
+        destinationDisplay: 'D:\\dest',
+        destinationLocationId: 'D:\\dest',
+        destinationPluginId: 'local-filesystem'
+      })
+
+      useOperationsStore.getState().updateOperation(opId, {
+        status: 'running',
+        overwritePrompt: {
+          sourcePath: 'D:\\test\\exists.txt',
+          sourceName: 'exists.txt',
+          sourceSize: 1000,
+          sourceDate: 2000000,
+          destPath: 'D:\\dest\\exists.txt',
+          destSize: 800,
+          destDate: 1500000
+        }
+      })
+
+      useOperationsStore.getState().cancelOperation(opId)
+      const op = useOperationsStore.getState().operations[0]
+      expect(op.status).toBe('cancelled')
+      expect(op.overwritePrompt).toBeNull()
+    })
+
+    it('cancelled op does not block getCurrentOperation from finding next queued', () => {
+      const id1 = useOperationsStore.getState().enqueue({
+        type: 'copy',
+        sourceEntries: [makeEntry('a.txt')],
+        sourcePluginId: 'local-filesystem',
+        destinationDisplay: 'D:\\dest',
+        destinationLocationId: 'D:\\dest',
+        destinationPluginId: 'local-filesystem'
+      })
+      const id2 = useOperationsStore.getState().enqueue({
+        type: 'copy',
+        sourceEntries: [makeEntry('b.txt')],
+        sourcePluginId: 'local-filesystem',
+        destinationDisplay: 'D:\\dest',
+        destinationLocationId: 'D:\\dest',
+        destinationPluginId: 'local-filesystem'
+      })
+
+      useOperationsStore.getState().updateOperation(id1, { status: 'running' })
+      useOperationsStore.getState().cancelOperation(id1)
+
+      const current = useOperationsStore.getState().getCurrentOperation()
+      expect(current?.id).toBe(id2)
+      expect(current?.status).toBe('queued')
+    })
   })
 
   describe('delete operation', () => {
