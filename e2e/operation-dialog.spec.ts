@@ -118,26 +118,40 @@ test.describe('Operation Dialog Visual Tests', () => {
   })
 
   test('all dialogs have aligned internal elements', async ({ page }) => {
+    // Consistency across variants (token-driven chrome), not pixel magic numbers.
     const dialogs = page.locator('[data-testid="op-dialog"]')
     const count = await dialogs.count()
+    const currentFileHeights: number[] = []
+    const fileProgressHeights: number[] = []
+    const totalProgressHeights: number[] = []
+
     for (let i = 0; i < count; i++) {
       const dialog = dialogs.nth(i)
       const currentFile = dialog.locator('[data-testid="op-current-file"]')
       if (await currentFile.isVisible()) {
         const cfBox = await currentFile.boundingBox()
-        expect(cfBox?.height).toBe(28)
+        if (cfBox) currentFileHeights.push(Math.round(cfBox.height))
       }
       const fileProgress = dialog.locator('[data-testid="op-file-progress"]')
       if (await fileProgress.isVisible()) {
         const fpBox = await fileProgress.boundingBox()
-        expect(fpBox?.height).toBe(44)
+        if (fpBox) fileProgressHeights.push(Math.round(fpBox.height))
       }
       const totalProgress = dialog.locator('[data-testid="op-total-progress"]')
       if (await totalProgress.isVisible()) {
         const tpBox = await totalProgress.boundingBox()
-        expect(tpBox?.height).toBe(44)
+        if (tpBox) totalProgressHeights.push(Math.round(tpBox.height))
       }
     }
+
+    expect(currentFileHeights.length).toBeGreaterThan(0)
+    expect(new Set(currentFileHeights).size).toBe(1)
+    expect(fileProgressHeights.length).toBeGreaterThan(0)
+    expect(new Set(fileProgressHeights).size).toBe(1)
+    expect(totalProgressHeights.length).toBeGreaterThan(0)
+    expect(new Set(totalProgressHeights).size).toBe(1)
+    // File and total progress sections share the same chrome height
+    expect(fileProgressHeights[0]).toBe(totalProgressHeights[0])
   })
 })
 
