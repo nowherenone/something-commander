@@ -161,17 +161,157 @@
 
 .settingsCheckbox {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   cursor: pointer;
   font-size: var(--font-size-small);
   color: var(--text-secondary);
+  line-height: 1.35;
 }
 
 .settingsCheckbox input {
   accent-color: var(--accent);
   width: 14px;
   height: 14px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.settingsHint {
+  font-size: var(--font-size-tiny);
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.settingsActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.colorPickerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.colorSwatch {
+  width: 34px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.colorHex {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-tiny);
+  color: var(--text-muted);
+  min-width: 64px;
+}
+
+.colorHexActive {
+  color: var(--text-primary);
+}
+
+.inputWide {
+  width: 200px;
+}
+
+/* Confirm operation dialog */
+.confirmDialog {
+  width: 460px;
+}
+
+.confirmSection {
+  margin-bottom: var(--space-5);
+}
+
+.confirmMeta {
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.confirmList {
+  max-height: 88px;
+  overflow: auto;
+  font-size: var(--font-size-tiny);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: var(--space-2) var(--space-4);
+}
+
+.confirmFieldLabel {
+  font-size: var(--font-size-tiny);
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+  font-weight: var(--font-weight-medium);
+}
+
+.confirmPath {
+  font-size: var(--font-size-small);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-primary);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confirmInput {
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--space-4);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: var(--border-width) solid var(--border-focus);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.confirmDanger {
+  color: var(--danger);
+  font-size: var(--font-size-small);
+  padding: var(--space-3) 0;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  height: 26px;
+  padding: 0 var(--space-4);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-tiny);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.chipActive {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
 }
 
 /* Shared form / table primitives (replace ad-hoc inline styles) */

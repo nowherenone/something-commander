@@ -213,7 +213,8 @@ describe('panel-store', () => {
       expect(tab.isLoading).toBe(false)
       expect(tab.error).toBeNull()
       expect(showToast).toHaveBeenCalledWith(
-        'Cannot open game.7z: file is not a valid 7z archive'
+        'Cannot open game.7z: file is not a valid 7z archive',
+        expect.objectContaining({ variant: 'error' })
       )
     })
   })

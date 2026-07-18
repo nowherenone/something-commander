@@ -11,7 +11,8 @@ import { MultiRename } from './components/dialogs/MultiRename'
 import { DirCompare } from './components/dialogs/DirCompare'
 import { ConfirmOperation } from './components/dialogs/ConfirmOperation'
 import { ToastContainer, showToast } from './components/layout/Toast'
-import { notifyUpdateCheckResult, downloadUpdateWithNotify } from './utils/update-notifications'
+import { runUpdateCheck } from './utils/update-notifications'
+import { useUpdateStore } from './stores/update-store'
 import { NetworkConnections } from './components/dialogs/NetworkConnections'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
@@ -31,6 +32,9 @@ import { splitPathTail } from './utils/entry-helpers'
 import type { Entry } from '@shared/types'
 
 declare const __APP_VERSION__: string
+
+/** Prevents double startup update checks (React Strict Mode remounts). */
+let startupUpdateCheckStarted = false
 
 function App(): React.JSX.Element {
   const [mkdirDialog, setMkdirDialog] = useState(false)
@@ -55,43 +59,38 @@ function App(): React.JSX.Element {
     loadBookmarks()
   }, [])
 
-  // Auto-update handling
+  // Auto-update: silent check → menu-bar badge only (never a toast for "available")
   useEffect(() => {
     const api = (window as any).api
     if (!api?.update) return
 
-    // Lifecycle events only — check results are handled via notifyUpdateCheckResult.
     const unsubscribe = api.update.onUpdateStatus((status: { type: string; data?: any }) => {
-      if (status.type === 'downloaded') {
-        showToast('Update downloaded. Restart to install.', 15000)
-      } else if (status.type === 'error') {
+      useUpdateStore.getState().setFromStatus(status)
+      if (status.type === 'error') {
         console.warn('[Updater]', status.data)
       }
     })
 
-    const runUpdateCheck = async (autoDownload: boolean): Promise<void> => {
-      try {
-        const res = await api.update.checkForUpdates()
-        notifyUpdateCheckResult(res)
-        if (res.updateAvailable && autoDownload) {
-          await downloadUpdateWithNotify(() => api.update.downloadUpdate())
-        }
-      } catch {
-        showToast('Failed to check for updates', 8000)
-      }
-    }
-
-    // Check on startup if enabled (after a short delay to let settings load)
+    // Never auto-download without the user clicking the badge; keep main in sync false
+    // for the check path (optional setting still pre-downloads after check if enabled).
+    let cancelled = false
     const timer = setTimeout(() => {
+      if (cancelled || startupUpdateCheckStarted) return
+      startupUpdateCheckStarted = true
+
       const shouldCheck = useSettingsStore.getState().autoCheckForUpdates
       const autoDl = useSettingsStore.getState().autoDownloadUpdates
-      api.update.setAutoDownload?.(autoDl)
-      if (shouldCheck) {
-        void runUpdateCheck(autoDl)
-      }
+      // Prefer manual install; only pre-download if user opted in (badge → ready)
+      api.update.setAutoDownload?.(false)
+      if (!shouldCheck) return
+
+      void runUpdateCheck({ autoDownload: autoDl }).catch((err) => {
+        console.warn('[Updater] startup check failed', err)
+      })
     }, 2500)
 
     return () => {
+      cancelled = true
       clearTimeout(timer)
       unsubscribe?.()
     }
@@ -258,17 +257,15 @@ function App(): React.JSX.Element {
   const handleCheckForUpdates = useCallback(async () => {
     const api = (window as any).api
     if (!api?.update?.checkForUpdates) {
-      showToast('Update system not available')
+      showToast('Update system not available', { variant: 'warning' })
       return
     }
     try {
-      const res = await api.update.checkForUpdates()
-      notifyUpdateCheckResult(res)
-      if (res?.updateAvailable && useSettingsStore.getState().autoDownloadUpdates) {
-        await downloadUpdateWithNotify(() => api.update.downloadUpdate())
-      }
+      const autoDl = useSettingsStore.getState().autoDownloadUpdates
+      // Available → badge only; toast only if already current (or error)
+      await runUpdateCheck({ announceCurrent: true, autoDownload: autoDl })
     } catch {
-      showToast('Failed to check for updates', 8000)
+      showToast('Failed to check for updates', { duration: 8000, variant: 'error' })
     }
   }, [])
 

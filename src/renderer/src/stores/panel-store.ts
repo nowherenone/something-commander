@@ -242,7 +242,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           errorFolderIds: errorSet
         }))
       })
-      showToast(err instanceof Error ? err.message : String(err))
+      showToast(err instanceof Error ? err.message : String(err), { variant: 'error', duration: 8000 })
     }
   },
 
@@ -302,7 +302,7 @@ export const usePanelStore = create<PanelStoreState>((set, get) => ({
           error: null
         }))
       })
-      showToast(err instanceof Error ? err.message : String(err))
+      showToast(err instanceof Error ? err.message : String(err), { variant: 'error', duration: 8000 })
     }
   },
 

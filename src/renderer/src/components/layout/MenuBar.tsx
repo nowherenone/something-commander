@@ -1,6 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/app-store'
 import { useSettingsStore } from '../../stores/settings-store'
+import {
+  useUpdateStore,
+  updateBadgeTitle,
+  updateBadgeVisible
+} from '../../stores/update-store'
 import styles from '../../styles/menubar.module.css'
 
 declare const __APP_VERSION__: string
@@ -92,6 +97,26 @@ const MENUS: MenuDef[] = [
   }
 ]
 
+function UpdateArrowIcon(): React.JSX.Element {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 2.5V10.5M8 2.5L5 5.5M8 2.5L11 5.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 12.5H13"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [versionMenuOpen, setVersionMenuOpen] = useState(false)
@@ -100,6 +125,20 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
   const activePanel = useAppStore((s) => s.activePanel)
   const viewMode = useAppStore((s) => activePanel === 'left' ? s.leftViewMode : s.rightViewMode)
   const { showHiddenFiles, showCommandLine, bottomBar } = useSettingsStore()
+
+  const updatePhase = useUpdateStore((s) => s.phase)
+  const availableVersion = useUpdateStore((s) => s.availableVersion)
+  const downloadPercent = useUpdateStore((s) => s.downloadPercent)
+  const lastError = useUpdateStore((s) => s.lastError)
+  const installAndRestart = useUpdateStore((s) => s.installAndRestart)
+
+  const showUpdateBadge = updateBadgeVisible(updatePhase)
+  const badgeTitle = updateBadgeTitle({
+    phase: updatePhase,
+    availableVersion,
+    downloadPercent,
+    lastError
+  })
 
   const getChecked = useCallback((action: string): boolean => {
     switch (action) {
@@ -124,6 +163,16 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
       onAction(action)
     },
     [onAction]
+  )
+
+  const handleUpdateClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setOpenMenu(null)
+      setVersionMenuOpen(false)
+      void installAndRestart()
+    },
+    [installAndRestart]
   )
 
   // Close on click outside
@@ -186,40 +235,90 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
         </div>
       ))}
       <div className={styles.spacer} />
-      <div style={{ position: 'relative' }}>
-        <button
-          className={`${styles.menuItem} ${versionMenuOpen ? styles.menuItemActive : ''}`}
-          onClick={() => {
-            setOpenMenu(null)
-            setVersionMenuOpen(!versionMenuOpen)
-          }}
-          title="Version and updates"
-        >
-          v{__APP_VERSION__}
-        </button>
-        {versionMenuOpen && (
-          <div className={styles.menuDropdown} style={{ right: 0, left: 'auto' }}>
-            <button
-              className={styles.menuAction}
-              onClick={() => {
-                setVersionMenuOpen(false)
-                onAction('checkForUpdates')
-              }}
-            >
-              <span>Check for Updates...</span>
-            </button>
-            <div className={styles.menuSep} />
-            <button
-              className={styles.menuAction}
-              onClick={() => {
-                setVersionMenuOpen(false)
-                onAction('about')
-              }}
-            >
-              <span>About</span>
-            </button>
-          </div>
+
+      <div className={styles.versionCluster}>
+        {showUpdateBadge && (
+          <button
+            type="button"
+            className={`${styles.updateBadge} ${
+              updatePhase === 'ready'
+                ? styles.updateBadgeReady
+                : updatePhase === 'downloading'
+                  ? styles.updateBadgeBusy
+                  : updatePhase === 'error'
+                    ? styles.updateBadgeError
+                    : ''
+            }`}
+            onClick={handleUpdateClick}
+            title={badgeTitle}
+            aria-label={badgeTitle}
+          >
+            <UpdateArrowIcon />
+            <span className={styles.updateBadgeLabel}>
+              {updatePhase === 'downloading'
+                ? `${downloadPercent}%`
+                : updatePhase === 'ready'
+                  ? 'Restart'
+                  : 'Update'}
+            </span>
+          </button>
         )}
+
+        <div style={{ position: 'relative' }}>
+          <button
+            className={`${styles.menuItem} ${versionMenuOpen ? styles.menuItemActive : ''}`}
+            onClick={() => {
+              setOpenMenu(null)
+              setVersionMenuOpen(!versionMenuOpen)
+            }}
+            title={showUpdateBadge ? badgeTitle : 'Version and updates'}
+          >
+            v{__APP_VERSION__}
+          </button>
+          {versionMenuOpen && (
+            <div className={styles.menuDropdown} style={{ right: 0, left: 'auto' }}>
+              {showUpdateBadge && (
+                <>
+                  <button
+                    className={styles.menuAction}
+                    onClick={() => {
+                      setVersionMenuOpen(false)
+                      void installAndRestart()
+                    }}
+                  >
+                    <span>
+                      {updatePhase === 'ready'
+                        ? `Restart to install${availableVersion ? ` v${availableVersion}` : ''}`
+                        : updatePhase === 'downloading'
+                          ? `Downloading… ${downloadPercent}%`
+                          : `Install update${availableVersion ? ` v${availableVersion}` : ''} & restart`}
+                    </span>
+                  </button>
+                  <div className={styles.menuSep} />
+                </>
+              )}
+              <button
+                className={styles.menuAction}
+                onClick={() => {
+                  setVersionMenuOpen(false)
+                  onAction('checkForUpdates')
+                }}
+              >
+                <span>Check for Updates...</span>
+              </button>
+              <div className={styles.menuSep} />
+              <button
+                className={styles.menuAction}
+                onClick={() => {
+                  setVersionMenuOpen(false)
+                  onAction('about')
+                }}
+              >
+                <span>About</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

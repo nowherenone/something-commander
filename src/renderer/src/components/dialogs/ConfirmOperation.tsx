@@ -36,51 +36,51 @@ export function ConfirmOperation({
   const totalSize = entries.reduce((sum, e) => sum + (e.size > 0 ? e.size : 0), 0)
   const fileCount = entries.filter((e) => !e.isContainer).length
   const dirCount = entries.filter((e) => e.isContainer).length
-  // Single non-folder file: dest field is full path (dir + name) for rename-on-copy
   const isSingleFileRename =
-    (type === 'copy' || type === 'move') &&
-    entries.length === 1 &&
-    !entries[0].isContainer
+    (type === 'copy' || type === 'move') && entries.length === 1 && !entries[0].isContainer
 
-  // Load writable archive formats for the pack dialog
   useEffect(() => {
     if (type !== 'pack') return
     window.api.util.getArchiveFormats().then((formats) => {
       const writable = formats.filter((f) => f.supportsWrite)
       setWritableFormats(writable)
-      // Detect which format the current path uses, or default to first writable
-      const current = writable.find((f) => f.extensions.some((ext) => editDest.toLowerCase().endsWith(ext)))
+      const current = writable.find((f) =>
+        f.extensions.some((ext) => editDest.toLowerCase().endsWith(ext))
+      )
       setSelectedFormat(current?.primaryExtension ?? writable[0]?.primaryExtension ?? '.zip')
     })
   }, [type]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFormatChange = (primaryExt: string): void => {
     setSelectedFormat(primaryExt)
-    // Swap the extension in the current path
     const allExts = writableFormats.flatMap((f) => f.extensions)
     const matchedExt = allExts.find((ext) => editDest.toLowerCase().endsWith(ext))
     if (matchedExt) {
       setEditDest(editDest.slice(0, editDest.length - matchedExt.length) + primaryExt)
     } else {
-      // No known extension — append the new one
       setEditDest(editDest + primaryExt)
     }
   }
 
-  const typeLabel = type === 'copy' ? 'Copy'
-    : type === 'move' ? 'Move'
-    : type === 'delete' ? 'Delete'
-    : type === 'pack' ? 'Pack'
-    : 'Unpack'
-  const destLabel = type === 'pack'
-    ? 'Archive:'
-    : type === 'unpack'
-      ? 'Extract to:'
-      : isSingleFileRename
-        ? 'To (edit path or file name):'
-        : 'To:'
+  const typeLabel =
+    type === 'copy'
+      ? 'Copy'
+      : type === 'move'
+        ? 'Move'
+        : type === 'delete'
+          ? 'Delete'
+          : type === 'pack'
+            ? 'Pack'
+            : 'Unpack'
+  const destLabel =
+    type === 'pack'
+      ? 'Archive:'
+      : type === 'unpack'
+        ? 'Extract to:'
+        : isSingleFileRename
+          ? 'To (path or file name):'
+          : 'To:'
 
-  // Select only the file name portion so typing renames quickly (TC-style)
   useEffect(() => {
     if (!isSingleFileRename) return
     const el = destInputRef.current
@@ -90,14 +90,12 @@ export function ConfirmOperation({
     const start = slash >= 0 ? slash + 1 : 0
     const dot = v.lastIndexOf('.')
     const end = dot > start ? dot : v.length
-    // Defer so autofocus has settled
     requestAnimationFrame(() => {
       el.focus()
       el.setSelectionRange(start, end)
     })
   }, [isSingleFileRename])
 
-  // Capture keyboard: Enter confirms, Escape cancels, block everything else from panels
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
       if (e.key === 'Enter') {
@@ -108,17 +106,14 @@ export function ConfirmOperation({
         e.preventDefault()
         e.stopPropagation()
         onCancel()
-      } else {
-        if (!(document.activeElement instanceof HTMLInputElement)) {
-          e.stopPropagation()
-        }
+      } else if (!(document.activeElement instanceof HTMLInputElement)) {
+        e.stopPropagation()
       }
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
   }, [editDest, onConfirm, onCancel])
 
-  // Register with overlay for top-wins priority (confirm is highest)
   useEffect(() => {
     const overlayId = 'confirm-op'
     useOverlayStore.getState().push({ id: overlayId, onEscape: onCancel })
@@ -130,74 +125,51 @@ export function ConfirmOperation({
 
   return (
     <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.dialog} style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`${styles.dialog} ${styles.confirmDialog}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.dialogTitle}>{typeLabel}</div>
-        <div className={styles.dialogBody} style={{ padding: '12px 16px' }}>
-          {/* What */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+        <div className={styles.dialogBody}>
+          <div className={styles.confirmSection}>
+            <div className={styles.confirmMeta}>
               {type === 'pack' ? 'Pack' : type === 'unpack' ? 'Unpack' : typeLabel}{' '}
               {entries.length} item{entries.length !== 1 ? 's' : ''}
               {fileCount > 0 && ` (${fileCount} file${fileCount !== 1 ? 's' : ''}`}
-              {dirCount > 0 && `, ${dirCount} folder${dirCount !== 1 ? 's' : ''}`}
+              {dirCount > 0 && `${fileCount > 0 ? ', ' : ' ('}${dirCount} folder${dirCount !== 1 ? 's' : ''}`}
               {(fileCount > 0 || dirCount > 0) && ')'}
               {totalSize > 0 && ` — ${formatSize(totalSize)}`}
             </div>
-            <div style={{
-              maxHeight: 80,
-              overflow: 'auto',
-              fontSize: 11,
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--text-muted)',
-              background: 'var(--bg-tertiary)',
-              borderRadius: 3,
-              padding: '4px 8px'
-            }}>
+            <div className={styles.confirmList}>
               {entries.slice(0, 20).map((e) => (
-                <div key={e.id}>{e.isContainer ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 '}{e.name}</div>
+                <div key={e.id}>
+                  {e.isContainer ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 '}
+                  {e.name}
+                </div>
               ))}
               {entries.length > 20 && (
-                <div style={{ color: 'var(--text-muted)' }}>...and {entries.length - 20} more</div>
+                <div>...and {entries.length - 20} more</div>
               )}
             </div>
           </div>
 
-          {/* From */}
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>From:</div>
-            <div style={{
-              fontSize: 12,
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--text-secondary)',
-              padding: '3px 8px',
-              background: 'var(--bg-tertiary)',
-              borderRadius: 3,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {sourceDir}
+          {type !== 'delete' && (
+            <div className={styles.confirmSection}>
+              <div className={styles.confirmFieldLabel}>From</div>
+              <div className={styles.confirmPath}>{sourceDir}</div>
             </div>
-          </div>
+          )}
 
-          {/* Format selector (pack only) */}
           {type === 'pack' && writableFormats.length > 1 && (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Format:</div>
-              <div style={{ display: 'flex', gap: 4 }}>
+            <div className={styles.confirmSection}>
+              <div className={styles.confirmFieldLabel}>Format</div>
+              <div className={styles.chipRow}>
                 {writableFormats.map((fmt) => (
                   <button
                     key={fmt.primaryExtension}
+                    type="button"
+                    className={`${styles.chip}${selectedFormat === fmt.primaryExtension ? ` ${styles.chipActive}` : ''}`}
                     onClick={() => handleFormatChange(fmt.primaryExtension)}
-                    style={{
-                      padding: '2px 10px',
-                      background: selectedFormat === fmt.primaryExtension ? 'var(--accent)' : 'var(--bg-tertiary)',
-                      color: selectedFormat === fmt.primaryExtension ? 'white' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 3,
-                      fontSize: 11,
-                      cursor: 'pointer'
-                    }}
                   >
                     {fmt.label}
                   </button>
@@ -206,49 +178,30 @@ export function ConfirmOperation({
             </div>
           )}
 
-          {/* Destination (editable for copy/move/pack/unpack) */}
           {type !== 'delete' && (
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{destLabel}</div>
+            <div className={styles.confirmSection}>
+              <div className={styles.confirmFieldLabel}>{destLabel}</div>
               <input
                 ref={destInputRef}
                 autoFocus
+                className={styles.confirmInput}
                 value={editDest}
                 onChange={(e) => setEditDest(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  background: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-focus)',
-                  borderRadius: 3,
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12
-                }}
               />
               {isSingleFileRename && (
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Change the file name to copy/move as a new name (same folder is fine).
-                </div>
+                <p className={styles.settingsHint} style={{ marginTop: 'var(--space-2)' }}>
+                  Edit the file name to copy/move under a new name (same folder is fine).
+                </p>
               )}
             </div>
           )}
 
           {type === 'delete' && (
-            <div style={{
-              color: 'var(--danger)',
-              fontSize: 12,
-              padding: '8px 0'
-            }}>
-              This action cannot be undone.
-            </div>
+            <div className={styles.confirmDanger}>This action cannot be undone.</div>
           )}
         </div>
         <div className={styles.dialogFooter}>
-          <button
-            className={`${styles.btn} ${styles.btnSecondary}`}
-            onClick={onCancel}
-          >
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onCancel}>
             Cancel
           </button>
           <button

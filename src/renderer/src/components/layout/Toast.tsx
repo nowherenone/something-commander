@@ -1,18 +1,98 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import styles from '../../styles/toast.module.css'
+
+export type ToastVariant = 'info' | 'success' | 'error' | 'warning'
+
+export interface ShowToastOptions {
+  duration?: number
+  variant?: ToastVariant
+  /** If set, replaces any existing toast with the same key (prevents duplicates). */
+  dedupeKey?: string
+  /** Show a copy-to-clipboard control (default: only for error). */
+  showCopy?: boolean
+}
 
 interface ToastMessage {
   id: number
   text: string
   duration: number
+  variant: ToastVariant
+  dedupeKey?: string
+  showCopy: boolean
 }
 
 let toastCounter = 0
-let addToastGlobal: ((text: string, duration?: number) => void) | null = null
+let addToastGlobal: ((text: string, opts?: ShowToastOptions) => void) | null = null
 
-/** Show a toast from anywhere */
-export function showToast(text: string, duration = 7000): void {
-  addToastGlobal?.(text, duration)
+function normalizeOpts(
+  durationOrOpts?: number | ShowToastOptions
+): Required<Pick<ShowToastOptions, 'duration' | 'variant'>> &
+  Pick<ShowToastOptions, 'dedupeKey' | 'showCopy'> {
+  if (typeof durationOrOpts === 'number') {
+    return { duration: durationOrOpts, variant: 'info' }
+  }
+  return {
+    duration: durationOrOpts?.duration ?? 4500,
+    variant: durationOrOpts?.variant ?? 'info',
+    dedupeKey: durationOrOpts?.dedupeKey,
+    showCopy: durationOrOpts?.showCopy
+  }
+}
+
+/**
+ * Show a toast from anywhere.
+ * `showToast('msg')` or `showToast('msg', 5000)` or `showToast('msg', { variant: 'error' })`.
+ */
+export function showToast(text: string, durationOrOpts?: number | ShowToastOptions): void {
+  const opts = normalizeOpts(durationOrOpts)
+  addToastGlobal?.(text, opts)
+}
+
+function Icon({ variant }: { variant: ToastVariant }): React.JSX.Element {
+  const common = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    'aria-hidden': true as const
+  }
+  if (variant === 'success') {
+    return (
+      <svg {...common}>
+        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M4.5 8.2L7 10.5L11.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (variant === 'error') {
+    return (
+      <svg {...common}>
+        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  if (variant === 'warning') {
+    return (
+      <svg {...common}>
+        <path
+          d="M8 2.5L14 13.5H2L8 2.5Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path d="M8 6.5V9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...common}>
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 7.2V11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="8" cy="5" r="0.85" fill="currentColor" />
+    </svg>
+  )
 }
 
 function CopyIcon(): React.JSX.Element {
@@ -29,44 +109,84 @@ function CopyIcon(): React.JSX.Element {
 }
 
 interface ToastItemProps {
-  text: string
-  duration: number
+  toast: ToastMessage
   onDismiss: () => void
 }
 
-function ToastItem({ text, duration, onDismiss }: ToastItemProps): React.JSX.Element {
+function ToastItem({ toast, onDismiss }: ToastItemProps): React.JSX.Element {
   const [copied, setCopied] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const dismiss = useCallback(() => {
+    if (leaving) return
+    setLeaving(true)
+    leaveTimer.current = setTimeout(onDismiss, 180)
+  }, [leaving, onDismiss])
+
+  useEffect(() => {
+    const t = setTimeout(dismiss, toast.duration)
+    return () => {
+      clearTimeout(t)
+      if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    }
+  }, [toast.duration, dismiss])
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {
       e.stopPropagation()
       try {
-        await navigator.clipboard.writeText(text)
+        await navigator.clipboard.writeText(toast.text)
         setCopied(true)
-        window.setTimeout(() => setCopied(false), 1500)
+        window.setTimeout(() => setCopied(false), 1200)
       } catch {
-        showToast('Could not copy to clipboard', 3000)
+        /* ignore */
       }
     },
-    [text]
+    [toast.text]
   )
+
+  const variantClass =
+    toast.variant === 'success'
+      ? styles.success
+      : toast.variant === 'error'
+        ? styles.error
+        : toast.variant === 'warning'
+          ? styles.warning
+          : styles.info
 
   return (
     <div
-      className={styles.toast}
-      style={{ animationDuration: `0.2s, ${duration}ms` }}
-      onClick={onDismiss}
+      className={`${styles.toast} ${variantClass}${leaving ? ` ${styles.leaving}` : ''}`}
+      onClick={dismiss}
       role="status"
     >
-      <div className={styles.toastBody}>{text}</div>
+      <span className={styles.icon} aria-hidden>
+        <Icon variant={toast.variant} />
+      </span>
+      <div className={styles.toastBody}>{toast.text}</div>
+      {toast.showCopy && (
+        <button
+          type="button"
+          className={`${styles.actionBtn}${copied ? ` ${styles.actionBtnActive}` : ''}`}
+          onClick={handleCopy}
+          title={copied ? 'Copied' : 'Copy'}
+          aria-label={copied ? 'Copied' : 'Copy to clipboard'}
+        >
+          <CopyIcon />
+        </button>
+      )}
       <button
         type="button"
-        className={`${styles.copyBtn}${copied ? ` ${styles.copyBtnCopied}` : ''}`}
-        onClick={handleCopy}
-        title={copied ? 'Copied' : 'Copy to clipboard'}
-        aria-label={copied ? 'Copied' : 'Copy to clipboard'}
+        className={styles.closeBtn}
+        onClick={(e) => {
+          e.stopPropagation()
+          dismiss()
+        }}
+        aria-label="Dismiss"
+        title="Dismiss"
       >
-        <CopyIcon />
+        ×
       </button>
     </div>
   )
@@ -75,23 +195,36 @@ function ToastItem({ text, duration, onDismiss }: ToastItemProps): React.JSX.Ele
 export function ToastContainer(): React.JSX.Element {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
-  const addToast = useCallback((text: string, duration = 7000) => {
+  const addToast = useCallback((text: string, opts?: ShowToastOptions) => {
+    const duration = opts?.duration ?? 4500
+    const variant = opts?.variant ?? 'info'
+    const dedupeKey = opts?.dedupeKey
+    const showCopy = opts?.showCopy ?? variant === 'error'
     const id = ++toastCounter
-    setToasts((prev) => [...prev, { id, text, duration }])
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, duration)
+
+    setToasts((prev) => {
+      const withoutDup = dedupeKey
+        ? prev.filter((t) => t.dedupeKey !== dedupeKey && t.text !== text)
+        : prev.filter((t) => t.text !== text)
+      // Cap stack so the corner doesn't explode
+      const next = [...withoutDup, { id, text, duration, variant, dedupeKey, showCopy }]
+      return next.slice(-4)
+    })
   }, [])
 
-  addToastGlobal = addToast
+  useEffect(() => {
+    addToastGlobal = addToast
+    return () => {
+      if (addToastGlobal === addToast) addToastGlobal = null
+    }
+  }, [addToast])
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} aria-live="polite">
       {toasts.map((t) => (
         <ToastItem
           key={t.id}
-          text={t.text}
-          duration={t.duration}
+          toast={t}
           onDismiss={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
         />
       ))}

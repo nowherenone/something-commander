@@ -121,7 +121,7 @@ async function executeDelete(opId: string, op: ReturnType<typeof useOperationsSt
     if (final && !isCancelled(opId) && final.status !== 'error') {
       store().updateOperation(opId, { status: 'done' })
       const count = final.processedFiles || final.totalFiles || op.sourceEntries.length
-      showToast(`Deleted ${count} item${count === 1 ? '' : 's'}`)
+      showToast(`Deleted ${count} item${count === 1 ? '' : 's'}`, { variant: 'success', duration: 3500 })
     }
     store().removeOperation(opId)
   } catch (err) {
@@ -305,9 +305,12 @@ async function tryBulkArchiveExtract(
       processedBytes: totalBytes
     })
     if (totalFiles > 0) {
-      showToast(`Extracted ${totalFiles} file${totalFiles === 1 ? '' : 's'}`)
+      showToast(`Extracted ${totalFiles} file${totalFiles === 1 ? '' : 's'}`, {
+        variant: 'success',
+        duration: 3500
+      })
     } else {
-      showToast('Extract complete')
+      showToast('Extract complete', { variant: 'success', duration: 3500 })
     }
   }
   if (finalOp && (finalOp.status === 'done' || finalOp.status === 'running')) {
@@ -507,7 +510,7 @@ async function tryLocalFsRenameMove(
       processedBytes
     })
     const n = processedFiles
-    showToast(`Moved ${n} item${n === 1 ? '' : 's'}`)
+    showToast(`Moved ${n} item${n === 1 ? '' : 's'}`, { variant: 'success', duration: 3500 })
     store().removeOperation(opId)
   }
   return true
@@ -758,9 +761,12 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
       const count = afterCancel.processedFiles || afterCancel.totalFiles || 0
       const verb = op.type === 'move' ? 'Moved' : 'Copied'
       if (count > 0) {
-        showToast(`${verb} ${count} file${count === 1 ? '' : 's'}`)
+        showToast(`${verb} ${count} file${count === 1 ? '' : 's'}`, {
+          variant: 'success',
+          duration: 3500
+        })
       } else {
-        showToast(`${verb} complete`)
+        showToast(`${verb} complete`, { variant: 'success', duration: 3500 })
       }
     }
     // Success: auto-dismiss. Errors and cancels are left for user to review/dismiss.
