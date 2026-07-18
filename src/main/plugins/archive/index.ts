@@ -78,12 +78,19 @@ export function getArchiveFormats(): ArchiveFormatInfo[] {
 export async function extractFromZip(
   archivePath: string,
   internalPath: string,
-  destDir: string
+  destDir: string,
+  onProgress?: (p: {
+    currentFile: string
+    filesDone: number
+    bytesDone: number
+    currentFileBytes?: number
+    currentFileSize?: number
+  }) => void
 ): Promise<{ success: boolean; error?: string; extractedCount: number }> {
   const driver = getDriver(archivePath)
   if (!driver) return { success: false, error: 'Unsupported archive format', extractedCount: 0 }
   const source = localSourceAccess(archivePath)
-  const result = await driver.extract(source, internalPath, destDir)
+  const result = await driver.extract(source, internalPath, destDir, onProgress)
   return { success: result.success, error: result.error, extractedCount: result.count }
 }
 
@@ -239,7 +246,9 @@ class ArchivePlugin implements BrowsePlugin {
         try {
           const source = await this.resolveSource(archivePath)
           const result = await driver.extract(source, internalPath, op.destinationLocationId)
-          if (!result.success) errors.push({ entryId: entry.id, message: result.error || 'Extraction failed' })
+          if (!result.success) {
+            errors.push({ entryId: entry.id, message: result.error || 'Extraction failed' })
+          }
         } catch (err) {
           errors.push({ entryId: entry.id, message: String(err) })
         }

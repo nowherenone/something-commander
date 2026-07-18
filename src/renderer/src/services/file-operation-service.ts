@@ -120,6 +120,174 @@ function splitDestPathForCopy(destPath: string, relativePath: string): {
   return { destDir: parent || destPath, destFileName: name || relativePath }
 }
 
+/** True when every source is an archive root (path::) — Alt+F9 unpack style. */
+function isWholeArchiveSource(entries: { id: string }[]): boolean {
+  return (
+    entries.length > 0 &&
+    entries.every((e) => {
+      const sep = e.id.indexOf('::')
+      return sep >= 0 && e.id.slice(sep + 2) === ''
+    })
+  )
+}
+
+function archivePathFromRootId(id: string): string {
+  const sep = id.indexOf('::')
+  return sep >= 0 ? id.slice(0, sep) : id
+}
+
+/**
+ * Bulk-extract whole archives to the local filesystem with per-entry progress.
+ * Returns true if the operation was handled (caller should not stream-copy).
+ * Returns false to fall back to per-file streaming (e.g. partial skips).
+ */
+async function tryBulkArchiveExtract(
+  opId: string,
+  op: ReturnType<typeof useOperationsStore.getState>['operations'][number],
+  fileList: FileItem[],
+  totalFiles: number,
+  totalBytes: number
+): Promise<boolean> {
+  if (
+    op.type !== 'copy' ||
+    op.sourcePluginId !== 'archive' ||
+    op.destinationPluginId !== 'local-filesystem' ||
+    !isWholeArchiveSource(op.sourceEntries)
+  ) {
+    return false
+  }
+
+  const store = () => useOperationsStore.getState()
+
+  // Resolve overwrites up front — bulk extract can't skip individual members.
+  const skipPaths = new Set<string>()
+  for (const item of fileList) {
+    if (item.isDirectory) continue
+    if (isCancelled(opId)) {
+      store().updateOperation(opId, { status: 'cancelled' })
+      return true
+    }
+    const exists = await window.api.util.checkExists(item.destPath)
+    if (!exists) continue
+
+    const policy: OverwritePolicy =
+      store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
+
+    if (policy === 'skip-all') {
+      skipPaths.add(item.destPath)
+      continue
+    }
+    if (policy === 'overwrite-all') continue
+
+    if (policy === 'ask') {
+      const destInfo = await window.api.util.getFileInfo(item.destPath)
+      store().updateOperation(opId, {
+        overwritePrompt: {
+          sourcePath: item.sourcePath,
+          sourceName: item.relativePath,
+          sourceSize: item.size,
+          sourceDate: 0,
+          destPath: item.destPath,
+          destSize: destInfo?.size || 0,
+          destDate: destInfo?.modifiedAt || 0
+        }
+      })
+      const decision = await waitForOverwriteDecision()
+      if (isCancelled(opId)) {
+        store().updateOperation(opId, { status: 'cancelled' })
+        return true
+      }
+      if (decision === 'skip') skipPaths.add(item.destPath)
+    }
+  }
+
+  // Partial skip → per-file stream path (bulk extract would still write skipped files).
+  if (skipPaths.size > 0) return false
+
+  let baseFiles = 0
+  let baseBytes = 0
+  const sizeByRel = new Map(
+    fileList
+      .filter((f) => !f.isDirectory)
+      .map((f) => [f.relativePath.replace(/\\/g, '/'), f.size] as const)
+  )
+
+  const unsub = window.api.util.onExtractProgress((p) => {
+    const rel = p.currentFile.replace(/\\/g, '/')
+    const fileSize = p.currentFileSize ?? sizeByRel.get(rel) ?? 0
+    // processedBytes = fully completed only; currentFileCopied is the in-flight file.
+    store().updateOperation(opId, {
+      currentFile: p.currentFile,
+      currentFileSize: fileSize,
+      currentFileCopied: p.currentFileBytes ?? 0,
+      processedFiles: Math.min(totalFiles, baseFiles + p.filesDone),
+      processedBytes: Math.min(totalBytes, baseBytes + p.bytesDone)
+    })
+  })
+
+  try {
+    for (const entry of op.sourceEntries) {
+      if (isCancelled(opId)) {
+        store().updateOperation(opId, { status: 'cancelled' })
+        return true
+      }
+      const archivePath = archivePathFromRootId(entry.id)
+      store().updateOperation(opId, {
+        currentFile: `Extracting ${archivePath.split(/[\\/]/).pop() || archivePath}...`,
+        currentFileCopied: 0,
+        currentFileSize: 0
+      })
+
+      const result = await window.api.util.extractFromArchive(
+        archivePath,
+        '',
+        op.destinationLocationId
+      )
+      if (!result.success) {
+        store().updateOperation(opId, {
+          status: 'error',
+          error: result.error || `Failed to extract ${archivePath}`
+        })
+        return true
+      }
+
+      // Advance base counters by this archive's share of the enumerated list.
+      const archiveFiles = fileList.filter(
+        (f) => !f.isDirectory && f.sourcePath.startsWith(archivePath + '::')
+      )
+      baseFiles += archiveFiles.length
+      baseBytes += archiveFiles.reduce((s, f) => s + f.size, 0)
+      store().updateOperation(opId, {
+        processedFiles: Math.min(totalFiles, baseFiles),
+        processedBytes: Math.min(totalBytes, baseBytes)
+      })
+    }
+  } finally {
+    unsub()
+  }
+
+  await usePanelStore.getState().refresh('left')
+  await usePanelStore.getState().refresh('right')
+
+  const finalOp = store().operations.find((o) => o.id === opId)
+  if (finalOp && finalOp.status !== 'error' && finalOp.status !== 'cancelled') {
+    store().updateOperation(opId, {
+      status: 'done',
+      processedFiles: totalFiles,
+      processedBytes: totalBytes
+    })
+    if (totalFiles > 0) {
+      showToast(`Extracted ${totalFiles} file${totalFiles === 1 ? '' : 's'}`)
+    } else {
+      showToast('Extract complete')
+    }
+  }
+  if (finalOp && (finalOp.status === 'done' || finalOp.status === 'running')) {
+    store().removeOperation(opId)
+  }
+  return true
+}
+
 async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperationsStore.getState>['operations'][number]): Promise<void> {
   const store = () => useOperationsStore.getState()
 
@@ -161,6 +329,11 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
       processedFiles: 0,
       processedBytes: 0
     })
+
+    // Alt+F9 / whole-archive unpack → local: one extract pass with real progress.
+    if (await tryBulkArchiveExtract(opId, op, fileList, totalFiles, totalBytes)) {
+      return
+    }
 
     let processedFiles = 0
     let processedBytes = 0
@@ -226,7 +399,8 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
           let lastProgressUpdate = 0
           const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
             const now = Date.now()
-            if (now - lastProgressUpdate >= 250) {
+            // Always accept the first update and then throttle; final report is always applied.
+            if (lastProgressUpdate === 0 || now - lastProgressUpdate >= 250) {
               store().updateOperation(opId, { currentFileCopied: bytesCopied })
               lastProgressUpdate = now
             }
@@ -246,6 +420,12 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
           )
           currentAbortController = null
           unsubProgress()
+          // Ensure the bar shows completion for this file before moving on.
+          if (result.success) {
+            store().updateOperation(opId, {
+              currentFileCopied: result.bytesWritten || item.size
+            })
+          }
 
           if (!result.success) {
             store().updateOperation(opId, {
@@ -282,7 +462,12 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
         processedFiles++
         processedBytes += item.size
       }
-      store().updateOperation(opId, { processedFiles, processedBytes })
+      // Clear in-flight bytes so total bar doesn't double-count completed files.
+      store().updateOperation(opId, {
+        processedFiles,
+        processedBytes,
+        currentFileCopied: 0
+      })
     }
 
     // For move, delete source directories after all files are moved.

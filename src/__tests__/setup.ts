@@ -30,6 +30,7 @@ const mockUtilApi = {
   checkExists: vi.fn().mockResolvedValue(false),
   getFileInfo: vi.fn().mockResolvedValue({ size: 100, modifiedAt: 1000, isDirectory: false }),
   onCopyFileProgress: vi.fn().mockReturnValue(() => {}),
+  onExtractProgress: vi.fn().mockReturnValue(() => {}),
   enumerateFiles: vi.fn().mockImplementation((_pluginId: string, _entryIds: string[], _destDir: string) => Promise.resolve([])),
   isArchive: vi.fn().mockResolvedValue(false),
   openFile: vi.fn().mockResolvedValue(''),

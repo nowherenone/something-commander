@@ -33,28 +33,51 @@ async function tarReadEntries(source: SourceAccess): Promise<ArchiveEntry[]> {
   return entries
 }
 
-/** Extract a single file from a TAR by piping through tar.extract to a temp dir. */
+/** Full-archive extract cache so multi-file reads don't re-scan the tar each time. */
+const tarExtractCache = new Map<string, { dir: string; expires: number }>()
+const TAR_CACHE_TTL_MS = 5 * 60 * 1000
+
+function tarCacheKey(source: SourceAccess): string {
+  return source.localPath || `remote:${source.totalSize}`
+}
+
+async function getTarExtractCache(source: SourceAccess): Promise<string> {
+  const key = tarCacheKey(source)
+  const hit = tarExtractCache.get(key)
+  if (hit && hit.expires > Date.now()) {
+    hit.expires = Date.now() + TAR_CACHE_TTL_MS
+    return hit.dir
+  }
+  if (hit) {
+    await fs.rm(hit.dir, { recursive: true, force: true }).catch(() => {})
+    tarExtractCache.delete(key)
+  }
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-tar-cache-'))
+  const extractStream = tar.extract({ cwd: tmpDir })
+  const readStream = source.createReadStream()
+  await new Promise<void>((resolve, reject) => {
+    readStream.pipe(extractStream)
+    extractStream.on('end', resolve)
+    extractStream.on('error', reject)
+    readStream.on('error', reject)
+  })
+  tarExtractCache.set(key, { dir: tmpDir, expires: Date.now() + TAR_CACHE_TTL_MS })
+  return tmpDir
+}
+
+/** Extract a single file from a TAR via full-archive cache (avoids N full rescans). */
 async function tarCreateReadStream(source: SourceAccess, entryPath: string): Promise<NodeJS.ReadableStream | null> {
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-tar-'))
   try {
-    const extractStream = tar.extract({ cwd: tmpDir, filter: (p) => p === entryPath })
-    const readStream = source.createReadStream()
-    await new Promise<void>((resolve, reject) => {
-      readStream.pipe(extractStream)
-      extractStream.on('end', resolve)
-      extractStream.on('error', reject)
-      readStream.on('error', reject)
-    })
-    const extracted = path.join(tmpDir, ...entryPath.split('/').filter(Boolean))
-    try { await fs.access(extracted) } catch {
-      await fs.rm(tmpDir, { recursive: true, force: true })
+    const cacheDir = await getTarExtractCache(source)
+    const extracted = path.join(cacheDir, ...entryPath.split('/').filter(Boolean))
+    try {
+      await fs.access(extracted)
+    } catch {
       return null
     }
-    const stream = fsSync.createReadStream(extracted)
-    stream.on('close', () => { fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {}) })
-    return stream
+    return fsSync.createReadStream(extracted)
   } catch {
-    await fs.rm(tmpDir, { recursive: true, force: true })
     return null
   }
 }
@@ -63,7 +86,8 @@ async function tarCreateReadStream(source: SourceAccess, entryPath: string): Pro
 async function tarExtract(
   source: SourceAccess,
   entryPath: string,
-  destDir: string
+  destDir: string,
+  onProgress?: (p: { currentFile: string; filesDone: number; bytesDone: number }) => void
 ): Promise<{ success: boolean; error?: string; count: number }> {
   try {
     await fs.mkdir(destDir, { recursive: true })
@@ -73,7 +97,23 @@ async function tarExtract(
         : (p: string): boolean => p === entryPath
       : undefined
 
-    const extractStream = tar.extract({ cwd: destDir, filter })
+    let count = 0
+    let bytesDone = 0
+    const extractStream = tar.extract({
+      cwd: destDir,
+      filter,
+      onentry: (entry) => {
+        const isDir = entry.type === 'Directory' || entry.path.endsWith('/')
+        if (isDir) return
+        count++
+        bytesDone += entry.size ?? 0
+        onProgress?.({
+          currentFile: entry.path,
+          filesDone: count,
+          bytesDone
+        })
+      }
+    })
     const readStream = source.createReadStream()
     await new Promise<void>((resolve, reject) => {
       readStream.pipe(extractStream)
@@ -82,12 +122,7 @@ async function tarExtract(
       readStream.on('error', reject)
     })
 
-    // Count extracted files
-    const entries = await tarReadEntries(source)
-    const matchingFiles = entryPath
-      ? entries.filter((e) => !e.isDirectory && (entryPath.endsWith('/') ? e.path.startsWith(entryPath) : e.path === entryPath))
-      : entries.filter((e) => !e.isDirectory)
-    return { success: true, count: matchingFiles.length }
+    return { success: true, count }
   } catch (err) {
     return { success: false, error: String(err), count: 0 }
   }

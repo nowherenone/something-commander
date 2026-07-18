@@ -32,8 +32,12 @@ export function registerPluginIPC(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.EXTRACT_FROM_ARCHIVE,
-    (_event, archivePath: string, internalPath: string, destDir: string) =>
-      extractFromZip(archivePath, internalPath, destDir)
+    (event, archivePath: string, internalPath: string, destDir: string) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      return extractFromZip(archivePath, internalPath, destDir, (progress) => {
+        if (win) win.webContents.send(IPC_CHANNELS.EXTRACT_PROGRESS, progress)
+      })
+    }
   )
 
   ipcMain.handle(

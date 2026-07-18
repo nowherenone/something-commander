@@ -108,30 +108,48 @@ async function sevenZReadEntries(source: SourceAccess): Promise<ArchiveEntry[]> 
   }
 }
 
+/** Full-archive extract cache so multi-file reads don't re-run 7za per file. */
+const sevenZExtractCache = new Map<string, { dir: string; expires: number }>()
+const SEVENZ_CACHE_TTL_MS = 5 * 60 * 1000
+
+function sevenZCacheKey(archivePath: string): string {
+  return archivePath
+}
+
+async function getSevenZExtractCache(archivePath: string): Promise<string> {
+  const key = sevenZCacheKey(archivePath)
+  const hit = sevenZExtractCache.get(key)
+  if (hit && hit.expires > Date.now()) {
+    hit.expires = Date.now() + SEVENZ_CACHE_TTL_MS
+    return hit.dir
+  }
+  if (hit) {
+    await fs.rm(hit.dir, { recursive: true, force: true }).catch(() => {})
+    sevenZExtractCache.delete(key)
+  }
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-7z-cache-'))
+  await _7z.unpack(archivePath, tmpDir)
+  sevenZExtractCache.set(key, { dir: tmpDir, expires: Date.now() + SEVENZ_CACHE_TTL_MS })
+  return tmpDir
+}
+
 async function sevenZCreateReadStream(
   source: SourceAccess,
   entryPath: string
 ): Promise<NodeJS.ReadableStream | null> {
   const resolved = await resolveLocalArchive(source)
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-7zread-'))
   try {
+    const cacheDir = await getSevenZExtractCache(resolved.path)
     const internalPath = entryPath.replace(/\\/g, '/')
-    await _7z.unpackSome(resolved.path, [internalPath], tmpDir)
-
-    const extracted = path.join(tmpDir, ...internalPath.split('/').filter(Boolean))
+    const extracted = path.join(cacheDir, ...internalPath.split('/').filter(Boolean))
     try {
       await fs.access(extracted)
     } catch {
       return null
     }
-
-    const stream = fsSync.createReadStream(extracted)
-    stream.on('close', () => {
-      fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
-    })
-    return stream
+    return fsSync.createReadStream(extracted)
   } catch {
-    await fs.rm(tmpDir, { recursive: true, force: true })
     return null
   } finally {
     await resolved.cleanup()
@@ -141,19 +159,14 @@ async function sevenZCreateReadStream(
 async function sevenZExtract(
   source: SourceAccess,
   entryPath: string,
-  destDir: string
+  destDir: string,
+  onProgress?: (p: { currentFile: string; filesDone: number; bytesDone: number }) => void
 ): Promise<{ success: boolean; error?: string; count: number }> {
   const resolved = await resolveLocalArchive(source)
   try {
     await fs.mkdir(destDir, { recursive: true })
     const prefix = entryPath ? entryPath.replace(/\\/g, '/') : ''
     const isExactFile = prefix !== '' && !prefix.endsWith('/')
-
-    if (!prefix) {
-      await _7z.unpack(resolved.path, destDir)
-    } else {
-      await _7z.unpackSome(resolved.path, [prefix], destDir)
-    }
 
     const items = await _7z.list(resolved.path)
     const entries = items.map(listItemToArchiveEntry)
@@ -163,6 +176,37 @@ async function sevenZExtract(
         ? entries.filter((e) => !e.isDirectory && e.path.startsWith(prefix))
         : entries.filter((e) => !e.isDirectory)
 
+    // When a progress callback is provided, extract file-by-file so the UI can
+    // advance between entries. Bulk unpack is used when no progress is needed.
+    if (onProgress && matchingFiles.length > 0 && !isExactFile) {
+      let filesDone = 0
+      let bytesDone = 0
+      onProgress({
+        currentFile: matchingFiles[0].path,
+        filesDone: 0,
+        bytesDone: 0
+      })
+      for (const file of matchingFiles) {
+        await _7z.unpackSome(resolved.path, [file.path], destDir)
+        filesDone++
+        bytesDone += file.size
+        onProgress({ currentFile: file.path, filesDone, bytesDone })
+      }
+      return { success: true, count: matchingFiles.length }
+    }
+
+    if (!prefix) {
+      await _7z.unpack(resolved.path, destDir)
+    } else {
+      await _7z.unpackSome(resolved.path, [prefix], destDir)
+    }
+
+    const totalBytes = matchingFiles.reduce((s, e) => s + e.size, 0)
+    onProgress?.({
+      currentFile: matchingFiles[matchingFiles.length - 1]?.path || path.basename(resolved.path),
+      filesDone: matchingFiles.length,
+      bytesDone: totalBytes
+    })
     return { success: true, count: matchingFiles.length }
   } catch (err) {
     return { success: false, error: String(err), count: 0 }

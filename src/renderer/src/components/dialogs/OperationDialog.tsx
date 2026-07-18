@@ -56,14 +56,16 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const remove = useOperationsStore((s) => s.removeOperation)
   const setShowDialog = useOperationsStore((s) => s.setShowDialog)
 
+  // Include the in-flight file so the total bar moves during large single files.
+  const effectiveBytes = op.processedBytes + Math.max(0, op.currentFileCopied || 0)
   const totalPct = op.totalBytes > 0
-    ? Math.round((op.processedBytes / op.totalBytes) * 100)
+    ? Math.min(100, Math.round((Math.min(effectiveBytes, op.totalBytes) / op.totalBytes) * 100))
     : op.totalFiles > 0
       ? Math.round((op.processedFiles / op.totalFiles) * 100)
       : 0
 
-  const filePct = op.currentFileSize > 0 && op.currentFileCopied > 0
-    ? Math.min(100, Math.round((op.currentFileCopied / op.currentFileSize) * 100))
+  const filePct = op.currentFileSize > 0
+    ? Math.min(100, Math.round((Math.max(0, op.currentFileCopied) / op.currentFileSize) * 100))
     : 0
 
   const isFileInProgress = op.status === 'running' && op.currentFile !== ''
@@ -76,8 +78,13 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
 
   const typeLabel = op.type === 'copy' ? 'Copying' : op.type === 'move' ? 'Moving' : 'Deleting'
   const elapsedMs = op.startTime > 0 ? Date.now() - op.startTime : 0
-  const speed = isRunning && elapsedMs > 1000 ? formatSpeed((op.processedBytes / elapsedMs) * 1000) : ''
-  const eta = isRunning ? formatEta(op.processedBytes, op.totalBytes, elapsedMs) : ''
+  const speed =
+    isRunning && elapsedMs > 1000
+      ? formatSpeed((Math.min(effectiveBytes, op.totalBytes || effectiveBytes) / elapsedMs) * 1000)
+      : ''
+  const eta = isRunning
+    ? formatEta(Math.min(effectiveBytes, op.totalBytes || effectiveBytes), op.totalBytes, elapsedMs)
+    : ''
 
   return (
     <div className={styles.opDialog} data-testid="op-dialog">
@@ -127,13 +134,13 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
         <div className={styles.opBarLabel}>
           <span>Current file</span>
           <span data-testid="op-file-pct">
-            {isFileInProgress && filePct > 0
+            {isFileInProgress && op.currentFileSize > 0
               ? `${formatSize(op.currentFileCopied)} / ${formatSize(op.currentFileSize)}`
               : '\u00A0'}
           </span>
         </div>
         <div className={styles.opBar}>
-          {isFileInProgress && filePct > 0 ? (
+          {isFileInProgress && op.currentFileSize > 0 ? (
             <div className={styles.opBarFill} style={{ width: `${filePct}%` }} data-testid="op-file-bar" />
           ) : isRunning || isEnumerating ? (
             <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
@@ -148,7 +155,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       <div className={styles.opBarSection} data-testid="op-total-progress">
         <div className={styles.opBarLabel}>
           <span data-testid="op-file-count">
-            {op.totalFiles > 0 ? `File ${op.processedFiles} of ${op.totalFiles}` : '\u00A0'}
+            {op.totalFiles > 0 ? `File ${Math.min(op.processedFiles, op.totalFiles)} of ${op.totalFiles}` : '\u00A0'}
           </span>
           <span data-testid="op-total-pct">{totalPct > 0 ? `${totalPct}%` : '\u00A0'}</span>
         </div>
@@ -164,7 +171,9 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       {/* Info line: bytes, speed, ETA */}
       <div className={styles.opInfo} data-testid="op-info">
         <span data-testid="op-bytes">
-          {op.totalBytes > 0 ? `${formatSize(op.processedBytes)} / ${formatSize(op.totalBytes)}` : '\u00A0'}
+          {op.totalBytes > 0
+            ? `${formatSize(Math.min(effectiveBytes, op.totalBytes))} / ${formatSize(op.totalBytes)}`
+            : '\u00A0'}
         </span>
         <span data-testid="op-speed">
           {speed}{speed && eta ? ` \u2022 ${eta}` : eta}{!speed && !eta ? '\u00A0' : ''}

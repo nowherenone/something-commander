@@ -43,6 +43,7 @@ export const IPC_CHANNELS = {
   PLUGIN_UNLOAD: 'plugin:unload',
   PLUGIN_GET_DIR: 'plugin:getDir',
   EXTRACT_FROM_ARCHIVE: 'ops:extractFromArchive',
+  EXTRACT_PROGRESS: 'ops:extractProgress',
   STREAM_COPY_FILE: 'ops:streamCopyFile',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 

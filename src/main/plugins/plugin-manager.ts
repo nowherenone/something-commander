@@ -1,3 +1,4 @@
+import { Transform } from 'stream'
 import type { BrowsePlugin, PluginManifest, ReadDirectoryResult } from '@shared/types'
 import type { OperationRequest, OperationResult, PluginOperation } from '@shared/types'
 
@@ -243,27 +244,34 @@ export class PluginManager {
       return { success: false, bytesWritten: 0, error: 'Cancelled' }
     }
 
-    // Track progress
+    // Progress via Transform so we don't put the source into flowing mode before the
+    // destination is ready to pipe (avoids lost chunks + silent zero progress).
     let bytesCopied = 0
     let lastReport = 0
-    const onData = (chunk: Buffer) => {
-      bytesCopied += chunk.length
-      const now = Date.now()
-      if (onProgress && now - lastReport >= 250) {
-        onProgress(bytesCopied)
-        lastReport = now
+    const progressStream = new Transform({
+      transform(chunk: Buffer, _enc, callback) {
+        bytesCopied += chunk.length
+        if (onProgress) {
+          const now = Date.now()
+          if (now - lastReport >= 250) {
+            onProgress(bytesCopied)
+            lastReport = now
+          }
+        }
+        callback(null, chunk)
       }
-    }
-    readStream.on('data', onData)
+    })
+    readStream.pipe(progressStream)
 
     const abortHandler = () => {
       ;(readStream as any).destroy?.()
+      progressStream.destroy()
     }
     if (signal) signal.addEventListener('abort', abortHandler, { once: true })
 
-    const result = await destPlugin.writeFromStream(destLocationId, destFileName, readStream)
+    const result = await destPlugin.writeFromStream(destLocationId, destFileName, progressStream)
     if (signal) signal.removeEventListener('abort', abortHandler)
-    if (onProgress) onProgress(result.bytesWritten)
+    if (onProgress) onProgress(result.bytesWritten || bytesCopied)
     if (signal?.aborted) return { success: false, bytesWritten: result.bytesWritten, error: 'Cancelled' }
     return result
   }

@@ -10,6 +10,17 @@ export interface ArchiveEntry {
   isDirectory: boolean
 }
 
+/** Progress callback for archive extraction (bulk or single-entry). */
+export interface ExtractProgress {
+  currentFile: string
+  filesDone: number
+  bytesDone: number
+  /** Bytes written for the current file so far (when known). */
+  currentFileBytes?: number
+  /** Uncompressed size of the current file (when known). */
+  currentFileSize?: number
+}
+
 /**
  * Format-specific implementation. ArchivePlugin routes all work through
  * the driver that matches the archive's file extension.
@@ -38,11 +49,13 @@ export interface ArchiveDriver {
    * - entryPath='' → extract entire archive
    * - entryPath ending with '/' → extract that directory subtree
    * - otherwise → extract single file
+   * onProgress is called as each file finishes (best-effort; some formats only report at end).
    */
   extract(
     source: SourceAccess,
     entryPath: string,
-    destDir: string
+    destDir: string,
+    onProgress?: (p: ExtractProgress) => void
   ): Promise<{ success: boolean; error?: string; count: number }>
 
   // ── Write operations (only called when supportsWrite === true) ──────────────

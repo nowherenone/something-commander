@@ -183,7 +183,14 @@ export class ZipDriver implements ArchiveDriver {
   async extract(
     source: SourceAccess,
     entryPath: string,
-    destDir: string
+    destDir: string,
+    onProgress?: (p: {
+      currentFile: string
+      filesDone: number
+      bytesDone: number
+      currentFileBytes?: number
+      currentFileSize?: number
+    }) => void
   ): Promise<{ success: boolean; error?: string; count: number }> {
     return new Promise((resolve) => {
       const reader = new PluginRandomAccessReader(source.readAt.bind(source))
@@ -194,6 +201,7 @@ export class ZipDriver implements ArchiveDriver {
         }
 
         let count = 0
+        let bytesDone = 0
         const prefix = entryPath || ''
         const isExactFile = prefix !== '' && !prefix.endsWith('/')
 
@@ -201,14 +209,17 @@ export class ZipDriver implements ArchiveDriver {
         zipfile.on('entry', async (entry) => {
           const fileName = entry.fileName
           let destPath: string
+          let relativeName: string
 
           if (isExactFile) {
             if (fileName !== prefix) { zipfile.readEntry(); return }
-            destPath = path.join(destDir, path.basename(fileName))
+            relativeName = path.basename(fileName)
+            destPath = path.join(destDir, relativeName)
           } else {
             if (prefix && !fileName.startsWith(prefix)) { zipfile.readEntry(); return }
             const relative = prefix ? fileName.slice(prefix.length) : fileName
             if (!relative) { zipfile.readEntry(); return }
+            relativeName = relative
             destPath = path.join(destDir, relative)
           }
 
@@ -221,8 +232,39 @@ export class ZipDriver implements ArchiveDriver {
               zipfile.openReadStream(entry, (streamErr, readStream) => {
                 if (streamErr || !readStream) { zipfile.readEntry(); return }
                 const ws = fsSync.createWriteStream(destPath)
+                let fileBytes = 0
+                let lastReport = 0
+                const fileSize = entry.uncompressedSize || 0
+                readStream.on('data', (chunk: Buffer) => {
+                  fileBytes += chunk.length
+                  if (onProgress) {
+                    const now = Date.now()
+                    if (now - lastReport >= 250) {
+                      // bytesDone = fully completed files only; current file is separate.
+                      onProgress({
+                        currentFile: relativeName,
+                        filesDone: count,
+                        bytesDone,
+                        currentFileBytes: fileBytes,
+                        currentFileSize: fileSize
+                      })
+                      lastReport = now
+                    }
+                  }
+                })
                 readStream.pipe(ws)
-                ws.on('finish', () => { count++; zipfile.readEntry() })
+                ws.on('finish', () => {
+                  count++
+                  bytesDone += fileSize || fileBytes
+                  onProgress?.({
+                    currentFile: relativeName,
+                    filesDone: count,
+                    bytesDone,
+                    currentFileBytes: fileSize || fileBytes,
+                    currentFileSize: fileSize || fileBytes
+                  })
+                  zipfile.readEntry()
+                })
                 ws.on('error', () => { zipfile.readEntry() })
               })
             } catch { zipfile.readEntry() }

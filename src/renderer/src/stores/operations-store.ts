@@ -35,7 +35,7 @@ export interface FileOperation {
   currentFile: string
   currentFileIndex: number
   currentFileSize: number
-  currentFileCopied: number // not used yet but reserved for per-byte tracking
+  currentFileCopied: number
   totalFiles: number
   totalBytes: number
   processedFiles: number

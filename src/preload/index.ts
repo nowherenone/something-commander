@@ -154,6 +154,29 @@ const utilAPI = {
     return () => ipcRenderer.removeListener(IPC_CHANNELS.COPY_FILE_PROGRESS, handler)
   },
 
+  onExtractProgress: (
+    callback: (progress: {
+      currentFile: string
+      filesDone: number
+      bytesDone: number
+      currentFileBytes?: number
+      currentFileSize?: number
+    }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      progress: {
+        currentFile: string
+        filesDone: number
+        bytesDone: number
+        currentFileBytes?: number
+        currentFileSize?: number
+      }
+    ): void => callback(progress)
+    ipcRenderer.on(IPC_CHANNELS.EXTRACT_PROGRESS, handler)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.EXTRACT_PROGRESS, handler)
+  },
+
   enumerateFiles: (
     pluginId: string,
     entryIds: string[],
