@@ -156,11 +156,69 @@ async function sevenZCreateReadStream(
   }
 }
 
+/** Poll dest file size while 7za runs so a single large file still moves the UI bar. */
+async function unpackSomeWithProgress(
+  archivePath: string,
+  entryPath: string,
+  destDir: string,
+  fileSize: number,
+  filesDone: number,
+  bytesDone: number,
+  onProgress?: (p: {
+    currentFile: string
+    filesDone: number
+    bytesDone: number
+    currentFileBytes?: number
+    currentFileSize?: number
+  }) => void
+): Promise<void> {
+  const destFile = path.join(destDir, ...entryPath.replace(/\\/g, '/').split('/').filter(Boolean))
+  onProgress?.({
+    currentFile: entryPath,
+    filesDone,
+    bytesDone,
+    currentFileBytes: 0,
+    currentFileSize: fileSize
+  })
+
+  let pollTimer: ReturnType<typeof setInterval> | null = null
+  if (onProgress) {
+    pollTimer = setInterval(() => {
+      void fs.stat(destFile).then(
+        (st) => {
+          onProgress({
+            currentFile: entryPath,
+            filesDone,
+            bytesDone,
+            currentFileBytes: st.size,
+            currentFileSize: fileSize
+          })
+        },
+        () => {
+          /* file not created yet */
+        }
+      )
+    }, 100)
+  }
+
+  try {
+    await _7z.unpackSome(archivePath, [entryPath], destDir)
+  } finally {
+    if (pollTimer) clearInterval(pollTimer)
+  }
+}
+
 async function sevenZExtract(
   source: SourceAccess,
   entryPath: string,
   destDir: string,
-  onProgress?: (p: { currentFile: string; filesDone: number; bytesDone: number }) => void
+  onProgress?: (p: {
+    currentFile: string
+    filesDone: number
+    bytesDone: number
+    currentFileBytes?: number
+    currentFileSize?: number
+  }) => void
 ): Promise<{ success: boolean; error?: string; count: number }> {
   const resolved = await resolveLocalArchive(source)
   try {
@@ -176,21 +234,31 @@ async function sevenZExtract(
         ? entries.filter((e) => !e.isDirectory && e.path.startsWith(prefix))
         : entries.filter((e) => !e.isDirectory)
 
-    // When a progress callback is provided, extract file-by-file so the UI can
-    // advance between entries. Bulk unpack is used when no progress is needed.
-    if (onProgress && matchingFiles.length > 0 && !isExactFile) {
+    // With progress: always extract file-by-file (including single large files) so
+    // we can poll mid-file size. Bulk unpack only when progress is not needed.
+    if (onProgress && matchingFiles.length > 0) {
       let filesDone = 0
       let bytesDone = 0
-      onProgress({
-        currentFile: matchingFiles[0].path,
-        filesDone: 0,
-        bytesDone: 0
-      })
       for (const file of matchingFiles) {
-        await _7z.unpackSome(resolved.path, [file.path], destDir)
+        const extractName = isExactFile ? prefix : file.path
+        await unpackSomeWithProgress(
+          resolved.path,
+          extractName,
+          destDir,
+          file.size,
+          filesDone,
+          bytesDone,
+          onProgress
+        )
         filesDone++
         bytesDone += file.size
-        onProgress({ currentFile: file.path, filesDone, bytesDone })
+        onProgress({
+          currentFile: file.path,
+          filesDone,
+          bytesDone,
+          currentFileBytes: file.size,
+          currentFileSize: file.size
+        })
       }
       return { success: true, count: matchingFiles.length }
     }

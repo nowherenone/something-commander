@@ -9,11 +9,13 @@ import panelStyles from '../../styles/panels.module.css'
 interface QuickViewProps {
   /** The entry from the OPPOSITE panel's cursor */
   entry: Entry | null
+  /** Plugin owning the opposite panel's location */
+  pluginId: string
 }
 
 const PREVIEW_LIMIT = 256 * 1024
 
-export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
+export function QuickView({ entry, pluginId }: QuickViewProps): React.JSX.Element {
   const [lines, setLines] = useState<string[]>([])
   const [isBinary, setIsBinary] = useState(false)
   const [fileSize, setFileSize] = useState(0)
@@ -33,30 +35,28 @@ export function QuickView({ entry }: QuickViewProps): React.JSX.Element {
     setLoading(true)
     setError(null)
 
-    // Prefer plugin aware if we can infer, but fallback to legacy for quickview simplicity
-    const useNew = false // full wiring later
-    if (useNew) {
-      // would call readEntryContent but need pluginId from context
-    }
-    window.api.util.readFileContent(entry.id, PREVIEW_LIMIT).then((result) => {
-      if (result.error) {
-        setError(result.error)
-      } else {
-        const newLines = result.isBinary
-          ? formatHexLines(result.content)
-          : result.content.split('\n')
-        setLines(newLines)
-        setIsBinary(result.isBinary)
-        setFileSize(result.totalSize)
-      }
-      setLoading(false)
-    })
-  }, [entry?.id])
+    // Always plugin-scoped content read
+    void window.api.util
+      .readEntryContent(pluginId || 'local-filesystem', entry.id, 0, PREVIEW_LIMIT)
+      .then((result) => {
+        if (result.error) {
+          setError(result.error)
+        } else {
+          const raw =
+            typeof result.data === 'string'
+              ? result.data
+              : Buffer.from(result.data).toString(result.isBinary ? 'hex' : 'utf-8')
+          const newLines = result.isBinary ? formatHexLines(raw) : raw.split('\n')
+          setLines(newLines)
+          setIsBinary(result.isBinary)
+          setFileSize(result.totalSize)
+        }
+        setLoading(false)
+      })
+  }, [entry?.id, pluginId])
 
-  // Auto-focus the content area so PageUp/Down etc work without extra click
   useEffect(() => {
     if (!contentRef.current) return
-    // small delay
     const t = setTimeout(() => contentRef.current?.focus(), 10)
     return () => clearTimeout(t)
   }, [entry?.id])

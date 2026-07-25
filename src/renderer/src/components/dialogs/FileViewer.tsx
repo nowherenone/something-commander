@@ -22,14 +22,22 @@ export function FileViewer({ filePath, fileName, onClose }: FileViewerProps): Re
 
   useEffect(() => {
     setIsLoading(true)
-    window.api.util.readFileContent(filePath).then((result) => {
+    // Composite pluginId|entryId or bare path → always via plugin-scoped read
+    const pipe = filePath.indexOf('|')
+    const pluginId = pipe > 0 ? filePath.slice(0, pipe) : 'local-filesystem'
+    const entryId = pipe > 0 ? filePath.slice(pipe + 1) : filePath
+    void window.api.util.readEntryContent(pluginId, entryId, 0, 512 * 1024).then((result) => {
       if (result.error) {
         setError(result.error)
       } else {
-        setContent(result.content)
+        const raw =
+          typeof result.data === 'string'
+            ? result.data
+            : Buffer.from(result.data).toString(result.isBinary ? 'hex' : 'utf-8')
+        setContent(raw)
         setIsBinary(result.isBinary)
         setTotalSize(result.totalSize)
-        setTruncated(result.truncated)
+        setTruncated(result.totalSize > 512 * 1024)
         if (result.isBinary) setViewMode('hex')
       }
       setIsLoading(false)

@@ -2,7 +2,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 import { scanPlugins, loadPlugin, unloadPlugin, ensurePluginsDir } from '../plugins/plugin-loader'
-import { extractFromZip, ArchivePlugin, getArchiveFormats } from '../plugins/archive'
+import { ArchivePlugin, getArchiveFormats } from '../plugins/archive'
 
 /** Thin pass-through registrations between the renderer and the plugin system. */
 export function registerPluginIPC(): void {
@@ -24,19 +24,59 @@ export function registerPluginIPC(): void {
     pluginManager.executeOperation(pluginId, op)
   )
 
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_EXISTS, (_event, pluginId: string, entryId: string) =>
+    pluginManager.exists(pluginId, entryId)
+  )
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_STAT, (_event, pluginId: string, entryId: string) =>
+    pluginManager.statEntry(pluginId, entryId)
+  )
+
+  ipcMain.handle(IPC_CHANNELS.PLUGIN_GET_SIZE, (_event, pluginId: string, entryId: string) =>
+    pluginManager.getSize(pluginId, entryId).catch(() => 0)
+  )
+
   ipcMain.handle(IPC_CHANNELS.IS_ARCHIVE, (_event, filePath: string) =>
     ArchivePlugin.isArchive(filePath)
   )
 
   ipcMain.handle(IPC_CHANNELS.ARCHIVE_FORMATS, () => getArchiveFormats())
 
+  /**
+   * Thin shim: bulk unpack → archive plugin executeOperation(copy).
+   * Kept for any remaining callers; preferred path is plugins.executeOperation.
+   */
   ipcMain.handle(
     IPC_CHANNELS.EXTRACT_FROM_ARCHIVE,
-    (event, archivePath: string, internalPath: string, destDir: string) => {
-      const win = BrowserWindow.fromWebContents(event.sender)
-      return extractFromZip(archivePath, internalPath, destDir, (progress) => {
-        if (win) win.webContents.send(IPC_CHANNELS.EXTRACT_PROGRESS, progress)
+    async (_event, archivePath: string, internalPath: string, destDir: string) => {
+      const entryId =
+        internalPath && internalPath.length > 0
+          ? `${archivePath}::${internalPath}`
+          : `${archivePath}::`
+      const baseName = archivePath.split(/[/\\]/).pop() || archivePath
+      const result = await pluginManager.executeOperation('archive', {
+        op: 'copy',
+        sourceEntries: [
+          {
+            id: entryId,
+            name: baseName,
+            isContainer: !internalPath || internalPath.endsWith('/'),
+            size: 0,
+            modifiedAt: 0,
+            mimeType: 'application/zip',
+            iconHint: 'archive',
+            meta: {},
+            attributes: { readonly: false, hidden: false, symlink: false }
+          }
+        ],
+        destinationLocationId: destDir,
+        destinationPluginId: 'local-filesystem'
       })
+      return {
+        success: result.success,
+        error: result.errors?.[0]?.message,
+        extractedCount: result.success ? 1 : 0
+      }
     }
   )
 
@@ -58,44 +98,68 @@ export function registerPluginIPC(): void {
       transferId?: string
     ) => {
       const win = BrowserWindow.fromWebContents(event.sender)
-      // Coalesce progress to the next tick so a tight zip-inflate loop cannot
-      // flood the renderer, while still delivering mid-copy after each yield.
-      let pendingBytes: number | null = null
-      let flushScheduled = false
+      const tid =
+        transferId ||
+        `xfer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+      // Push latest bytes every 50ms from main — independent of transform
+      // callbacks and independent of the (returned-immediately) invoke.
+      const progressTick = setInterval(() => {
+        if (!win || win.isDestroyed()) return
+        const n = pluginManager.getStreamCopyProgress(tid)
+        if (n > 0) {
+          win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, n)
+        }
+      }, 50)
+
       const sendProgress = (bytesCopied: number): void => {
-        pendingBytes = bytesCopied
-        if (flushScheduled || !win) return
-        flushScheduled = true
-        setImmediate(() => {
-          flushScheduled = false
-          if (pendingBytes !== null && win && !win.isDestroyed()) {
-            win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, pendingBytes)
-            pendingBytes = null
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, bytesCopied)
+        }
+      }
+
+      // CRITICAL: do NOT await the multi-GB copy inside this handle.
+      // Holding the invoke open for the whole transfer starves concurrent
+      // progress polls and freezes the op dialog in real Electron use.
+      void pluginManager
+        .streamCopyFile(
+          sourcePluginId,
+          sourceEntryId,
+          destPluginId,
+          destLocationId,
+          destFileName,
+          sendProgress,
+          tid
+        )
+        .then((result) => {
+          clearInterval(progressTick)
+          if (win && !win.isDestroyed()) {
+            const finalBytes = result.bytesWritten || pluginManager.getStreamCopyProgress(tid)
+            win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, finalBytes)
+            win.webContents.send(IPC_CHANNELS.STREAM_COPY_DONE, { transferId: tid, result })
           }
         })
-      }
-      return pluginManager.streamCopyFile(
-        sourcePluginId,
-        sourceEntryId,
-        destPluginId,
-        destLocationId,
-        destFileName,
-        sendProgress,
-        transferId
-      ).then((result) => {
-        // Final flush so the last byte count is never lost after unsub races
-        if (pendingBytes !== null && win && !win.isDestroyed()) {
-          win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, pendingBytes)
-          pendingBytes = null
-        }
-        return result
-      })
+        .catch((err) => {
+          clearInterval(progressTick)
+          if (win && !win.isDestroyed()) {
+            win.webContents.send(IPC_CHANNELS.STREAM_COPY_DONE, {
+              transferId: tid,
+              result: { success: false, bytesWritten: 0, error: String(err) }
+            })
+          }
+        })
+
+      return { started: true, transferId: tid }
     }
   )
 
   ipcMain.handle(IPC_CHANNELS.CANCEL_STREAM_COPY, (_event, transferId: string) => {
     pluginManager.cancelStreamCopy(transferId)
   })
+
+  ipcMain.handle(IPC_CHANNELS.GET_STREAM_COPY_PROGRESS, (_event, transferId: string) =>
+    pluginManager.getStreamCopyProgress(transferId)
+  )
 
   // External plugin management
   ipcMain.handle(IPC_CHANNELS.PLUGIN_SCAN, () => scanPlugins())

@@ -468,4 +468,33 @@ class ArchivePlugin implements BrowsePlugin {
     if (!entry) throw new Error(`Entry not found: ${internalPath}`)
     return entry.size
   }
+
+  async statEntry(
+    entryId: string
+  ): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null> {
+    try {
+      const [archivePath, internalPath] = parseLocation(entryId)
+      if (!internalPath) return null
+      const driver = getDriver(archivePath)
+      if (!driver) return null
+      const source = await this.resolveSource(archivePath)
+      const allEntries = await driver.readEntries(source)
+      const entry = allEntries.find(
+        (e) => e.path === internalPath || e.path === internalPath.replace(/\/$/, '')
+      )
+      if (!entry) return null
+      return {
+        size: entry.size,
+        modifiedAt: entry.modifiedAt?.getTime?.() ?? 0,
+        isDirectory: entry.isDirectory
+      }
+    } catch {
+      return null
+    }
+  }
+
+  async exists(entryId: string): Promise<boolean> {
+    const st = await this.statEntry(entryId)
+    return !!st
+  }
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { formatSize } from '../utils/format'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { parseEditorPath, resolveEditorSaveTarget } from '../utils/editor-path'
 
 interface EditorPageProps {
   filePath: string
@@ -12,7 +13,8 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   const [originalContent, setOriginalContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [modified, setModified] = useState(false)
   const [fileSize, setFileSize] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -20,51 +22,39 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   useEffect(() => {
     async function loadFile(): Promise<void> {
       setLoading(true)
+      setLoadError(null)
       try {
-        const parts = filePath.split('|')
-        const usePlugin = parts.length === 2
-        const pluginId = usePlugin ? parts[0] : ''
-        const entryId = usePlugin ? parts[1] : filePath
+        // Always plugin-scoped (plain paths → local-filesystem)
+        const { pluginId, entryId } = parseEditorPath(filePath)
+        const maxEditBytes = 10 * 1024 * 1024
 
-        let size = 0
-        let content = ''
-        let isBin = false
-        if (usePlugin) {
-          const res = await window.api.util.readEntryContent(pluginId, entryId, 0)
-          size = res.totalSize || 0
-          isBin = res.isBinary
-          content = typeof res.data === 'string' ? res.data : ''
-          if (res.error) {
-            setError(res.error)
-          }
-        } else {
-          size = await window.api.util.getFileSize(filePath)
-          const res = await window.api.util.readFileContent(filePath, size)
-          size = size
-          isBin = res.isBinary
-          content = res.content || ''
-          if (res.error) setError(res.error)
-        }
-
-        setFileSize(size)
-
-        // Limit editor to ~10MB
-        if (size > 10 * 1024 * 1024) {
-          setError('File too large for editor (>10MB). Use F3 viewer instead.')
+        const probe = await window.api.util.readEntryContent(pluginId, entryId, 0, 1)
+        let size = probe.totalSize || 0
+        if (size > maxEditBytes) {
+          setFileSize(size)
+          setLoadError('File too large for editor (>10MB). Use F3 viewer instead.')
           setLoading(false)
           return
         }
-
-        if (isBin) {
-          setError('Cannot edit binary files. Use F3 viewer instead.')
-        } else if (!content && !usePlugin) {
-          setError('Empty or unreadable')
+        const res = await window.api.util.readEntryContent(
+          pluginId,
+          entryId,
+          0,
+          size > 0 ? size : maxEditBytes
+        )
+        size = res.totalSize || size
+        setFileSize(size)
+        if (res.error) {
+          setLoadError(res.error)
+        } else if (res.isBinary) {
+          setLoadError('Cannot edit binary files. Use F3 viewer instead.')
         } else {
-          setContent(content)
-          setOriginalContent(content)
+          const text = typeof res.data === 'string' ? res.data : ''
+          setContent(text)
+          setOriginalContent(text)
         }
       } catch (err) {
-        setError(String(err))
+        setLoadError(String(err))
       }
       setLoading(false)
     }
@@ -73,12 +63,36 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
 
   const handleSave = useCallback(async () => {
     setSaving(true)
-    const result = await window.api.util.saveFile(filePath, content)
-    if (result.success) {
-      setOriginalContent(content)
-      setModified(false)
-    } else {
-      setError(result.error || 'Save failed')
+    setSaveMessage(null)
+
+    const target = resolveEditorSaveTarget(filePath)
+    if ('error' in target) {
+      setSaveMessage(target.error)
+      setSaving(false)
+      return
+    }
+
+    try {
+      const result = await window.api.util.saveEntryContent(
+        target.pluginId,
+        target.entryId,
+        content
+      )
+      if (result.success) {
+        setOriginalContent(content)
+        setModified(false)
+        setFileSize(
+          typeof result.bytesWritten === 'number'
+            ? result.bytesWritten
+            : new TextEncoder().encode(content).length
+        )
+        setSaveMessage('Saved')
+        window.setTimeout(() => setSaveMessage(null), 2000)
+      } else {
+        setSaveMessage(result.error || 'Save failed')
+      }
+    } catch (err) {
+      setSaveMessage(String(err))
     }
     setSaving(false)
   }, [filePath, content])
@@ -86,11 +100,11 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value)
     setModified(e.target.value !== originalContent)
+    setSaveMessage(null)
   }, [originalContent])
 
   const rootRef = useRef<HTMLDivElement>(null)
 
-  // Use shared escape handler: blur inputs first, then close (with confirm if dirty)
   useEscapeKey(() => {
     if (modified) {
       if (window.confirm('Unsaved changes. Close anyway?')) {
@@ -101,7 +115,6 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
     }
   })
 
-  // Ensure focus for keyboard
   useEffect(() => {
     const t = setTimeout(() => {
       if (textareaRef.current) {
@@ -116,9 +129,8 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.ctrlKey && e.key === 's') {
       e.preventDefault()
-      handleSave()
+      void handleSave()
     }
-    // Tab inserts a tab character
     if (e.key === 'Tab') {
       e.preventDefault()
       const ta = textareaRef.current
@@ -136,6 +148,7 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   }, [handleSave, content, originalContent])
 
   const lineCount = content.split('\n').length
+  const displayPath = parseEditorPath(filePath).entryId || filePath
 
   return (
     <div ref={rootRef} className="appShell" style={{ background: 'var(--bg-primary)' }}>
@@ -143,9 +156,9 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
         <div className="panelSlot" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           Loading...
         </div>
-      ) : error ? (
+      ) : loadError ? (
         <div className="panelSlot" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--danger)', padding: 'var(--space-6)', textAlign: 'center' }}>
-          {error}
+          {loadError}
         </div>
       ) : (
         <textarea
@@ -187,13 +200,19 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
           flexShrink: 0
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{filePath}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{displayPath}</span>
         <span>
           {formatSize(fileSize)} | {lineCount} lines
+          {modified ? ' | modified' : ''}
+          {saveMessage ? (
+            <span style={{ color: saveMessage === 'Saved' ? 'var(--success)' : 'var(--danger)', marginLeft: 8 }}>
+              {saveMessage}
+            </span>
+          ) : null}
         </span>
         <button
-          onClick={handleSave}
-          disabled={!modified || saving}
+          onClick={() => void handleSave()}
+          disabled={!modified || saving || !!loadError}
           style={{
             height: 24,
             padding: '0 var(--space-3)',

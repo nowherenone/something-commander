@@ -32,7 +32,7 @@ function normalizeOpts(
     return { duration: durationOrOpts, variant: 'info' }
   }
   return {
-    duration: durationOrOpts?.duration ?? 4500,
+    duration: durationOrOpts?.duration ?? 4000,
     variant: durationOrOpts?.variant ?? 'info',
     dedupeKey: durationOrOpts?.dedupeKey,
     showCopy: durationOrOpts?.showCopy
@@ -48,61 +48,14 @@ export function showToast(text: string, durationOrOpts?: number | ShowToastOptio
   addToastGlobal?.(text, opts)
 }
 
-function Icon({ variant }: { variant: ToastVariant }): React.JSX.Element {
-  const common = {
-    width: 16,
-    height: 16,
-    viewBox: '0 0 16 16',
-    fill: 'none',
-    'aria-hidden': true as const
-  }
-  if (variant === 'success') {
-    return (
-      <svg {...common}>
-        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M4.5 8.2L7 10.5L11.5 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    )
-  }
-  if (variant === 'error') {
-    return (
-      <svg {...common}>
-        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    )
-  }
-  if (variant === 'warning') {
-    return (
-      <svg {...common}>
-        <path
-          d="M8 2.5L14 13.5H2L8 2.5Z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path d="M8 6.5V9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
-      </svg>
-    )
-  }
-  return (
-    <svg {...common}>
-      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M8 7.2V11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="8" cy="5" r="0.85" fill="currentColor" />
-    </svg>
-  )
-}
-
 function CopyIcon(): React.JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.75" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
       <path
         d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="2"
       />
     </svg>
   )
@@ -121,7 +74,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps): React.JSX.Element {
   const dismiss = useCallback(() => {
     if (leaving) return
     setLeaving(true)
-    leaveTimer.current = setTimeout(onDismiss, 180)
+    leaveTimer.current = setTimeout(onDismiss, 120)
   }, [leaving, onDismiss])
 
   useEffect(() => {
@@ -138,7 +91,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps): React.JSX.Element {
       try {
         await navigator.clipboard.writeText(toast.text)
         setCopied(true)
-        window.setTimeout(() => setCopied(false), 1200)
+        window.setTimeout(() => setCopied(false), 1000)
       } catch {
         /* ignore */
       }
@@ -161,9 +114,6 @@ function ToastItem({ toast, onDismiss }: ToastItemProps): React.JSX.Element {
       onClick={dismiss}
       role="status"
     >
-      <span className={styles.icon} aria-hidden>
-        <Icon variant={toast.variant} />
-      </span>
       <div className={styles.toastBody}>{toast.text}</div>
       {toast.showCopy && (
         <button
@@ -196,7 +146,7 @@ export function ToastContainer(): React.JSX.Element {
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
   const addToast = useCallback((text: string, opts?: ShowToastOptions) => {
-    const duration = opts?.duration ?? 4500
+    const duration = opts?.duration ?? 4000
     const variant = opts?.variant ?? 'info'
     const dedupeKey = opts?.dedupeKey
     const showCopy = opts?.showCopy ?? variant === 'error'
@@ -206,9 +156,8 @@ export function ToastContainer(): React.JSX.Element {
       const withoutDup = dedupeKey
         ? prev.filter((t) => t.dedupeKey !== dedupeKey && t.text !== text)
         : prev.filter((t) => t.text !== text)
-      // Cap stack so the corner doesn't explode
       const next = [...withoutDup, { id, text, duration, variant, dedupeKey, showCopy }]
-      return next.slice(-4)
+      return next.slice(-3)
     })
   }, [])
 

@@ -3,6 +3,7 @@ import { formatSize } from '../utils/format'
 import { formatHexLines } from '../utils/hex'
 import { FileContentView } from '../components/FileContentView'
 import { useEscapeKey } from '../hooks/useEscapeKey'
+import { parseEditorPath } from '../utils/editor-path'
 import styles from '../styles/viewer.module.css'
 import panelStyles from '../styles/panels.module.css'
 
@@ -47,22 +48,17 @@ export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
       setEstimatedTotalLines(0)
       setError(null)
 
-      // Support new plugin-aware: filePath as 'pluginId|entryId'
-      const parts = filePath.split('|')
-      const usePlugin = parts.length === 2
-      const pluginId = usePlugin ? parts[0] : ''
-      const entryId = usePlugin ? parts[1] : filePath
+      // Always plugin-scoped (composite pluginId|entryId or bare path → local-filesystem)
+      const { pluginId, entryId } = parseEditorPath(filePath)
 
       try {
-        let size = 0
-        let initial: any
-        if (usePlugin) {
-          initial = await window.api.util.readEntryContent(pluginId, entryId, 0, INITIAL_CHUNK)
-          size = initial.totalSize || 0
-        } else {
-          size = await window.api.util.getFileSize(filePath)
-          initial = await window.api.util.readFileContent(filePath, INITIAL_CHUNK)
-        }
+        const initial = await window.api.util.readEntryContent(
+          pluginId,
+          entryId,
+          0,
+          INITIAL_CHUNK
+        )
+        const size = initial.totalSize || 0
         setFileSize(size)
         fileSizeRef.current = size
 
@@ -78,21 +74,23 @@ export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
 
         if (isBin) {
           setViewMode('hex')
-          let hexContent = initial.data || ''
-          if (usePlugin) {
-            const hexRes = await window.api.util.readEntryContent(pluginId, entryId, 0, Math.min(size, 512*1024))
-            hexContent = hexRes.data || ''
-          } else {
-            const hexRes = await window.api.util.readFileContent(filePath, Math.min(size, 512 * 1024))
-            hexContent = hexRes.content
-          }
-          const hexLines = formatHexLines(typeof hexContent === 'string' ? hexContent : hexContent.toString('hex'))
+          const hexRes = await window.api.util.readEntryContent(
+            pluginId,
+            entryId,
+            0,
+            Math.min(size || 512 * 1024, 512 * 1024)
+          )
+          const hexContent = hexRes.data || initial.data || ''
+          const hexLines = formatHexLines(
+            typeof hexContent === 'string' ? hexContent : Buffer.from(hexContent).toString('hex')
+          )
           linesRef.current = hexLines
           allLoadedRef.current = true
           setLines(hexLines)
           setEstimatedTotalLines(hexLines.length)
         } else {
-          const textContent = typeof initial.data === 'string' ? initial.data : initial.content || ''
+          const textContent =
+            typeof initial.data === 'string' ? initial.data : String(initial.data || '')
           const textLines = textContent.split('\n')
           linesRef.current = textLines
           loadedBytesRef.current = Math.min(size, INITIAL_CHUNK)
@@ -101,7 +99,7 @@ export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
             allLoadedRef.current = true
             setEstimatedTotalLines(textLines.length)
           } else {
-            const lineRate = textLines.length / loadedBytesRef.current
+            const lineRate = textLines.length / Math.max(1, loadedBytesRef.current)
             setEstimatedTotalLines(Math.ceil(lineRate * size))
           }
 
@@ -129,47 +127,33 @@ export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
         return
       }
 
-      const parts = filePath.split('|')
-      const usePlugin = parts.length === 2
-      const pluginId = usePlugin ? parts[0] : ''
-      const entryId = usePlugin ? parts[1] : filePath
-
-      let result: any
-      if (usePlugin) {
-        result = await window.api.util.readEntryContent(pluginId, entryId, offset, Math.min(LOAD_CHUNK, remaining))
-        const chunkData = typeof result.data === 'string' ? result.data : (result.data ? result.data.toString('utf-8') : '')
-        if (result.error || !chunkData) {
-          allLoadedRef.current = true
-          setEstimatedTotalLines(linesRef.current.length)
-          return
-        }
-        const newLines = chunkData.split('\n')
-        const current = linesRef.current
-        if (current.length > 0) {
-          current[current.length - 1] += newLines[0]
-          linesRef.current = [...current, ...newLines.slice(1)]
-        } else {
-          linesRef.current = [...newLines]
-        }
-        loadedBytesRef.current = offset + Math.min(LOAD_CHUNK, remaining)
-      } else {
-        result = await window.api.util.readFileChunk(filePath, offset, Math.min(LOAD_CHUNK, remaining))
-        if (result.error || result.bytesRead === 0) {
-          allLoadedRef.current = true
-          setEstimatedTotalLines(linesRef.current.length)
-          return
-        }
-        const raw = result.encoding === 'base64' ? Buffer.from(result.data, 'base64').toString('utf-8') : result.data
-        const newLines = raw.split('\n')
-        const current = linesRef.current
-        if (current.length > 0) {
-          current[current.length - 1] += newLines[0]
-          linesRef.current = [...current, ...newLines.slice(1)]
-        } else {
-          linesRef.current = [...newLines]
-        }
-        loadedBytesRef.current = offset + result.bytesRead
+      const { pluginId, entryId } = parseEditorPath(filePath)
+      const result = await window.api.util.readEntryContent(
+        pluginId,
+        entryId,
+        offset,
+        Math.min(LOAD_CHUNK, remaining)
+      )
+      const chunkData =
+        typeof result.data === 'string'
+          ? result.data
+          : result.data
+            ? Buffer.from(result.data).toString('utf-8')
+            : ''
+      if (result.error || !chunkData) {
+        allLoadedRef.current = true
+        setEstimatedTotalLines(linesRef.current.length)
+        return
       }
+      const newLines = chunkData.split('\n')
+      const current = linesRef.current
+      if (current.length > 0) {
+        current[current.length - 1] += newLines[0]
+        linesRef.current = [...current, ...newLines.slice(1)]
+      } else {
+        linesRef.current = [...newLines]
+      }
+      loadedBytesRef.current = offset + Math.min(LOAD_CHUNK, remaining)
 
       if (loadedBytesRef.current >= fileSizeRef.current) {
         allLoadedRef.current = true

@@ -132,6 +132,16 @@ export function useFileOperations() {
         destinationLocationId: destInput,
         destinationPluginId: pendingOp.destPluginId
       })
+    } else if (pendingOp.type === 'delete') {
+      // Delete has no destination; confirm dialog passes empty destInput.
+      useOperationsStore.getState().enqueue({
+        type: 'delete',
+        sourceEntries: pendingOp.entries,
+        sourcePluginId: pendingOp.sourcePluginId,
+        destinationDisplay: '',
+        destinationLocationId: '',
+        destinationPluginId: pendingOp.sourcePluginId
+      })
     } else {
       // copy / move — single file may include a renamed destination file name
       const isSingleFile =

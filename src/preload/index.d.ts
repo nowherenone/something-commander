@@ -13,6 +13,12 @@ interface PluginsAPI {
   resolveLocation(pluginId: string, input: string): Promise<string | null>
   getSupportedOperations(pluginId: string): Promise<PluginOperation[]>
   executeOperation(pluginId: string, op: OperationRequest): Promise<OperationResult>
+  exists(pluginId: string, entryId: string): Promise<boolean>
+  statEntry(
+    pluginId: string,
+    entryId: string
+  ): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null>
+  getSize(pluginId: string, entryId: string): Promise<number>
 }
 
 interface UtilAPI {
@@ -51,7 +57,15 @@ interface UtilAPI {
   readFileChunk(filePath: string, offset: number, length: number): Promise<{ data: string; bytesRead: number; error?: string }>
   getFileSize(filePath: string): Promise<number>
   readEntryContent(pluginId: string, entryId: string, offset?: number, length?: number): Promise<{ data: string | Buffer; totalSize: number; isBinary: boolean; error?: string }>
-  saveFile(filePath: string, content: string): Promise<{ success: boolean; error?: string }>
+  saveFile(
+    filePath: string,
+    content: string
+  ): Promise<{ success: boolean; error?: string; bytesWritten?: number }>
+  saveEntryContent(
+    pluginId: string,
+    entryId: string,
+    content: string
+  ): Promise<{ success: boolean; bytesWritten?: number; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
   showFileProperties(filePath: string): Promise<{ success: boolean; error?: string }>
   getDiskSpace(pluginId: string, locationId: string): Promise<{ free: number; total: number }>
@@ -77,6 +91,8 @@ interface UtilAPI {
     transferId?: string
   ): Promise<{ success: boolean; bytesWritten: number; error?: string }>
   cancelStreamCopy(transferId: string): Promise<void>
+  /** Poll live bytes for an in-flight streamCopyFile (transferId). */
+  getStreamCopyProgress(transferId: string): Promise<number>
   extractFromArchive(archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }>
   onCopyFileProgress(callback: (bytesCopied: number) => void): () => void
   onExtractProgress(

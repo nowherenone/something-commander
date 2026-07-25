@@ -2,11 +2,11 @@
  * Move operation matrix — routing (executeOperation) + real archive/local I/O.
  *
  * Paths that must work:
- *  1. local → local (same volume)  → moveSingleFile / rename, no stream
+ *  1. local → local (same volume)  → plugin executeOperation move, no stream
  *  2. local → archive              → stream + delete source
  *  3. archive → local              → stream + delete source
  *  4. archive → archive            → stream + delete source
- *  5. copy never uses moveSingleFile
+ *  5. copy never uses bare-path move util
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as os from 'os'
@@ -106,13 +106,13 @@ describe('move routing (executeOperation)', () => {
   beforeEach(() => {
     useOperationsStore.setState({ operations: [], showDialog: false })
     vi.clearAllMocks()
-    vi.mocked(window.api.util.checkExists).mockResolvedValue(false)
-    vi.mocked(window.api.util.moveSingleFile).mockResolvedValue({ success: true })
+    vi.mocked(window.api.plugins.exists).mockResolvedValue(false)
+    vi.mocked(window.api.plugins.statEntry).mockResolvedValue(null)
     vi.mocked(window.api.util.streamCopyFile).mockResolvedValue({ success: true, bytesWritten: 100 })
     vi.mocked(window.api.plugins.executeOperation).mockResolvedValue({ success: true })
   })
 
-  it('local → local: rename via moveSingleFile, no stream, no enumerate', async () => {
+  it('local → local: move via plugin executeOperation, no stream, no enumerate', async () => {
     const opId = useOperationsStore.getState().enqueue({
       type: 'move',
       sourceEntries: [makeEntry('/home/u/a.txt', 'a.txt', false, 50)],
@@ -123,20 +123,18 @@ describe('move routing (executeOperation)', () => {
     })
     await executeOperation(opId)
 
-    expect(window.api.util.moveSingleFile).toHaveBeenCalledWith(
-      '/home/u/a.txt',
-      '/home/u/dest/a.txt',
-      false
+    expect(window.api.plugins.executeOperation).toHaveBeenCalledWith(
+      'local-filesystem',
+      expect.objectContaining({
+        op: 'move',
+        destinationLocationId: '/home/u/dest'
+      })
     )
     expect(window.api.util.streamCopyFile).not.toHaveBeenCalled()
     expect(window.api.util.enumerateFiles).not.toHaveBeenCalled()
-    expect(window.api.plugins.executeOperation).not.toHaveBeenCalledWith(
-      'local-filesystem',
-      expect.objectContaining({ op: 'delete' })
-    )
   })
 
-  it('local → local Windows paths: joins with backslash', async () => {
+  it('local → local Windows paths: plugin move into dest parent', async () => {
     const opId = useOperationsStore.getState().enqueue({
       type: 'move',
       sourceEntries: [makeEntry('D:\\data\\f.txt', 'f.txt')],
@@ -146,14 +144,16 @@ describe('move routing (executeOperation)', () => {
       destinationPluginId: 'local-filesystem'
     })
     await executeOperation(opId)
-    expect(window.api.util.moveSingleFile).toHaveBeenCalledWith(
-      'D:\\data\\f.txt',
-      'D:\\other\\f.txt',
-      false
+    expect(window.api.plugins.executeOperation).toHaveBeenCalledWith(
+      'local-filesystem',
+      expect.objectContaining({
+        op: 'move',
+        destinationLocationId: 'D:\\other'
+      })
     )
   })
 
-  it('local → local multi-select: one rename per top-level item', async () => {
+  it('local → local multi-select: one plugin move per top-level item', async () => {
     const opId = useOperationsStore.getState().enqueue({
       type: 'move',
       sourceEntries: [
@@ -167,11 +167,14 @@ describe('move routing (executeOperation)', () => {
       destinationPluginId: 'local-filesystem'
     })
     await executeOperation(opId)
-    expect(window.api.util.moveSingleFile).toHaveBeenCalledTimes(3)
+    const moveCalls = vi
+      .mocked(window.api.plugins.executeOperation)
+      .mock.calls.filter((c) => (c[1] as { op?: string })?.op === 'move')
+    expect(moveCalls.length).toBe(3)
     expect(window.api.util.streamCopyFile).not.toHaveBeenCalled()
   })
 
-  it('local → archive: stream copy then delete source (no moveSingleFile)', async () => {
+  it('local → archive: stream copy then delete source (no bare-path move util)', async () => {
     vi.mocked(window.api.util.enumerateFiles).mockResolvedValue([
       {
         sourcePath: '/tmp/a.txt',

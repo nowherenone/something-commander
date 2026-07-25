@@ -1,76 +1,40 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import * as fs from 'fs/promises'
-import * as fsSync from 'fs'
-import * as path from 'path'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
+import { pluginManager } from '../plugins/plugin-manager'
+import type { Entry } from '@shared/types'
 
-async function copyDirRecursive(src: string, dest: string): Promise<void> {
-  await fs.mkdir(dest, { recursive: true })
-  const dirents = await fs.readdir(src, { withFileTypes: true })
-  for (const dirent of dirents) {
-    const srcPath = path.join(src, dirent.name)
-    const destPath = path.join(dest, dirent.name)
-    if (dirent.isDirectory()) {
-      await copyDirRecursive(srcPath, destPath)
-    } else {
-      await fs.copyFile(srcPath, destPath)
-    }
+const LOCAL = 'local-filesystem'
+
+function makeEntry(id: string, name: string, isContainer: boolean, size = 0): Entry {
+  return {
+    id,
+    name,
+    isContainer,
+    size: isContainer ? -1 : size,
+    modifiedAt: 0,
+    mimeType: isContainer ? 'inode/directory' : 'application/octet-stream',
+    iconHint: isContainer ? 'folder' : 'file',
+    meta: {},
+    attributes: { readonly: false, hidden: false, symlink: false }
   }
 }
 
-function copyFileWithProgress(
-  src: string,
-  dest: string,
-  onProgress: (bytesCopied: number) => void
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const readStream = fsSync.createReadStream(src, { highWaterMark: 256 * 1024 })
-    const writeStream = fsSync.createWriteStream(dest)
-    let bytesCopied = 0
-    let lastReport = 0
-
-    readStream.on('data', (chunk: string | Buffer) => {
-      bytesCopied += chunk.length
-      // Throttle progress reports to avoid flooding IPC
-      const now = Date.now()
-      if (now - lastReport > 250) {
-        onProgress(bytesCopied)
-        lastReport = now
-      }
-    })
-    readStream.on('error', (err) => {
-      writeStream.destroy()
-      reject(err)
-    })
-    writeStream.on('error', (err) => {
-      readStream.destroy()
-      reject(err)
-    })
-    writeStream.on('finish', () => {
-      onProgress(bytesCopied) // final report
-      resolve()
-    })
-    readStream.pipe(writeStream)
-  })
-}
-
-/** Local-filesystem IO used by renderer operation execution. */
+/**
+ * Bare-path util handlers kept for back-compat: each injects pluginId
+ * `local-filesystem` and delegates to pluginManager — no parallel fs stack.
+ */
 export function registerFsIPC(): void {
   ipcMain.handle(IPC_CHANNELS.CHECK_EXISTS, async (_event, filePath: string) => {
-    try {
-      await fs.access(filePath)
-      return true
-    } catch {
-      return false
-    }
+    return pluginManager.exists(LOCAL, filePath)
   })
 
   ipcMain.handle(IPC_CHANNELS.GET_FILE_INFO, async (_event, filePath: string) => {
-    try {
-      const stat = await fs.stat(filePath)
-      return { size: stat.size, modifiedAt: stat.mtimeMs, isDirectory: stat.isDirectory() }
-    } catch {
-      return null
+    const st = await pluginManager.statEntry(LOCAL, filePath)
+    if (!st) return null
+    return {
+      size: st.size,
+      modifiedAt: st.modifiedAt,
+      isDirectory: !!st.isDirectory
     }
   })
 
@@ -78,16 +42,58 @@ export function registerFsIPC(): void {
     IPC_CHANNELS.COPY_SINGLE_FILE,
     async (event, sourcePath: string, destPath: string, isDirectory: boolean) => {
       try {
+        const pathMod = await import('path')
+        const destDir = pathMod.dirname(destPath)
+        const destName = pathMod.basename(destPath)
+        const entry = makeEntry(sourcePath, pathMod.basename(sourcePath), isDirectory)
+
         if (isDirectory) {
-          await fs.mkdir(destPath, { recursive: true })
-        } else {
-          await fs.mkdir(path.dirname(destPath), { recursive: true })
-          await copyFileWithProgress(sourcePath, destPath, (bytesCopied) => {
-            const win = BrowserWindow.fromWebContents(event.sender)
-            if (win) win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, bytesCopied)
+          // Create dest dir then copy tree via plugin copy of the source folder
+          // into the parent with the desired name: copy to destDir, then rename if needed
+          const result = await pluginManager.executeOperation(LOCAL, {
+            op: 'copy',
+            sourceEntries: [entry],
+            destinationLocationId: destDir,
+            destinationPluginId: LOCAL
           })
+          if (!result.success) {
+            return { success: false, error: result.errors?.[0]?.message || 'Copy failed' }
+          }
+          // Plugin copies as source basename; rename if dest name differs
+          const copiedAs = pathMod.join(destDir, entry.name)
+          if (copiedAs !== destPath) {
+            const ren = await pluginManager.executeOperation(LOCAL, {
+              op: 'rename',
+              entry: makeEntry(copiedAs, entry.name, true),
+              newName: destName
+            })
+            if (!ren.success) {
+              return {
+                success: false,
+                error: ren.errors?.[0]?.message || 'Rename after directory copy failed'
+              }
+            }
+          }
+          return { success: true }
         }
-        return { success: true }
+
+        // File copy with progress via streamCopyFile
+        const win = BrowserWindow.fromWebContents(event.sender)
+        const transferId = `legacy-copy-${Date.now()}`
+        const result = await pluginManager.streamCopyFile(
+          LOCAL,
+          sourcePath,
+          LOCAL,
+          destDir,
+          destName,
+          (bytes) => {
+            if (win && !win.isDestroyed()) {
+              win.webContents.send(IPC_CHANNELS.COPY_FILE_PROGRESS, bytes)
+            }
+          },
+          transferId
+        )
+        return { success: result.success, error: result.error }
       } catch (err) {
         return { success: false, error: String(err) }
       }
@@ -98,19 +104,45 @@ export function registerFsIPC(): void {
     IPC_CHANNELS.MOVE_SINGLE_FILE,
     async (_event, sourcePath: string, destPath: string, isDirectory: boolean) => {
       try {
-        await fs.mkdir(path.dirname(destPath), { recursive: true })
-        try {
-          await fs.rename(sourcePath, destPath)
-        } catch (err: unknown) {
-          if ((err as NodeJS.ErrnoException).code === 'EXDEV') {
-            if (isDirectory) {
-              await copyDirRecursive(sourcePath, destPath)
-            } else {
-              await fs.copyFile(sourcePath, destPath)
-            }
-            await fs.rm(sourcePath, { recursive: true })
-          } else {
-            throw err
+        const pathMod = await import('path')
+        const destDir = pathMod.dirname(destPath)
+        const destName = pathMod.basename(destPath)
+        const srcName = pathMod.basename(sourcePath)
+        const entry = makeEntry(sourcePath, srcName, isDirectory)
+
+        // Same parent → rename
+        if (pathMod.dirname(sourcePath) === destDir) {
+          if (srcName === destName) return { success: true }
+          const result = await pluginManager.executeOperation(LOCAL, {
+            op: 'rename',
+            entry,
+            newName: destName
+          })
+          return {
+            success: result.success,
+            error: result.errors?.[0]?.message
+          }
+        }
+
+        // Different parent → move into destDir (keeps source name), then rename if needed
+        const result = await pluginManager.executeOperation(LOCAL, {
+          op: 'move',
+          sourceEntries: [entry],
+          destinationLocationId: destDir,
+          destinationPluginId: LOCAL
+        })
+        if (!result.success) {
+          return { success: false, error: result.errors?.[0]?.message || 'Move failed' }
+        }
+        const movedAs = pathMod.join(destDir, srcName)
+        if (movedAs !== destPath) {
+          const ren = await pluginManager.executeOperation(LOCAL, {
+            op: 'rename',
+            entry: makeEntry(movedAs, srcName, isDirectory),
+            newName: destName
+          })
+          if (!ren.success) {
+            return { success: false, error: ren.errors?.[0]?.message || 'Rename after move failed' }
           }
         }
         return { success: true }
@@ -122,8 +154,17 @@ export function registerFsIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.DELETE_SINGLE, async (_event, targetPath: string) => {
     try {
-      await fs.rm(targetPath, { recursive: true })
-      return { success: true }
+      const pathMod = await import('path')
+      const st = await pluginManager.statEntry(LOCAL, targetPath)
+      const isDir = !!st?.isDirectory
+      const result = await pluginManager.executeOperation(LOCAL, {
+        op: 'delete',
+        entries: [makeEntry(targetPath, pathMod.basename(targetPath), isDir, st?.size || 0)]
+      })
+      return {
+        success: result.success,
+        error: result.errors?.[0]?.message
+      }
     } catch (err) {
       return { success: false, error: String(err) }
     }

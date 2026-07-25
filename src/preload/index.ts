@@ -15,7 +15,19 @@ const pluginsAPI = {
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_OPS, pluginId),
 
   executeOperation: (pluginId: string, op: unknown) =>
-    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_EXEC_OP, pluginId, op)
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_EXEC_OP, pluginId, op),
+
+  exists: (pluginId: string, entryId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_EXISTS, pluginId, entryId),
+
+  statEntry: (
+    pluginId: string,
+    entryId: string
+  ): Promise<{ size: number; modifiedAt: number; isDirectory?: boolean } | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_STAT, pluginId, entryId),
+
+  getSize: (pluginId: string, entryId: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_SIZE, pluginId, entryId)
 }
 
 const utilAPI = {
@@ -82,8 +94,19 @@ const utilAPI = {
   readEntryContent: (pluginId: string, entryId: string, offset?: number, length?: number): Promise<{ data: string | Buffer; totalSize: number; isBinary: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.READ_ENTRY_CONTENT, pluginId, entryId, offset || 0, length),
 
-  saveFile: (filePath: string, content: string): Promise<{ success: boolean; error?: string }> =>
+  saveFile: (
+    filePath: string,
+    content: string
+  ): Promise<{ success: boolean; error?: string; bytesWritten?: number }> =>
     ipcRenderer.invoke(IPC_CHANNELS.SAVE_FILE, filePath, content),
+
+  /** Save editor content through any plugin (local, sftp, smb, s3, archive, …). */
+  saveEntryContent: (
+    pluginId: string,
+    entryId: string,
+    content: string
+  ): Promise<{ success: boolean; bytesWritten?: number; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SAVE_ENTRY_CONTENT, pluginId, entryId, content),
 
   showContextMenu: (items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_CONTEXT_MENU, items),
@@ -133,6 +156,10 @@ const utilAPI = {
   pluginGetDir: (): Promise<string> =>
     ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_GET_DIR),
 
+  /**
+   * Long copies must not hold a single invoke open (progress IPC dies).
+   * Main starts the copy and returns immediately; we wait for STREAM_COPY_DONE.
+   */
   streamCopyFile: (
     sourcePluginId: string,
     sourceEntryId: string,
@@ -140,19 +167,54 @@ const utilAPI = {
     destLocationId: string,
     destFileName: string,
     transferId?: string
-  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> =>
-    ipcRenderer.invoke(
-      IPC_CHANNELS.STREAM_COPY_FILE,
-      sourcePluginId,
-      sourceEntryId,
-      destPluginId,
-      destLocationId,
-      destFileName,
-      transferId
-    ),
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> => {
+    const tid =
+      transferId ||
+      `xfer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+    return new Promise((resolve, reject) => {
+      const onDone = (
+        _event: Electron.IpcRendererEvent,
+        payload: {
+          transferId: string
+          result: { success: boolean; bytesWritten: number; error?: string }
+        }
+      ): void => {
+        if (payload.transferId !== tid) return
+        ipcRenderer.removeListener(IPC_CHANNELS.STREAM_COPY_DONE, onDone)
+        resolve(payload.result)
+      }
+
+      ipcRenderer.on(IPC_CHANNELS.STREAM_COPY_DONE, onDone)
+
+      ipcRenderer
+        .invoke(
+          IPC_CHANNELS.STREAM_COPY_FILE,
+          sourcePluginId,
+          sourceEntryId,
+          destPluginId,
+          destLocationId,
+          destFileName,
+          tid
+        )
+        .then((start: { started?: boolean; transferId?: string } | undefined) => {
+          if (!start || start.started !== true) {
+            ipcRenderer.removeListener(IPC_CHANNELS.STREAM_COPY_DONE, onDone)
+            reject(new Error('Stream copy failed to start'))
+          }
+        })
+        .catch((err: unknown) => {
+          ipcRenderer.removeListener(IPC_CHANNELS.STREAM_COPY_DONE, onDone)
+          reject(err)
+        })
+    })
+  },
 
   cancelStreamCopy: (transferId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.CANCEL_STREAM_COPY, transferId),
+
+  getStreamCopyProgress: (transferId: string): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.GET_STREAM_COPY_PROGRESS, transferId),
 
   extractFromArchive: (archivePath: string, internalPath: string, destDir: string): Promise<{ success: boolean; error?: string; extractedCount: number }> =>
     ipcRenderer.invoke(IPC_CHANNELS.EXTRACT_FROM_ARCHIVE, archivePath, internalPath, destDir),

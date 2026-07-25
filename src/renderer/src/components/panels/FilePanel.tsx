@@ -28,7 +28,7 @@ function QuickViewBridge({ panelId }: { panelId: PanelId }): React.JSX.Element {
   const idx = (otherTab?.cursorIndex || 0) - offset
   const cursorEntry = otherTab && idx >= 0 && idx < otherTab.entries.length ? otherTab.entries[idx] : null
 
-  return <QuickView entry={cursorEntry} />
+  return <QuickView entry={cursorEntry} pluginId={otherTab?.pluginId || 'local-filesystem'} />
 }
 
 interface FilePanelProps {

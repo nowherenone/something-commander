@@ -11,7 +11,10 @@ const mockPluginsApi = {
   }),
   resolveLocation: vi.fn().mockResolvedValue(null),
   getSupportedOperations: vi.fn().mockResolvedValue([]),
-  executeOperation: vi.fn().mockResolvedValue({ success: true })
+  executeOperation: vi.fn().mockResolvedValue({ success: true }),
+  exists: vi.fn().mockResolvedValue(false),
+  statEntry: vi.fn().mockResolvedValue(null),
+  getSize: vi.fn().mockResolvedValue(0)
 }
 
 const mockUtilApi = {
@@ -39,7 +42,8 @@ const mockUtilApi = {
   readEntryContent: vi.fn().mockResolvedValue({ data: '', totalSize: 0, isBinary: false }),
   readFileChunk: vi.fn().mockResolvedValue({ data: '', bytesRead: 0 }),
   getFileSize: vi.fn().mockResolvedValue(0),
-  saveFile: vi.fn().mockResolvedValue({ success: true }),
+  saveFile: vi.fn().mockResolvedValue({ success: true, bytesWritten: 0 }),
+  saveEntryContent: vi.fn().mockResolvedValue({ success: true, bytesWritten: 0 }),
   showContextMenu: vi.fn().mockResolvedValue(null),
   showFileProperties: vi.fn().mockResolvedValue({ success: true }),
   getDiskSpace: vi.fn().mockResolvedValue({ free: 100000000, total: 500000000 }),
@@ -56,6 +60,7 @@ const mockUtilApi = {
   s3Disconnect: vi.fn().mockResolvedValue(undefined),
   streamCopyFile: vi.fn().mockResolvedValue({ success: true, bytesWritten: 1000 }),
   cancelStreamCopy: vi.fn().mockResolvedValue(undefined),
+  getStreamCopyProgress: vi.fn().mockResolvedValue(0),
   extractFromArchive: vi.fn().mockResolvedValue({ success: true, extractedCount: 1 })
 }
 

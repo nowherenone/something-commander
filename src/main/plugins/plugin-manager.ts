@@ -1,6 +1,7 @@
-import { Transform } from 'stream'
+import { Transform, Readable } from 'stream'
 import type { BrowsePlugin, PluginManifest, ReadDirectoryResult } from '@shared/types'
 import type { OperationRequest, OperationResult, PluginOperation } from '@shared/types'
+import { splitEntryParentAndName } from '@shared/entry-write-path'
 
 export class PluginManager {
   private plugins: Map<string, BrowsePlugin> = new Map()
@@ -8,6 +9,12 @@ export class PluginManager {
   private activeStreamCopies = new Map<string, () => void>()
   /** Cancels that arrived before the transfer registered its abort handler. */
   private pendingCancels = new Set<string>()
+  /**
+   * Live byte counts for in-flight stream copies.
+   * Renderer polls this via IPC — does not depend on webContents.send (which can
+   * stall while main is busy inflating a large zip member).
+   */
+  private transferBytes = new Map<string, number>()
 
   register(plugin: BrowsePlugin): void {
     this.plugins.set(plugin.manifest.id, plugin)
@@ -22,6 +29,11 @@ export class PluginManager {
     }
     // Not registered yet (still opening source / zip entry) — remember for later
     this.pendingCancels.add(transferId)
+  }
+
+  /** Bytes written so far for a transfer (0 if unknown / finished). */
+  getStreamCopyProgress(transferId: string): number {
+    return this.transferBytes.get(transferId) ?? 0
   }
 
   get(pluginId: string): BrowsePlugin | undefined {
@@ -171,6 +183,45 @@ export class PluginManager {
   }
 
   /**
+   * Write full text/binary content to an entry via the plugin's writeFromStream.
+   * Works for local-filesystem, sftp, smb, s3, archive (writable formats), etc.
+   */
+  async writeEntryContent(
+    pluginId: string,
+    entryId: string,
+    content: string | Buffer
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
+    const plugin = this.get(pluginId)
+    if (!plugin) {
+      return { success: false, bytesWritten: 0, error: `Unknown plugin: ${pluginId}` }
+    }
+    if (!plugin.writeFromStream) {
+      return {
+        success: false,
+        bytesWritten: 0,
+        error: `Plugin "${plugin.manifest.displayName}" does not support writing`
+      }
+    }
+
+    const { destLocationId, fileName } = splitEntryParentAndName(entryId)
+    if (!fileName) {
+      return { success: false, bytesWritten: 0, error: 'Invalid entry path (missing file name)' }
+    }
+    if (!destLocationId && pluginId !== 'local-filesystem') {
+      // local may use drive-root edge cases; remotes always need a parent location
+      return { success: false, bytesWritten: 0, error: 'Invalid entry path (missing parent location)' }
+    }
+
+    try {
+      const buf = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content
+      const stream = Readable.from(buf)
+      return await plugin.writeFromStream(destLocationId, fileName, stream)
+    } catch (err) {
+      return { success: false, bytesWritten: 0, error: String(err) }
+    }
+  }
+
+  /**
    * Unified content read for viewer/editor/quickview.
    * Uses readAt + getSize when available; falls back for local if needed.
    */
@@ -301,13 +352,21 @@ export class PluginManager {
 
     // Register cancel handle BEFORE any await so cancel during zip open works
     if (transferId) {
+      this.transferBytes.set(transferId, 0)
       this.activeStreamCopies.set(transferId, abort)
       if (this.pendingCancels.has(transferId)) {
         this.pendingCancels.delete(transferId)
         abort()
         this.activeStreamCopies.delete(transferId)
+        this.transferBytes.delete(transferId)
         return { success: false, bytesWritten: 0, error: 'Cancelled' }
       }
+    }
+
+    const transferBytesMap = this.transferBytes
+    const recordProgress = (n: number): void => {
+      if (transferId) transferBytesMap.set(transferId, n)
+      onProgress?.(n)
     }
 
     try {
@@ -344,13 +403,16 @@ export class PluginManager {
             const piece = chunk.subarray(offset, end)
             offset = end
             bytesCopied += piece.length
+            // Always keep pollable counter current (every piece) — renderer polls this.
+            if (transferId) transferBytesMap.set(transferId, bytesCopied)
             const now = Date.now()
             const byBytes = bytesCopied - lastReportBytes >= REPORT_EVERY_BYTES
             const byTime = lastReportTime === 0 || now - lastReportTime >= REPORT_EVERY_MS
-            if (onProgress && (byBytes || byTime)) {
+            if (byBytes || byTime) {
               lastReportBytes = bytesCopied
               lastReportTime = now
-              onProgress(bytesCopied)
+              // Push event is best-effort; poll map is authoritative.
+              onProgress?.(bytesCopied)
             }
             this.push(piece)
             setImmediate(pump)
@@ -372,7 +434,8 @@ export class PluginManager {
       if (cancelled || result.error === 'Cancelled' || String(result.error || '').includes('Cancelled')) {
         return { success: false, bytesWritten: bytesCopied || result.bytesWritten, error: 'Cancelled' }
       }
-      if (onProgress) onProgress(result.bytesWritten || bytesCopied)
+      const finalBytes = result.bytesWritten || bytesCopied
+      recordProgress(finalBytes)
       return result
     } catch (err) {
       if (cancelled || String(err).includes('Cancelled')) {
@@ -383,6 +446,13 @@ export class PluginManager {
       if (transferId) {
         this.activeStreamCopies.delete(transferId)
         this.pendingCancels.delete(transferId)
+        // Keep last byte count briefly so a final poll can read it, then clear
+        const final = this.transferBytes.get(transferId)
+        setTimeout(() => {
+          if (this.transferBytes.get(transferId) === final) {
+            this.transferBytes.delete(transferId)
+          }
+        }, 2000)
       }
     }
   }

@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useOperationsStore, type FileOperation, type OverwritePrompt } from '../../stores/operations-store'
 import { resolveOverwriteAction } from '../../hooks/useFileOperations'
+import { getLiveTransferProgress } from '../../services/file-operation-service'
 import { formatSize, formatDate } from '../../utils/format'
 import { useOverlayStore } from '../../stores/overlay-store'
 import styles from '../../styles/operations.module.css'
@@ -56,36 +57,81 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const remove = useOperationsStore((s) => s.removeOperation)
   const setShowDialog = useOperationsStore((s) => s.setShowDialog)
 
+  // Re-read live progress from the store by primitive fields (not object identity).
+  // Prevents a stuck bar if a parent memo/selector ever skips object reference updates.
+  const liveCopied = useOperationsStore((s) => {
+    const live = s.operations.find((o) => o.id === op.id)
+    return live?.currentFileCopied ?? op.currentFileCopied
+  })
+  const liveProcessedBytes = useOperationsStore((s) => {
+    const live = s.operations.find((o) => o.id === op.id)
+    return live?.processedBytes ?? op.processedBytes
+  })
+  const liveFileSize = useOperationsStore((s) => {
+    const live = s.operations.find((o) => o.id === op.id)
+    return live?.currentFileSize ?? op.currentFileSize
+  })
+  const liveStatus = useOperationsStore((s) => {
+    const live = s.operations.find((o) => o.id === op.id)
+    return live?.status ?? op.status
+  })
+  const liveCurrentFile = useOperationsStore((s) => {
+    const live = s.operations.find((o) => o.id === op.id)
+    return live?.currentFile ?? op.currentFile
+  })
+  const liveProcessedFiles = useOperationsStore((s) => {
+    const live = s.operations.find((o) => o.id === op.id)
+    return live?.processedFiles ?? op.processedFiles
+  })
+
+  // Keep UI ticking while running so bars move even if zustand identity is sticky.
+  const [nowTick, setNowTick] = useState(0)
+  useEffect(() => {
+    if (liveStatus !== 'running' && liveStatus !== 'enumerating') return
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 50)
+    return () => window.clearInterval(id)
+  }, [liveStatus, op.id])
+
+  // Module-level live progress (updated by poll/events) — source of truth for the bar.
+  void nowTick
+  const liveXfer = getLiveTransferProgress()
+  const xferBytes =
+    liveXfer && liveXfer.opId === op.id ? liveXfer.bytes : 0
+  const xferTotal =
+    liveXfer && liveXfer.opId === op.id ? liveXfer.total : 0
+
   // Include the in-flight file so the total bar moves during large single files.
-  const copied = Math.max(0, op.currentFileCopied || 0)
-  const effectiveBytes = op.processedBytes + copied
-  const totalPct = op.totalBytes > 0
-    ? Math.min(100, Math.round((Math.min(effectiveBytes, op.totalBytes) / op.totalBytes) * 100))
+  const copied = Math.max(0, xferBytes || liveCopied || 0)
+  const fileSize = Math.max(0, xferTotal || liveFileSize || 0)
+  const effectiveBytes = liveProcessedBytes + copied
+  const totalBytes = Math.max(op.totalBytes || 0, fileSize)
+  const totalPct = totalBytes > 0
+    ? Math.min(100, Math.round((Math.min(effectiveBytes, totalBytes) / totalBytes) * 100))
     : op.totalFiles > 0
-      ? Math.round((op.processedFiles / op.totalFiles) * 100)
+      ? Math.round((liveProcessedFiles / op.totalFiles) * 100)
       : 0
 
-  const filePct = op.currentFileSize > 0
-    ? Math.min(100, Math.round((copied / op.currentFileSize) * 100))
+  const filePct = fileSize > 0
+    ? Math.min(100, Math.round((copied / fileSize) * 100))
     : 0
 
-  const isFileInProgress = op.status === 'running' && op.currentFile !== ''
-  const hasFileProgress = isFileInProgress && (op.currentFileSize > 0 || copied > 0)
-  const isError = op.status === 'error'
-  const isCancelled = op.status === 'cancelled'
-  const isRunning = op.status === 'running'
-  const isEnumerating = op.status === 'enumerating'
-  const isQueued = op.status === 'queued'
+  const isFileInProgress = liveStatus === 'running' && liveCurrentFile !== ''
+  const hasFileProgress = isFileInProgress && (fileSize > 0 || copied > 0)
+  const isError = liveStatus === 'error'
+  const isCancelled = liveStatus === 'cancelled'
+  const isRunning = liveStatus === 'running'
+  const isEnumerating = liveStatus === 'enumerating'
+  const isQueued = liveStatus === 'queued'
   const isActive = isRunning || isEnumerating || isQueued
 
   const typeLabel = op.type === 'copy' ? 'Copying' : op.type === 'move' ? 'Moving' : 'Deleting'
   const elapsedMs = op.startTime > 0 ? Date.now() - op.startTime : 0
   const speed =
     isRunning && elapsedMs > 1000 && effectiveBytes > 0
-      ? formatSpeed((Math.min(effectiveBytes, op.totalBytes || effectiveBytes) / elapsedMs) * 1000)
+      ? formatSpeed((Math.min(effectiveBytes, totalBytes || effectiveBytes) / elapsedMs) * 1000)
       : ''
   const eta = isRunning
-    ? formatEta(Math.min(effectiveBytes, op.totalBytes || effectiveBytes), op.totalBytes, elapsedMs)
+    ? formatEta(Math.min(effectiveBytes, totalBytes || effectiveBytes), totalBytes, elapsedMs)
     : ''
 
   return (
@@ -125,7 +171,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       <div className={styles.opCurrentFile} data-testid="op-current-file">
         {isEnumerating ? 'Scanning files...' :
          isQueued ? 'Waiting in queue...' :
-         isRunning && op.currentFile ? op.currentFile :
+         isRunning && liveCurrentFile ? liveCurrentFile :
          isError ? '' :
          isCancelled ? '' :
          '\u00A0'}
@@ -136,15 +182,15 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
         <div className={styles.opBarLabel}>
           <span>Current file</span>
           <span data-testid="op-file-pct">
-            {isFileInProgress && op.currentFileSize > 0
-              ? `${formatSize(copied)} / ${formatSize(op.currentFileSize)}`
+            {isFileInProgress && fileSize > 0
+              ? `${formatSize(copied)} / ${formatSize(fileSize)}`
               : isFileInProgress && copied > 0
                 ? formatSize(copied)
                 : '\u00A0'}
           </span>
         </div>
         <div className={styles.opBar}>
-          {hasFileProgress && op.currentFileSize > 0 ? (
+          {hasFileProgress && fileSize > 0 ? (
             <div className={styles.opBarFill} style={{ width: `${filePct}%` }} data-testid="op-file-bar" />
           ) : hasFileProgress && copied > 0 ? (
             // Unknown total size: show a moving indeterminate bar (still better than frozen)
@@ -162,7 +208,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       <div className={styles.opBarSection} data-testid="op-total-progress">
         <div className={styles.opBarLabel}>
           <span data-testid="op-file-count">
-            {op.totalFiles > 0 ? `File ${Math.min(op.processedFiles, op.totalFiles)} of ${op.totalFiles}` : '\u00A0'}
+            {op.totalFiles > 0 ? `File ${Math.min(liveProcessedFiles, op.totalFiles)} of ${op.totalFiles}` : '\u00A0'}
           </span>
           <span data-testid="op-total-pct">{totalPct > 0 ? `${totalPct}%` : '\u00A0'}</span>
         </div>
@@ -178,8 +224,8 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       {/* Info line: bytes, speed, ETA */}
       <div className={styles.opInfo} data-testid="op-info">
         <span data-testid="op-bytes">
-          {op.totalBytes > 0
-            ? `${formatSize(Math.min(effectiveBytes, op.totalBytes))} / ${formatSize(op.totalBytes)}`
+          {totalBytes > 0
+            ? `${formatSize(Math.min(effectiveBytes, totalBytes))} / ${formatSize(totalBytes)}`
             : '\u00A0'}
         </span>
         <span data-testid="op-speed">
@@ -189,7 +235,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
 
       {/* Error/cancel message */}
       {isError && <div className={styles.opErrorMsg} data-testid="op-error">{op.error}</div>}
-      {isCancelled && <div className={styles.opErrorMsg} data-testid="op-cancelled">Cancelled at file {op.processedFiles} of {op.totalFiles}</div>}
+      {isCancelled && <div className={styles.opErrorMsg} data-testid="op-cancelled">Cancelled at file {liveProcessedFiles} of {op.totalFiles}</div>}
 
       {/* Overwrite prompt */}
       {op.overwritePrompt && <OverwritePromptView prompt={op.overwritePrompt} />}
@@ -298,9 +344,15 @@ export function QueueButton(): React.JSX.Element | null {
   if (active.length === 0 || showDialog) return null
 
   const running = active.find((op) => op.status === 'running')
-  const pct = running && running.totalBytes > 0
-    ? Math.round((running.processedBytes / running.totalBytes) * 100)
-    : 0
+  // Include in-flight bytes so the minimize chip moves during a single large file.
+  const pct =
+    running && running.totalBytes > 0
+      ? Math.round(
+          (Math.min(running.totalBytes, running.processedBytes + (running.currentFileCopied || 0)) /
+            running.totalBytes) *
+            100
+        )
+      : 0
 
   return (
     <button className={styles.queueBtn} data-testid="queue-btn" onClick={() => setShowDialog(true)}>

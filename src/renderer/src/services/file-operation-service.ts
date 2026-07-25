@@ -21,6 +21,32 @@ let overwriteResolve: ((action: 'overwrite' | 'skip' | 'cancel') => void) | null
 /** Active IPC transfer id so cancel can tear down main-process streams. */
 let currentTransferId: string | null = null
 
+/** Latest in-flight copy progress for the op dialog (updated by poll + events). */
+let liveTransferProgress: {
+  opId: string
+  transferId: string
+  bytes: number
+  total: number
+  fileName: string
+} | null = null
+
+/** Read by OperationDialog every frame — does not depend on zustand identity. */
+export function getLiveTransferProgress(): typeof liveTransferProgress {
+  return liveTransferProgress
+}
+
+function setLiveTransferProgress(
+  update: Partial<NonNullable<typeof liveTransferProgress>> & { opId: string }
+): void {
+  liveTransferProgress = {
+    opId: update.opId,
+    transferId: update.transferId ?? liveTransferProgress?.transferId ?? '',
+    bytes: update.bytes ?? liveTransferProgress?.bytes ?? 0,
+    total: update.total ?? liveTransferProgress?.total ?? 0,
+    fileName: update.fileName ?? liveTransferProgress?.fileName ?? ''
+  }
+}
+
 export function resolveOverwriteAction(
   action: 'overwrite' | 'skip' | 'overwrite-all' | 'skip-all'
 ): void {
@@ -76,6 +102,126 @@ function isCancelled(opId: string): boolean {
 
 function newTransferId(): string {
   return `xfer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/**
+ * Files larger than this (or a single-file archive) use stream-copy instead of bulk
+ * extract. Bulk extract's mid-file progress IPC has been unreliable in the UI for
+ * large single members; stream-copy + dest-size polling is the path that actually
+ * moves the bar.
+ */
+export const BULK_EXTRACT_MAX_FILE_BYTES = 8 * 1024 * 1024
+
+/** Whether whole-archive unpack should use one-shot bulk extract (many small files). */
+export function shouldUseBulkArchiveExtract(fileList: FileItem[]): boolean {
+  const files = fileList.filter((f) => !f.isDirectory)
+  if (files.length <= 1) return false
+  if (files.some((f) => f.size >= BULK_EXTRACT_MAX_FILE_BYTES)) return false
+  return true
+}
+
+/**
+ * Poll transfer progress while streamCopyFile runs.
+ *
+ * Primary: main-process counter via getStreamCopyProgress(transferId) — updated
+ * every 256KB piece even when webContents.send progress events stall.
+ * Fallback: local dest file size via getFileInfo (if path is a real file).
+ */
+export function startTransferProgressPoll(
+  opId: string,
+  opts: {
+    transferId: string
+    destPath?: string
+    destPluginId?: string
+    expectedSize: number
+    fileName?: string
+    intervalMs?: number
+  }
+): () => void {
+  const intervalMs = opts.intervalMs ?? 50
+  let stopped = false
+  let lastBytes = 0
+  let inFlight = false
+
+  setLiveTransferProgress({
+    opId,
+    transferId: opts.transferId,
+    bytes: 0,
+    total: opts.expectedSize,
+    fileName: opts.fileName || ''
+  })
+
+  const apply = (bytes: number): void => {
+    if (stopped || bytes < lastBytes) return
+    lastBytes = bytes
+    setLiveTransferProgress({
+      opId,
+      transferId: opts.transferId,
+      bytes,
+      total: opts.expectedSize,
+      fileName: opts.fileName || ''
+    })
+    const update: { currentFileCopied: number; currentFileSize?: number } = {
+      currentFileCopied: bytes
+    }
+    if (opts.expectedSize > 0) update.currentFileSize = opts.expectedSize
+    useOperationsStore.getState().updateOperation(opId, update)
+  }
+
+  const tick = async (): Promise<void> => {
+    if (stopped || isCancelled(opId) || inFlight) return
+    inFlight = true
+    try {
+      let bytes = 0
+      try {
+        if (typeof window.api.util.getStreamCopyProgress === 'function') {
+          bytes = await window.api.util.getStreamCopyProgress(opts.transferId)
+        }
+      } catch {
+        /* channel missing until full restart */
+      }
+      // Fallback: dest file growing on disk
+      if (bytes <= 0 && opts.destPath && !isArchivePath(opts.destPath)) {
+        try {
+          const info = await window.api.plugins.statEntry(opts.destPluginId || 'local-filesystem', opts.destPath)
+          if (info && !info.isDirectory) bytes = info.size
+        } catch {
+          /* dest may not exist yet */
+        }
+      }
+      if (!stopped) apply(bytes)
+    } finally {
+      inFlight = false
+    }
+  }
+
+  const timer = setInterval(() => {
+    void tick()
+  }, intervalMs)
+  void tick()
+
+  return () => {
+    stopped = true
+    clearInterval(timer)
+    if (liveTransferProgress?.opId === opId) {
+      liveTransferProgress = null
+    }
+  }
+}
+
+/** @deprecated use startTransferProgressPoll */
+export function startLocalDestProgressPoll(
+  opId: string,
+  destPath: string,
+  expectedSize: number,
+  intervalMs = 100
+): () => void {
+  return startTransferProgressPoll(opId, {
+    transferId: '',
+    destPath,
+    expectedSize,
+    intervalMs
+  })
 }
 
 async function executeDelete(opId: string, op: ReturnType<typeof useOperationsStore.getState>['operations'][number]): Promise<void> {
@@ -185,6 +331,13 @@ async function tryBulkArchiveExtract(
     return false
   }
 
+  // Single large member (or any large file) → fall through to stream-copy so the
+  // dialog gets mid-file progress via dest-size polling. Bulk is only a win when
+  // progress-by-file-count is enough (many small files).
+  if (!shouldUseBulkArchiveExtract(fileList)) {
+    return false
+  }
+
   const store = () => useOperationsStore.getState()
 
   // Resolve overwrites up front — bulk extract can't skip individual members.
@@ -195,7 +348,7 @@ async function tryBulkArchiveExtract(
       store().updateOperation(opId, { status: 'cancelled' })
       return true
     }
-    const exists = await window.api.util.checkExists(item.destPath)
+    const exists = await window.api.plugins.exists(op.destinationPluginId || 'local-filesystem', item.destPath)
     if (!exists) continue
 
     const policy: OverwritePolicy =
@@ -208,7 +361,7 @@ async function tryBulkArchiveExtract(
     if (policy === 'overwrite-all') continue
 
     if (policy === 'ask') {
-      const destInfo = await window.api.util.getFileInfo(item.destPath)
+      const destInfo = await window.api.plugins.statEntry(op.destinationPluginId || 'local-filesystem', item.destPath)
       store().updateOperation(opId, {
         overwritePrompt: {
           sourcePath: item.sourcePath,
@@ -234,24 +387,6 @@ async function tryBulkArchiveExtract(
 
   let baseFiles = 0
   let baseBytes = 0
-  const sizeByRel = new Map(
-    fileList
-      .filter((f) => !f.isDirectory)
-      .map((f) => [f.relativePath.replace(/\\/g, '/'), f.size] as const)
-  )
-
-  const unsub = window.api.util.onExtractProgress((p) => {
-    const rel = p.currentFile.replace(/\\/g, '/')
-    const fileSize = p.currentFileSize ?? sizeByRel.get(rel) ?? 0
-    // processedBytes = fully completed only; currentFileCopied is the in-flight file.
-    store().updateOperation(opId, {
-      currentFile: p.currentFile,
-      currentFileSize: fileSize,
-      currentFileCopied: p.currentFileBytes ?? 0,
-      processedFiles: Math.min(totalFiles, baseFiles + p.filesDone),
-      processedBytes: Math.min(totalBytes, baseBytes + p.bytesDone)
-    })
-  })
 
   try {
     for (const entry of op.sourceEntries) {
@@ -266,15 +401,17 @@ async function tryBulkArchiveExtract(
         currentFileSize: 0
       })
 
-      const result = await window.api.util.extractFromArchive(
-        archivePath,
-        '',
-        op.destinationLocationId
-      )
+      // Whole-archive unpack via archive plugin copy — not bare util.extractFromArchive.
+      const result = await window.api.plugins.executeOperation('archive', {
+        op: 'copy',
+        sourceEntries: [entry],
+        destinationLocationId: op.destinationLocationId,
+        destinationPluginId: op.destinationPluginId
+      })
       if (!result.success) {
         store().updateOperation(opId, {
           status: 'error',
-          error: result.error || `Failed to extract ${archivePath}`
+          error: result.errors?.[0]?.message || `Failed to extract ${archivePath}`
         })
         return true
       }
@@ -290,8 +427,12 @@ async function tryBulkArchiveExtract(
         processedBytes: Math.min(totalBytes, baseBytes)
       })
     }
-  } finally {
-    unsub()
+  } catch (err) {
+    store().updateOperation(opId, {
+      status: 'error',
+      error: String(err)
+    })
+    return true
   }
 
   await usePanelStore.getState().refresh('left')
@@ -349,9 +490,7 @@ export function applyDestinationFileName(
 }
 
 /**
- * Same-volume local move: use fs.rename (via moveSingleFile) on each top-level
- * selection instead of stream-copy + delete. Instant on one disk; EXDEV still
- * falls back to copy+delete inside moveSingleFile.
+ * Same-volume local move via plugin executeOperation (rename/move), not bare util.moveSingleFile.
  * Returns true if the op was fully handled (caller must not continue).
  */
 async function tryLocalFsRenameMove(
@@ -364,7 +503,6 @@ async function tryLocalFsRenameMove(
   }
   if (isArchivePath(op.destinationLocationId)) return false
   if (op.sourceEntries.some((e) => isArchivePath(e.id))) return false
-  if (typeof window.api.util.moveSingleFile !== 'function') return false
 
   const store = () => useOperationsStore.getState()
   const entries = op.sourceEntries
@@ -400,7 +538,7 @@ async function tryLocalFsRenameMove(
     })
 
     try {
-      const exists = await window.api.util.checkExists(destPath)
+      const exists = await window.api.plugins.exists(op.destinationPluginId || 'local-filesystem', destPath)
       if (exists) {
         const policy: OverwritePolicy =
           store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
@@ -412,7 +550,7 @@ async function tryLocalFsRenameMove(
           continue
         }
         if (policy === 'ask') {
-          const destInfo = await window.api.util.getFileInfo(destPath)
+          const destInfo = await window.api.plugins.statEntry(op.destinationPluginId || 'local-filesystem', destPath)
           store().updateOperation(opId, {
             overwritePrompt: {
               sourcePath: entry.id,
@@ -470,7 +608,38 @@ async function tryLocalFsRenameMove(
         }
       }
 
-      const result = await window.api.util.moveSingleFile(entry.id, destPath, !!entry.isContainer)
+      // Plugin-scoped move: rename within dir, or move into dest parent (+ rename)
+      const { parent: destParent, name: destBase } = splitPathTail(destPath)
+      const srcParent = splitPathTail(entry.id).parent
+      let result: { success: boolean; error?: string }
+      if (srcParent === destParent || srcParent === (destParent || '')) {
+        const ren = await window.api.plugins.executeOperation(op.sourcePluginId, {
+          op: 'rename',
+          entry,
+          newName: destBase || entry.name
+        })
+        result = { success: ren.success, error: ren.errors?.[0]?.message }
+      } else {
+        const mov = await window.api.plugins.executeOperation(op.sourcePluginId, {
+          op: 'move',
+          sourceEntries: [entry],
+          destinationLocationId: destParent || op.destinationLocationId,
+          destinationPluginId: op.destinationPluginId
+        })
+        if (!mov.success) {
+          result = { success: false, error: mov.errors?.[0]?.message || 'Move failed' }
+        } else if (destBase && destBase !== entry.name) {
+          const movedId = joinLocalPath(destParent || op.destinationLocationId, entry.name)
+          const ren = await window.api.plugins.executeOperation(op.sourcePluginId, {
+            op: 'rename',
+            entry: { ...entry, id: movedId, name: entry.name },
+            newName: destBase
+          })
+          result = { success: ren.success, error: ren.errors?.[0]?.message }
+        } else {
+          result = { success: true }
+        }
+      }
       if (!result.success) {
         store().updateOperation(opId, {
           status: 'error',
@@ -598,7 +767,7 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
           }
         } else {
           // Overwrite check (only meaningful for local-filesystem destinations).
-          const exists = !isArchivePath(item.destPath) && (await window.api.util.checkExists(item.destPath))
+          const exists = await window.api.plugins.exists(op.destinationPluginId, item.destPath)
           if (exists) {
             const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
 
@@ -608,7 +777,7 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
               continue
             }
             if (policy === 'ask') {
-              const destInfo = await window.api.util.getFileInfo(item.destPath)
+              const destInfo = await window.api.plugins.statEntry(op.destinationPluginId || 'local-filesystem', item.destPath)
               const srcEntry = op.sourceEntries.find((e) => e.id === item.sourcePath)
               store().updateOperation(opId, {
                 overwritePrompt: {
@@ -632,18 +801,35 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
           }
 
           // Stream copy through the plugin system — works across any plugin combination.
-          // Apply progress updates immediately (main already throttles ~100ms). Extra
-          // renderer throttle was dropping the only events that arrived after a tight
-          // zip inflate finished in one event-loop turn.
+          // Progress: main pushes every 50ms + renderer polls getStreamCopyProgress.
+          // streamCopyFile invoke returns immediately; completion via STREAM_COPY_DONE.
           const unsubProgress = window.api.util.onCopyFileProgress((bytesCopied) => {
             if (isCancelled(opId)) return
-            store().updateOperation(opId, { currentFileCopied: bytesCopied })
+            if (typeof bytesCopied !== 'number' || bytesCopied < 0) return
+            setLiveTransferProgress({
+              opId,
+              bytes: bytesCopied,
+              total: item.size,
+              fileName: item.relativePath
+            })
+            store().updateOperation(opId, {
+              currentFileCopied: bytesCopied,
+              currentFileSize: item.size > 0 ? item.size : undefined
+            })
           })
 
           const { destDir, destFileName } = splitDestPathForCopy(item.destPath, item.relativePath)
 
           const transferId = newTransferId()
           currentTransferId = transferId
+          const stopProgressPoll = startTransferProgressPoll(opId, {
+            transferId,
+            destPath: item.destPath,
+            destPluginId: op.destinationPluginId,
+            expectedSize: item.size,
+            fileName: item.relativePath,
+            intervalMs: 50
+          })
           // If user cancelled between loop check and now, abort before starting
           if (isCancelled(opId)) {
             void window.api.util.cancelStreamCopy?.(transferId)
@@ -658,10 +844,22 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
               destFileName,
               transferId
             )
-            // Let any in-flight progress IPC land before we unsubscribe
-            await new Promise<void>((r) => setTimeout(r, 0))
+            if (result.success && (result.bytesWritten || item.size)) {
+              const doneBytes = result.bytesWritten || item.size
+              setLiveTransferProgress({
+                opId,
+                bytes: doneBytes,
+                total: item.size || doneBytes,
+                fileName: item.relativePath
+              })
+              store().updateOperation(opId, {
+                currentFileCopied: doneBytes,
+                currentFileSize: item.size || doneBytes
+              })
+            }
           } finally {
             if (currentTransferId === transferId) currentTransferId = null
+            stopProgressPoll()
             unsubProgress()
           }
 

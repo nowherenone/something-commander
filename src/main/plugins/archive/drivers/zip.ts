@@ -1,11 +1,76 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
+import { Transform, pipeline } from 'stream'
+import { promisify } from 'util'
 import * as yauzl from 'yauzl'
-import type { ArchiveDriver, ArchiveEntry } from '../driver'
+import type { ArchiveDriver, ArchiveEntry, ExtractProgress } from '../driver'
 import type { SourceAccess } from '../plugin-reader'
 import { PluginRandomAccessReader } from '../plugin-reader'
 import { archiveBasename } from '../utils'
+
+const pipelineAsync = promisify(pipeline)
+
+/** Progress transform: slice large inflate chunks and yield so Electron IPC/UI can run mid-file. */
+function createExtractProgressStream(
+  relativeName: string,
+  fileSize: number,
+  getFilesDone: () => number,
+  getBytesDone: () => number,
+  onProgress?: (p: ExtractProgress) => void
+): { stream: Transform; getFileBytes: () => number } {
+  const PIECE = 256 * 1024
+  const REPORT_EVERY_BYTES = 256 * 1024
+  const REPORT_EVERY_MS = 50
+  let fileBytes = 0
+  let lastReportBytes = 0
+  let lastReportTime = 0
+
+  const report = (force = false): void => {
+    if (!onProgress) return
+    const now = Date.now()
+    const byBytes = fileBytes - lastReportBytes >= REPORT_EVERY_BYTES
+    const byTime = lastReportTime === 0 || now - lastReportTime >= REPORT_EVERY_MS
+    if (!force && !byBytes && !byTime) return
+    lastReportBytes = fileBytes
+    lastReportTime = now
+    onProgress({
+      currentFile: relativeName,
+      filesDone: getFilesDone(),
+      bytesDone: getBytesDone(),
+      currentFileBytes: fileBytes,
+      currentFileSize: fileSize
+    })
+  }
+
+  const stream = new Transform({
+    highWaterMark: PIECE,
+    transform(this: Transform, chunk: Buffer, _enc, callback) {
+      let offset = 0
+      const pump = (): void => {
+        if (offset >= chunk.length) {
+          callback()
+          return
+        }
+        const end = Math.min(offset + PIECE, chunk.length)
+        const piece = chunk.subarray(offset, end)
+        offset = end
+        fileBytes += piece.length
+        report(false)
+        this.push(piece)
+        // Yield so webContents.send / renderer paint can run during multi-GB inflate.
+        setImmediate(pump)
+      }
+      pump()
+    },
+    flush(callback) {
+      report(true)
+      callback()
+    }
+  })
+
+  return { stream, getFileBytes: () => fileBytes }
+}
 
 // ─── Internal ZIP types ────────────────────────────────────────────────────────
 
@@ -186,13 +251,7 @@ export class ZipDriver implements ArchiveDriver {
     source: SourceAccess,
     entryPath: string,
     destDir: string,
-    onProgress?: (p: {
-      currentFile: string
-      filesDone: number
-      bytesDone: number
-      currentFileBytes?: number
-      currentFileSize?: number
-    }) => void
+    onProgress?: (p: ExtractProgress) => void
   ): Promise<{ success: boolean; error?: string; count: number }> {
     return new Promise((resolve) => {
       const reader = new PluginRandomAccessReader(source.readAt.bind(source))
@@ -204,11 +263,17 @@ export class ZipDriver implements ArchiveDriver {
 
         let count = 0
         let bytesDone = 0
+        let settled = false
+        const finish = (result: { success: boolean; error?: string; count: number }): void => {
+          if (settled) return
+          settled = true
+          resolve(result)
+        }
         const prefix = entryPath || ''
         const isExactFile = prefix !== '' && !prefix.endsWith('/')
 
         zipfile.readEntry()
-        zipfile.on('entry', async (entry) => {
+        zipfile.on('entry', (entry) => {
           const fileName = entry.fileName
           let destPath: string
           let relativeName: string
@@ -226,55 +291,64 @@ export class ZipDriver implements ArchiveDriver {
           }
 
           if (fileName.endsWith('/')) {
-            try { await fs.mkdir(destPath, { recursive: true }) } catch { /* ignore */ }
-            zipfile.readEntry()
-          } else {
+            void fs.mkdir(destPath, { recursive: true }).finally(() => zipfile.readEntry())
+            return
+          }
+
+          void (async () => {
             try {
               await fs.mkdir(path.dirname(destPath), { recursive: true })
-              zipfile.openReadStream(entry, (streamErr, readStream) => {
-                if (streamErr || !readStream) { zipfile.readEntry(); return }
-                const ws = fsSync.createWriteStream(destPath)
-                let fileBytes = 0
-                let lastReport = 0
-                const fileSize = entry.uncompressedSize || 0
-                readStream.on('data', (chunk: Buffer) => {
-                  fileBytes += chunk.length
-                  if (onProgress) {
-                    const now = Date.now()
-                    if (now - lastReport >= 250) {
-                      // bytesDone = fully completed files only; current file is separate.
-                      onProgress({
-                        currentFile: relativeName,
-                        filesDone: count,
-                        bytesDone,
-                        currentFileBytes: fileBytes,
-                        currentFileSize: fileSize
-                      })
-                      lastReport = now
-                    }
-                  }
+              const readStream = await new Promise<NodeJS.ReadableStream | null>((res) => {
+                zipfile.openReadStream(entry, (streamErr, rs) => {
+                  if (streamErr || !rs) res(null)
+                  else res(rs)
                 })
-                readStream.pipe(ws)
-                ws.on('finish', () => {
-                  count++
-                  bytesDone += fileSize || fileBytes
-                  onProgress?.({
-                    currentFile: relativeName,
-                    filesDone: count,
-                    bytesDone,
-                    currentFileBytes: fileSize || fileBytes,
-                    currentFileSize: fileSize || fileBytes
-                  })
-                  zipfile.readEntry()
-                })
-                ws.on('error', () => { zipfile.readEntry() })
               })
-            } catch { zipfile.readEntry() }
-          }
+              if (!readStream) {
+                zipfile.readEntry()
+                return
+              }
+
+              const fileSize = entry.uncompressedSize || 0
+              // Immediate start report so UI shows the file name before first chunk.
+              onProgress?.({
+                currentFile: relativeName,
+                filesDone: count,
+                bytesDone,
+                currentFileBytes: 0,
+                currentFileSize: fileSize
+              })
+
+              const { stream: progressStream, getFileBytes } = createExtractProgressStream(
+                relativeName,
+                fileSize,
+                () => count,
+                () => bytesDone,
+                onProgress
+              )
+              const ws = fsSync.createWriteStream(destPath)
+              await pipelineAsync(readStream as NodeJS.ReadableStream, progressStream, ws)
+
+              const written = getFileBytes()
+              count++
+              bytesDone += fileSize || written
+              onProgress?.({
+                currentFile: relativeName,
+                filesDone: count,
+                bytesDone,
+                currentFileBytes: fileSize || written,
+                currentFileSize: fileSize || written
+              })
+              zipfile.readEntry()
+            } catch (e) {
+              finish({ success: false, error: String(e), count })
+              try { zipfile.close() } catch { /* ignore */ }
+            }
+          })()
         })
 
-        zipfile.on('end', () => resolve({ success: true, count }))
-        zipfile.on('error', (e) => resolve({ success: false, error: String(e), count }))
+        zipfile.on('end', () => finish({ success: true, count }))
+        zipfile.on('error', (e) => finish({ success: false, error: String(e), count }))
       })
     })
   }

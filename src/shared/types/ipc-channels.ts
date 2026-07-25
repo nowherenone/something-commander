@@ -5,6 +5,10 @@ export const IPC_CHANNELS = {
   PLUGIN_RESOLVE_LOC: 'plugin:resolveLocation',
   PLUGIN_GET_OPS: 'plugin:getSupportedOperations',
   PLUGIN_EXEC_OP: 'plugin:executeOperation',
+  /** Plugin-scoped exists/stat/size — preferred over bare-path util checks */
+  PLUGIN_EXISTS: 'plugin:exists',
+  PLUGIN_STAT: 'plugin:statEntry',
+  PLUGIN_GET_SIZE: 'plugin:getSize',
 
   // Utility
   CALC_FOLDER_SIZE: 'util:calcFolderSize',
@@ -25,6 +29,8 @@ export const IPC_CHANNELS = {
   READ_FILE_CHUNK: 'util:readFileChunk',
   GET_FILE_SIZE: 'util:getFileSize',
   SAVE_FILE: 'util:saveFile',
+  /** Save editor content through any plugin (pluginId + entryId). */
+  SAVE_ENTRY_CONTENT: 'util:saveEntryContent',
   READ_ENTRY_CONTENT: 'util:readEntryContent',
   SHOW_CONTEXT_MENU: 'util:showContextMenu',
   SHOW_FILE_PROPERTIES: 'util:showFileProperties',
@@ -44,8 +50,16 @@ export const IPC_CHANNELS = {
   PLUGIN_GET_DIR: 'plugin:getDir',
   EXTRACT_FROM_ARCHIVE: 'ops:extractFromArchive',
   EXTRACT_PROGRESS: 'ops:extractProgress',
+  /**
+   * Start a stream copy and return immediately { started, transferId }.
+   * Completion is delivered via STREAM_COPY_DONE (do not hold the invoke open
+   * for multi-GB copies — that starves progress IPC in the real app).
+   */
   STREAM_COPY_FILE: 'ops:streamCopyFile',
+  STREAM_COPY_DONE: 'ops:streamCopyDone',
   CANCEL_STREAM_COPY: 'ops:cancelStreamCopy',
+  /** Poll in-flight stream copy bytes (works even when progress events stall). */
+  GET_STREAM_COPY_PROGRESS: 'ops:getStreamCopyProgress',
   ENUMERATE_FILES: 'ops:enumerateFiles',
 
   // Persistent user data store (survives builds)

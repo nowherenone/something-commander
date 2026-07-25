@@ -1,11 +1,24 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import * as fs from 'fs/promises'
 import * as path from 'path'
 import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 
 type UtilWindowKind = 'viewer' | 'editor'
+
+const LOCAL = 'local-filesystem'
+
+/** Parse pluginId|entryId composite, or treat bare path as local-filesystem. */
+function parseScopedPath(filePath: string): { pluginId: string; entryId: string } {
+  const pipe = filePath.indexOf('|')
+  if (pipe > 0) {
+    return { pluginId: filePath.slice(0, pipe), entryId: filePath.slice(pipe + 1) }
+  }
+  if (filePath.includes('::')) {
+    return { pluginId: 'archive', entryId: filePath }
+  }
+  return { pluginId: LOCAL, entryId: filePath }
+}
 
 function openUtilWindow(kind: UtilWindowKind, filePath: string, fileName: string): void {
   const win = new BrowserWindow({
@@ -18,7 +31,6 @@ function openUtilWindow(kind: UtilWindowKind, filePath: string, fileName: string
       sandbox: false
     }
   })
-  // Ensure no menu at all (top menu not needed for viewer/editor)
   win.setMenu(null)
 
   const query = `file=${encodeURIComponent(filePath)}&name=${encodeURIComponent(fileName)}`
@@ -31,10 +43,9 @@ function openUtilWindow(kind: UtilWindowKind, filePath: string, fileName: string
   }
 }
 
-/** File-viewer/editor IO and window lifecycle handlers. */
+/** File-viewer/editor IO and window lifecycle — all content I/O via pluginManager. */
 export function registerViewerIPC(): void {
   ipcMain.handle(IPC_CHANNELS.OPEN_VIEWER_WINDOW, (_event, pluginId: string, entryId: string, fileName: string) => {
-    // Pass as query: pluginId|entryId for the pages to use new API
     openUtilWindow('viewer', `${pluginId}|${entryId}`, fileName)
   })
 
@@ -46,12 +57,25 @@ export function registerViewerIPC(): void {
     IPC_CHANNELS.READ_FILE_CHUNK,
     async (_event, filePath: string, offset: number, length: number) => {
       try {
-        const handle = await fs.open(filePath, 'r')
-        const buffer = Buffer.alloc(length)
-        const { bytesRead } = await handle.read(buffer, 0, length, offset)
-        await handle.close()
-        // Return base64 to avoid utf8 boundary corruption for binary/large text
-        return { data: buffer.slice(0, bytesRead).toString('base64'), bytesRead, encoding: 'base64' }
+        const { pluginId, entryId } = parseScopedPath(filePath)
+        const res = await pluginManager.readEntryContent(pluginId, entryId, offset, length)
+        if (res.error) {
+          return { data: '', bytesRead: 0, error: res.error }
+        }
+        // When isBinary, data may be hex string from readEntryContent
+        let raw: Buffer
+        if (Buffer.isBuffer(res.data)) {
+          raw = res.data
+        } else if (res.isBinary && typeof res.data === 'string') {
+          raw = Buffer.from(res.data, 'hex')
+        } else {
+          raw = Buffer.from(String(res.data), 'utf-8')
+        }
+        return {
+          data: raw.toString('base64'),
+          bytesRead: raw.length,
+          encoding: 'base64'
+        }
       } catch (err) {
         return { data: '', bytesRead: 0, error: String(err) }
       }
@@ -60,51 +84,66 @@ export function registerViewerIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.GET_FILE_SIZE, async (_event, filePath: string) => {
     try {
-      const stat = await fs.stat(filePath)
-      return stat.size
+      const { pluginId, entryId } = parseScopedPath(filePath)
+      return await pluginManager.getSize(pluginId, entryId)
     } catch {
-      return 0
+      const { pluginId, entryId } = parseScopedPath(filePath)
+      const st = await pluginManager.statEntry(pluginId, entryId)
+      return st?.size || 0
     }
   })
 
   ipcMain.handle(IPC_CHANNELS.SAVE_FILE, async (_event, filePath: string, content: string) => {
     try {
-      await fs.writeFile(filePath, content, 'utf-8')
-      return { success: true }
+      const { pluginId, entryId } = parseScopedPath(filePath)
+      if (!entryId) return { success: false, error: 'Invalid save path' }
+      const result = await pluginManager.writeEntryContent(pluginId, entryId, content)
+      return { success: result.success, error: result.error, bytesWritten: result.bytesWritten }
     } catch (err) {
       return { success: false, error: String(err) }
     }
   })
 
-  ipcMain.handle(IPC_CHANNELS.READ_ENTRY_CONTENT, async (_event, pluginId: string, entryId: string, offset = 0, length?: number) => {
-    return pluginManager.readEntryContent(pluginId, entryId, offset, length)
-  })
+  ipcMain.handle(
+    IPC_CHANNELS.SAVE_ENTRY_CONTENT,
+    async (_event, pluginId: string, entryId: string, content: string) => {
+      return pluginManager.writeEntryContent(pluginId, entryId, content)
+    }
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.READ_ENTRY_CONTENT,
+    async (_event, pluginId: string, entryId: string, offset = 0, length?: number) => {
+      return pluginManager.readEntryContent(pluginId, entryId, offset, length)
+    }
+  )
 
   ipcMain.handle(
     IPC_CHANNELS.READ_FILE_CONTENT,
     async (_event, filePath: string, maxBytes: number = 512 * 1024) => {
       try {
-        const stat = await fs.stat(filePath)
-        const isLarge = stat.size > maxBytes
-        const handle = await fs.open(filePath, 'r')
-        const buffer = Buffer.alloc(Math.min(stat.size, maxBytes))
-        await handle.read(buffer, 0, buffer.length, 0)
-        await handle.close()
-
-        // Try to detect if it's text or binary
-        let isBinary = false
-        for (let i = 0; i < Math.min(buffer.length, 8192); i++) {
-          if (buffer[i] === 0) {
-            isBinary = true
-            break
+        const { pluginId, entryId } = parseScopedPath(filePath)
+        const res = await pluginManager.readEntryContent(pluginId, entryId, 0, maxBytes)
+        if (res.error) {
+          return {
+            content: '',
+            isBinary: false,
+            totalSize: 0,
+            truncated: false,
+            error: res.error
           }
         }
-
+        const content =
+          typeof res.data === 'string'
+            ? res.data
+            : res.isBinary
+              ? Buffer.from(res.data).toString('hex')
+              : Buffer.from(res.data).toString('utf-8')
         return {
-          content: isBinary ? buffer.toString('hex') : buffer.toString('utf-8'),
-          isBinary,
-          totalSize: stat.size,
-          truncated: isLarge
+          content,
+          isBinary: res.isBinary,
+          totalSize: res.totalSize,
+          truncated: res.totalSize > maxBytes
         }
       } catch (err) {
         return { content: '', isBinary: false, totalSize: 0, truncated: false, error: String(err) }
