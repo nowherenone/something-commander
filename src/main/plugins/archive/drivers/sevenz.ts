@@ -108,51 +108,34 @@ async function sevenZReadEntries(source: SourceAccess): Promise<ArchiveEntry[]> 
   }
 }
 
-/** Full-archive extract cache so multi-file reads don't re-run 7za per file. */
-const sevenZExtractCache = new Map<string, { dir: string; expires: number }>()
-const SEVENZ_CACHE_TTL_MS = 5 * 60 * 1000
-
-function sevenZCacheKey(archivePath: string): string {
-  return archivePath
-}
-
-async function getSevenZExtractCache(archivePath: string): Promise<string> {
-  const key = sevenZCacheKey(archivePath)
-  const hit = sevenZExtractCache.get(key)
-  if (hit && hit.expires > Date.now()) {
-    hit.expires = Date.now() + SEVENZ_CACHE_TTL_MS
-    return hit.dir
-  }
-  if (hit) {
-    await fs.rm(hit.dir, { recursive: true, force: true }).catch(() => {})
-    sevenZExtractCache.delete(key)
-  }
-
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-7z-cache-'))
-  await _7z.unpack(archivePath, tmpDir)
-  sevenZExtractCache.set(key, { dir: tmpDir, expires: Date.now() + SEVENZ_CACHE_TTL_MS })
-  return tmpDir
-}
-
 async function sevenZCreateReadStream(
   source: SourceAccess,
   entryPath: string
 ): Promise<NodeJS.ReadableStream | null> {
   const resolved = await resolveLocalArchive(source)
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-7z-one-'))
   try {
-    const cacheDir = await getSevenZExtractCache(resolved.path)
     const internalPath = entryPath.replace(/\\/g, '/')
-    const extracted = path.join(cacheDir, ...internalPath.split('/').filter(Boolean))
+    await _7z.unpackSome(resolved.path, [internalPath], tmpDir)
+    const extracted = path.join(tmpDir, ...internalPath.split('/').filter(Boolean))
     try {
       await fs.access(extracted)
     } catch {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
       return null
     }
-    return fsSync.createReadStream(extracted)
+    const stream = fsSync.createReadStream(extracted, { highWaterMark: 256 * 1024 })
+    const cleanup = (): void => {
+      void fs.rm(tmpDir, { recursive: true, force: true })
+      void resolved.cleanup()
+    }
+    stream.on('close', cleanup)
+    stream.on('error', cleanup)
+    return stream
   } catch {
-    return null
-  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
     await resolved.cleanup()
+    return null
   }
 }
 
@@ -218,7 +201,8 @@ async function sevenZExtract(
     bytesDone: number
     currentFileBytes?: number
     currentFileSize?: number
-  }) => void
+  }) => void,
+  signal?: AbortSignal
 ): Promise<{ success: boolean; error?: string; count: number }> {
   const resolved = await resolveLocalArchive(source)
   try {
@@ -236,10 +220,13 @@ async function sevenZExtract(
 
     // With progress: always extract file-by-file (including single large files) so
     // we can poll mid-file size. Bulk unpack only when progress is not needed.
+    if (signal?.aborted) return { success: false, error: 'Cancelled', count: 0 }
+
     if (onProgress && matchingFiles.length > 0) {
       let filesDone = 0
       let bytesDone = 0
       for (const file of matchingFiles) {
+        if (signal?.aborted) return { success: false, error: 'Cancelled', count: filesDone }
         const extractName = isExactFile ? prefix : file.path
         await unpackSomeWithProgress(
           resolved.path,

@@ -50,12 +50,14 @@ export interface ArchiveDriver {
    * - entryPath ending with '/' → extract that directory subtree
    * - otherwise → extract single file
    * onProgress is called as each file finishes (best-effort; some formats only report at end).
+   * signal aborts an in-flight extract (zip/tar tear down streams; 7z best-effort).
    */
   extract(
     source: SourceAccess,
     entryPath: string,
     destDir: string,
-    onProgress?: (p: ExtractProgress) => void
+    onProgress?: (p: ExtractProgress) => void,
+    signal?: AbortSignal
   ): Promise<{ success: boolean; error?: string; count: number }>
 
   // ── Write operations (only called when supportsWrite === true) ──────────────

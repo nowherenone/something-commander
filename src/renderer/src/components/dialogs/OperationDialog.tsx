@@ -117,6 +117,8 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
 
   const isFileInProgress = liveStatus === 'running' && liveCurrentFile !== ''
   const hasFileProgress = isFileInProgress && (fileSize > 0 || copied > 0)
+  // One file (or still scanning) — a second "overall" bar is the same bar twice.
+  const showOverallBar = op.totalFiles > 1
   const isError = liveStatus === 'error'
   const isCancelled = liveStatus === 'cancelled'
   const isRunning = liveStatus === 'running'
@@ -177,16 +179,18 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
          '\u00A0'}
       </div>
 
-      {/* Current file progress */}
+      {/* Current file progress — also the only bar when copying a single file */}
       <div className={styles.opBarSection} data-testid="op-file-progress">
         <div className={styles.opBarLabel}>
-          <span>Current file</span>
+          <span>{showOverallBar ? 'Current file' : '\u00A0'}</span>
           <span data-testid="op-file-pct">
             {isFileInProgress && fileSize > 0
               ? `${formatSize(copied)} / ${formatSize(fileSize)}`
               : isFileInProgress && copied > 0
                 ? formatSize(copied)
-                : '\u00A0'}
+                : !showOverallBar && totalPct > 0
+                  ? `${totalPct}%`
+                  : '\u00A0'}
           </span>
         </div>
         <div className={styles.opBar}>
@@ -198,28 +202,33 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
           ) : isRunning || isEnumerating ? (
             <div className={`${styles.opBarFill} ${styles.opBarFillAnimated}`} />
           ) : (
-            <div className={styles.opBarFill} style={{ width: isError ? '100%' : `${totalPct}%` }}
-              data-testid="op-file-bar-static" />
+            <div
+              className={`${styles.opBarFill} ${isError ? styles.opBarFillError : ''}`}
+              style={{ width: isError ? '100%' : `${totalPct}%` }}
+              data-testid="op-file-bar-static"
+            />
           )}
         </div>
       </div>
 
-      {/* Total progress */}
-      <div className={styles.opBarSection} data-testid="op-total-progress">
-        <div className={styles.opBarLabel}>
-          <span data-testid="op-file-count">
-            {op.totalFiles > 0 ? `File ${Math.min(liveProcessedFiles, op.totalFiles)} of ${op.totalFiles}` : '\u00A0'}
-          </span>
-          <span data-testid="op-total-pct">{totalPct > 0 ? `${totalPct}%` : '\u00A0'}</span>
+      {/* Overall progress — only when more than one file (otherwise same as above) */}
+      {showOverallBar && (
+        <div className={styles.opBarSection} data-testid="op-total-progress">
+          <div className={styles.opBarLabel}>
+            <span data-testid="op-file-count">
+              {`File ${Math.min(liveProcessedFiles, op.totalFiles)} of ${op.totalFiles}`}
+            </span>
+            <span data-testid="op-total-pct">{totalPct > 0 ? `${totalPct}%` : '\u00A0'}</span>
+          </div>
+          <div className={styles.opBar}>
+            <div
+              className={`${styles.opBarFill} ${isError ? styles.opBarFillError : ''}`}
+              style={{ width: `${totalPct}%` }}
+              data-testid="op-total-bar"
+            />
+          </div>
         </div>
-        <div className={styles.opBar}>
-          <div
-            className={`${styles.opBarFill} ${isError ? styles.opBarFillError : ''}`}
-            style={{ width: `${totalPct}%` }}
-            data-testid="op-total-bar"
-          />
-        </div>
-      </div>
+      )}
 
       {/* Info line: bytes, speed, ETA */}
       <div className={styles.opInfo} data-testid="op-info">

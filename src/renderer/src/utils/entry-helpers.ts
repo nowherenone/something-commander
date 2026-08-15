@@ -16,6 +16,33 @@ export function getBaseName(name: string): string {
 }
 
 /**
+ * Name-column text for the file list. Files show the stem only — the Ext
+ * column already has the suffix (orthodox commander layout).
+ */
+export function listName(entry: { name: string; isContainer?: boolean }): string {
+  if (entry.isContainer) return entry.name
+  return getBaseName(entry.name)
+}
+
+/**
+ * Ext-column text. Empty for directories (`<DIR>` belongs in Size).
+ * Prefers `meta.extension` (no leading dot) when present.
+ */
+export function listExtension(entry: {
+  name: string
+  isContainer?: boolean
+  meta?: Record<string, unknown>
+}): string {
+  if (entry.isContainer) return ''
+  const fromMeta = entry.meta?.extension
+  if (typeof fromMeta === 'string' && fromMeta) {
+    return fromMeta.replace(/^\./, '')
+  }
+  const ext = getExtension(entry.name)
+  return ext.startsWith('.') ? ext.slice(1) : ext
+}
+
+/**
  * Split a plain (non-archive) filesystem path into its parent directory and
  * its last segment. Handles both `\` and `/` separators. If there is no
  * separator, the whole input is treated as the name and the parent is `''`.

@@ -33,51 +33,31 @@ async function tarReadEntries(source: SourceAccess): Promise<ArchiveEntry[]> {
   return entries
 }
 
-/** Full-archive extract cache so multi-file reads don't re-scan the tar each time. */
-const tarExtractCache = new Map<string, { dir: string; expires: number }>()
-const TAR_CACHE_TTL_MS = 5 * 60 * 1000
-
-function tarCacheKey(source: SourceAccess): string {
-  return source.localPath || `remote:${source.totalSize}`
-}
-
-async function getTarExtractCache(source: SourceAccess): Promise<string> {
-  const key = tarCacheKey(source)
-  const hit = tarExtractCache.get(key)
-  if (hit && hit.expires > Date.now()) {
-    hit.expires = Date.now() + TAR_CACHE_TTL_MS
-    return hit.dir
-  }
-  if (hit) {
-    await fs.rm(hit.dir, { recursive: true, force: true }).catch(() => {})
-    tarExtractCache.delete(key)
-  }
-
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-tar-cache-'))
-  const extractStream = tar.extract({ cwd: tmpDir })
-  const readStream = source.createReadStream()
-  await new Promise<void>((resolve, reject) => {
-    readStream.pipe(extractStream)
-    extractStream.on('end', resolve)
-    extractStream.on('error', reject)
-    readStream.on('error', reject)
-  })
-  tarExtractCache.set(key, { dir: tmpDir, expires: Date.now() + TAR_CACHE_TTL_MS })
-  return tmpDir
-}
-
-/** Extract a single file from a TAR via full-archive cache (avoids N full rescans). */
+/** Extract a single file from a TAR (not the whole archive) then stream it. */
 async function tarCreateReadStream(source: SourceAccess, entryPath: string): Promise<NodeJS.ReadableStream | null> {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-tar-one-'))
   try {
-    const cacheDir = await getTarExtractCache(source)
-    const extracted = path.join(cacheDir, ...entryPath.split('/').filter(Boolean))
+    const result = await tarExtract(source, entryPath, tmpDir)
+    if (!result.success) {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+      return null
+    }
+    const extracted = path.join(tmpDir, ...entryPath.split('/').filter(Boolean))
     try {
       await fs.access(extracted)
     } catch {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
       return null
     }
-    return fsSync.createReadStream(extracted)
+    const stream = fsSync.createReadStream(extracted, { highWaterMark: 256 * 1024 })
+    const cleanup = (): void => {
+      void fs.rm(tmpDir, { recursive: true, force: true })
+    }
+    stream.on('close', cleanup)
+    stream.on('error', cleanup)
+    return stream
   } catch {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
     return null
   }
 }
@@ -87,9 +67,17 @@ async function tarExtract(
   source: SourceAccess,
   entryPath: string,
   destDir: string,
-  onProgress?: (p: { currentFile: string; filesDone: number; bytesDone: number }) => void
+  onProgress?: (p: {
+    currentFile: string
+    filesDone: number
+    bytesDone: number
+    currentFileBytes?: number
+    currentFileSize?: number
+  }) => void,
+  signal?: AbortSignal
 ): Promise<{ success: boolean; error?: string; count: number }> {
   try {
+    if (signal?.aborted) return { success: false, error: 'Cancelled', count: 0 }
     await fs.mkdir(destDir, { recursive: true })
     const filter = entryPath
       ? entryPath.endsWith('/')
@@ -97,30 +85,96 @@ async function tarExtract(
         : (p: string): boolean => p === entryPath
       : undefined
 
+    const isSingleFile = !!entryPath && !entryPath.endsWith('/')
+    const destFile = isSingleFile
+      ? path.join(destDir, ...entryPath.replace(/\\/g, '/').split('/').filter(Boolean))
+      : ''
+
     let count = 0
     let bytesDone = 0
+    let currentFileSize = 0
+    let pollTimer: ReturnType<typeof setInterval> | null = null
+    if (onProgress && isSingleFile) {
+      pollTimer = setInterval(() => {
+        void fs.stat(destFile).then(
+          (st) => {
+            onProgress({
+              currentFile: entryPath,
+              filesDone: count,
+              bytesDone,
+              currentFileBytes: st.size,
+              currentFileSize: currentFileSize || st.size
+            })
+          },
+          () => {
+            /* not created yet */
+          }
+        )
+      }, 80)
+    }
+
     const extractStream = tar.extract({
       cwd: destDir,
       filter,
       onentry: (entry) => {
         const isDir = entry.type === 'Directory' || entry.path.endsWith('/')
         if (isDir) return
-        count++
-        bytesDone += entry.size ?? 0
+        currentFileSize = entry.size ?? 0
+        if (!isSingleFile) {
+          count++
+          bytesDone += currentFileSize
+        }
         onProgress?.({
           currentFile: entry.path,
-          filesDone: count,
-          bytesDone
+          filesDone: isSingleFile ? 0 : count,
+          bytesDone,
+          currentFileBytes: 0,
+          currentFileSize
         })
       }
     })
     const readStream = source.createReadStream()
-    await new Promise<void>((resolve, reject) => {
-      readStream.pipe(extractStream)
-      extractStream.on('end', resolve)
-      extractStream.on('error', reject)
-      readStream.on('error', reject)
-    })
+    const abortTar = (): void => {
+      try {
+        ;(readStream as { destroy?: (e?: Error) => void }).destroy?.(new Error('Cancelled'))
+      } catch { /* ignore */ }
+      try {
+        ;(extractStream as { destroy?: (e?: Error) => void }).destroy?.(new Error('Cancelled'))
+      } catch { /* ignore */ }
+    }
+    if (signal) {
+      if (signal.aborted) abortTar()
+      else signal.addEventListener('abort', abortTar, { once: true })
+    }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        readStream.pipe(extractStream)
+        extractStream.on('end', resolve)
+        extractStream.on('error', reject)
+        readStream.on('error', reject)
+      })
+    } finally {
+      if (pollTimer) clearInterval(pollTimer)
+    }
+    if (signal?.aborted) return { success: false, error: 'Cancelled', count }
+
+    if (isSingleFile) {
+      let written = 0
+      try {
+        written = (await fs.stat(destFile)).size
+      } catch {
+        written = currentFileSize
+      }
+      count = 1
+      bytesDone = written
+      onProgress?.({
+        currentFile: entryPath,
+        filesDone: 1,
+        bytesDone: written,
+        currentFileBytes: written,
+        currentFileSize: currentFileSize || written
+      })
+    }
 
     return { success: true, count }
   } catch (err) {

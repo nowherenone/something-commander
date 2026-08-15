@@ -120,6 +120,58 @@ describe('zip → local streamCopyFile progress', () => {
     expect(samples[samples.length - 1].bytes).toBe(FILE_SIZE)
   }, 60000)
 
+  it('cancel during zip extract does not throw an uncaught main-process error', async () => {
+    const FILE_SIZE = 24 * 1024 * 1024
+    const { zipPath } = await createLargeZip(tmpDir, 'huge.bin', FILE_SIZE)
+    const destDir = path.join(tmpDir, 'out-no-crash')
+    await fs.mkdir(destDir)
+
+    const uncaught: unknown[] = []
+    const onUncaught = (err: unknown): void => {
+      uncaught.push(err)
+    }
+    process.on('uncaughtException', onUncaught)
+    process.on('unhandledRejection', onUncaught)
+    try {
+      const transferId = 'zip-cancel-no-throw'
+      const progress: number[] = []
+      const copyPromise = manager.streamCopyFile(
+        'archive',
+        `${zipPath}::huge.bin`,
+        'local-filesystem',
+        destDir,
+        'huge.bin',
+        (bytes) => progress.push(bytes),
+        transferId
+      )
+      await new Promise<void>((resolve, reject) => {
+        const start = Date.now()
+        const tick = (): void => {
+          if (progress.length > 0 && progress[progress.length - 1] > 128 * 1024) {
+            manager.cancelStreamCopy(transferId)
+            resolve()
+            return
+          }
+          if (Date.now() - start > 15000) {
+            reject(new Error('Timed out waiting for progress before cancel'))
+            return
+          }
+          setTimeout(tick, 5)
+        }
+        tick()
+      })
+      const result = await copyPromise
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/Cancel/i)
+      // Give leftover setImmediate callbacks a turn
+      await new Promise((r) => setTimeout(r, 50))
+      expect(uncaught).toEqual([])
+    } finally {
+      process.off('uncaughtException', onUncaught)
+      process.off('unhandledRejection', onUncaught)
+    }
+  }, 60000)
+
   it('cancelStreamCopy stops a large zip extract mid-flight and unblocks', async () => {
     const FILE_SIZE = 32 * 1024 * 1024
     const entryName = 'huge.bin'
@@ -164,6 +216,32 @@ describe('zip → local streamCopyFile progress', () => {
     expect(result.bytesWritten).toBeLessThan(FILE_SIZE)
     expect(progress.length).toBeGreaterThan(0)
     expect(progress[progress.length - 1]).toBeLessThan(FILE_SIZE)
+  }, 60000)
+
+  it('extractToLocal reports mid-file bytes while a large zip member inflates', async () => {
+    const FILE_SIZE = 8 * 1024 * 1024
+    const { zipPath } = await createLargeZip(tmpDir, 'huge.bin', FILE_SIZE)
+    const destDir = path.join(tmpDir, 'extract-out')
+    await fs.mkdir(destDir)
+
+    const samples: number[] = []
+    let resolved = false
+    const extractPromise = archive.extractToLocal(
+      `${zipPath}::huge.bin`,
+      destDir,
+      'huge.bin',
+      (bytes) => {
+        if (!resolved && bytes > 0) samples.push(bytes)
+      }
+    )
+    const result = await extractPromise
+    resolved = true
+
+    expect(result.success).toBe(true)
+    expect(result.bytesWritten).toBe(FILE_SIZE)
+    expect(samples.length).toBeGreaterThanOrEqual(2)
+    expect(samples.some((b) => b > 0 && b < FILE_SIZE)).toBe(true)
+    expect((await fs.stat(path.join(destDir, 'huge.bin'))).size).toBe(FILE_SIZE)
   }, 60000)
 
   it('enumerate + stream copy path has non-zero size for zip members', async () => {

@@ -1,3 +1,4 @@
+import * as path from 'path'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import type {
@@ -21,7 +22,9 @@ import {
   joinDestPath,
   buildDirectoryListing,
   isRemoteArchivePath,
-  parseRemoteRef
+  parseRemoteRef,
+  extractedDestPath,
+  removeEmptyParents
 } from './utils'
 
 // ─── Module-level driver registry ─────────────────────────────────────────────
@@ -425,6 +428,79 @@ class ArchivePlugin implements BrowsePlugin {
     }
 
     return result
+  }
+
+  /**
+   * Extract one archive member straight to a local dest file, reporting
+   * mid-file bytes via onProgress. Used by streamCopyFile for archive→disk
+   * so we do not extract-to-temp then copy (that froze the current-file bar).
+   */
+  async extractToLocal(
+    entryId: string,
+    destDir: string,
+    destFileName: string,
+    onProgress?: (bytesCopied: number, totalBytes?: number) => void,
+    signal?: AbortSignal
+  ): Promise<{ success: boolean; bytesWritten: number; error?: string }> {
+    const [archivePath, internalPath] = parseLocation(entryId)
+    if (!internalPath || internalPath.endsWith('/')) {
+      return { success: false, bytesWritten: 0, error: 'Cannot extract a directory as a single file' }
+    }
+    const driver = getDriver(archivePath)
+    if (!driver) return { success: false, bytesWritten: 0, error: 'Unsupported archive format' }
+
+    const finalPath = path.join(destDir, destFileName)
+    try {
+      if (signal?.aborted) {
+        return { success: false, bytesWritten: 0, error: 'Cancelled' }
+      }
+      const source = await this.resolveSource(archivePath)
+      await fs.mkdir(destDir, { recursive: true })
+
+      const result = await driver.extract(
+        source,
+        internalPath,
+        destDir,
+        (p) => {
+          if (signal?.aborted) return
+          const bytes = p.currentFileBytes ?? 0
+          onProgress?.(bytes, p.currentFileSize)
+        },
+        signal
+      )
+      if (signal?.aborted || result.error === 'Cancelled') {
+        await fs.unlink(finalPath).catch(() => {})
+        await fs.unlink(extractedDestPath(destDir, internalPath)).catch(() => {})
+        return { success: false, bytesWritten: 0, error: 'Cancelled' }
+      }
+      if (!result.success) {
+        return { success: false, bytesWritten: 0, error: result.error || 'Extract failed' }
+      }
+
+      const nested = extractedDestPath(destDir, internalPath)
+      const flat = path.join(destDir, archiveBasename(internalPath))
+      let written = nested
+      try {
+        await fs.access(nested)
+      } catch {
+        written = flat
+        await fs.access(flat)
+      }
+      if (path.resolve(written) !== path.resolve(finalPath)) {
+        await fs.rename(written, finalPath)
+        await removeEmptyParents(path.dirname(written), destDir)
+      }
+
+      const st = await fs.stat(finalPath)
+      onProgress?.(st.size, st.size)
+      return { success: true, bytesWritten: st.size }
+    } catch (err) {
+      if (signal?.aborted || String(err).includes('Cancelled')) {
+        await fs.unlink(finalPath).catch(() => {})
+        return { success: false, bytesWritten: 0, error: 'Cancelled' }
+      }
+      return { success: false, bytesWritten: 0, error: String(err) }
+    }
   }
 
   async createReadStream(entryId: string): Promise<NodeJS.ReadableStream | null> {

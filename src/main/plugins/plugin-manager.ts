@@ -322,6 +322,7 @@ export class PluginManager {
     let readStream: NodeJS.ReadableStream | null = null
     let progressStream: Transform | null = null
     let settleCancel: ((r: CopyResult) => void) | null = null
+    const abortController = new AbortController()
     const cancelRace = new Promise<CopyResult>((resolve) => {
       settleCancel = resolve
     })
@@ -346,6 +347,9 @@ export class PluginManager {
     const abort = (): void => {
       if (cancelled) return
       cancelled = true
+      try {
+        abortController.abort()
+      } catch { /* ignore */ }
       destroyStreams()
       settleCancel?.({ success: false, bytesWritten: bytesCopied, error: 'Cancelled' })
     }
@@ -370,6 +374,46 @@ export class PluginManager {
     }
 
     try {
+      const archiveSource = sourcePlugin as {
+        extractToLocal?: (
+          entryId: string,
+          destDir: string,
+          destFileName: string,
+          onProgress?: (bytesCopied: number, totalBytes?: number) => void,
+          signal?: AbortSignal
+        ) => Promise<{ success: boolean; bytesWritten: number; error?: string }>
+      }
+
+      // Archive → local disk: inflate/unpack straight to dest in blocks.
+      // 7z/tar createReadStream extracts the whole member first, so the
+      // current-file bar sat at 0% until the copy (instant) finished.
+      if (
+        sourcePluginId === 'archive' &&
+        destPluginId === 'local-filesystem' &&
+        typeof archiveSource.extractToLocal === 'function'
+      ) {
+        const result = await Promise.race([
+          archiveSource.extractToLocal(
+            sourceEntryId,
+            destLocationId,
+            destFileName,
+            (n) => {
+              if (cancelled) return
+              bytesCopied = n
+              recordProgress(n)
+            },
+            abortController.signal
+          ),
+          cancelRace
+        ])
+        if (cancelled || result.error === 'Cancelled' || String(result.error || '').includes('Cancelled')) {
+          return { success: false, bytesWritten: bytesCopied || result.bytesWritten, error: 'Cancelled' }
+        }
+        const finalBytes = result.bytesWritten || bytesCopied
+        recordProgress(finalBytes)
+        return result
+      }
+
       readStream = await sourcePlugin.createReadStream(sourceEntryId)
       if (cancelled) {
         ;(readStream as { destroy?: () => void } | null)?.destroy?.()
@@ -391,7 +435,7 @@ export class PluginManager {
         transform(this: Transform, chunk: Buffer, _enc, callback) {
           let offset = 0
           const pump = (): void => {
-            if (cancelled) {
+            if (cancelled || this.destroyed) {
               callback(new Error('Cancelled'))
               return
             }
@@ -413,6 +457,10 @@ export class PluginManager {
               lastReportTime = now
               // Push event is best-effort; poll map is authoritative.
               onProgress?.(bytesCopied)
+            }
+            if (this.destroyed) {
+              callback(new Error('Cancelled'))
+              return
             }
             this.push(piece)
             setImmediate(pump)

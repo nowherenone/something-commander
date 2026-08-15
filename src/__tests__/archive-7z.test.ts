@@ -110,6 +110,24 @@ describe('7z archive support', () => {
     expect(extracted).toBe('payload')
   })
 
+  it('extractToLocal writes a nested 7z member as a flat dest file', async () => {
+    const archivePath = await createTest7z(tmpDir, 'nested-out.7z', [
+      { name: 'docs', isDir: true },
+      { name: 'docs/guide.txt', content: 'guide-body' }
+    ])
+    const destDir = path.join(tmpDir, 'flat-out')
+    await fs.mkdir(destDir)
+
+    const result = await plugin.extractToLocal(
+      `${archivePath}::docs/guide.txt`,
+      destDir,
+      'guide.txt'
+    )
+    expect(result.success).toBe(true)
+    expect(await fs.readFile(path.join(destDir, 'guide.txt'), 'utf8')).toBe('guide-body')
+    await expect(fs.access(path.join(destDir, 'docs'))).rejects.toThrow()
+  })
+
   it('opens a read stream for a file inside a 7z archive', async () => {
     const archivePath = await createTest7z(tmpDir, 'stream.7z', [
       { name: 'note.txt', content: 'streamed' }

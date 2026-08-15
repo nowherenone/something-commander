@@ -1,4 +1,5 @@
 import * as path from 'path'
+import * as fs from 'fs/promises'
 import type { Entry, ReadDirectoryResult } from '@shared/types'
 import type { ArchiveEntry } from './driver'
 
@@ -91,6 +92,28 @@ export function archiveBasename(internalPath: string): string {
   const noTrailing = internalPath.replace(/\/$/, '')
   const lastSlash = noTrailing.lastIndexOf('/')
   return lastSlash >= 0 ? noTrailing.slice(lastSlash + 1) : noTrailing
+}
+
+/** Absolute path a driver would write for `internalPath` under `destDir`. */
+export function extractedDestPath(destDir: string, internalPath: string): string {
+  const parts = internalPath.replace(/\\/g, '/').split('/').filter(Boolean)
+  return path.join(destDir, ...parts)
+}
+
+/** Remove empty directories from `fromDir` up to (but not including) `stopDir`. */
+export async function removeEmptyParents(fromDir: string, stopDir: string): Promise<void> {
+  let current = fromDir
+  const stop = path.resolve(stopDir)
+  while (current && path.resolve(current) !== stop) {
+    try {
+      const leftover = await fs.readdir(current)
+      if (leftover.length > 0) return
+      await fs.rmdir(current)
+    } catch {
+      return
+    }
+    current = path.dirname(current)
+  }
 }
 
 /** Return the parent directory of an archive-internal path, with trailing slash. */

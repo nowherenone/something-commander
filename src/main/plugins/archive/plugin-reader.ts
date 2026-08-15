@@ -28,20 +28,34 @@ export class PluginRandomAccessReader extends yauzl.RandomAccessReader {
 
   _readStreamForRange(start: number, end: number): Readable {
     const readAt = this._readAt
-    const length = end - start
+    const CHUNK = 256 * 1024
+    let offset = start
     let reading = false
 
     return new Readable({
       read(): void {
         if (reading) return
+        if (offset >= end) {
+          this.push(null)
+          return
+        }
         reading = true
-        readAt(start, length)
+        const length = Math.min(CHUNK, end - offset)
+        const at = offset
+        readAt(at, length)
           .then((buf) => {
+            offset += buf.length
+            if (buf.length === 0) {
+              this.push(null)
+              return
+            }
             this.push(buf)
-            this.push(null)
           })
           .catch((err) => {
             this.destroy(err instanceof Error ? err : new Error(String(err)))
+          })
+          .finally(() => {
+            reading = false
           })
       }
     })

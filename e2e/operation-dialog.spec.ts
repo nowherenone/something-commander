@@ -63,6 +63,8 @@ test.describe('Operation Dialog Visual Tests', () => {
     const pct = parseInt(width, 10)
     expect(pct).toBeGreaterThanOrEqual(25)
     expect(pct).toBeLessThanOrEqual(35)
+    // Single-file copy: no redundant overall bar
+    await expect(dialog.locator('[data-testid="op-total-progress"]')).toHaveCount(0)
     await expect(dialog).toHaveScreenshot('dialog-zip-copy-progress.png', { animations: 'disabled' })
   })
 
@@ -177,7 +179,8 @@ test.describe('Live zip progress UI', () => {
     await expect(page.locator('[data-testid="live-progress-pct"]')).toHaveText('25%')
     width = await dialog.locator('[data-testid="op-file-bar"]').evaluate((el) => (el as HTMLElement).style.width)
     expect(parseInt(width, 10)).toBe(25)
-    await expect(dialog.locator('[data-testid="op-total-pct"]')).toContainText('25%')
+    await expect(dialog.locator('[data-testid="op-title"]')).toContainText('25%')
+    await expect(dialog.locator('[data-testid="op-total-progress"]')).toHaveCount(0)
     await expect(dialog).toHaveScreenshot('live-zip-progress-25.png', { animations: 'disabled' })
 
     // 50%
@@ -191,7 +194,7 @@ test.describe('Live zip progress UI', () => {
     await page.click('[data-testid="progress-step-100"]')
     width = await dialog.locator('[data-testid="op-file-bar"]').evaluate((el) => (el as HTMLElement).style.width)
     expect(parseInt(width, 10)).toBe(100)
-    await expect(dialog.locator('[data-testid="op-total-pct"]')).toContainText('100%')
+    await expect(dialog.locator('[data-testid="op-title"]')).toContainText('100%')
     await expect(dialog).toHaveScreenshot('live-zip-progress-100.png', { animations: 'disabled' })
   })
 

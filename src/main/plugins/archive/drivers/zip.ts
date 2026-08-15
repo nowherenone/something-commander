@@ -17,7 +17,8 @@ function createExtractProgressStream(
   fileSize: number,
   getFilesDone: () => number,
   getBytesDone: () => number,
-  onProgress?: (p: ExtractProgress) => void
+  onProgress?: (p: ExtractProgress) => void,
+  isAborted?: () => boolean
 ): { stream: Transform; getFileBytes: () => number } {
   const PIECE = 256 * 1024
   const REPORT_EVERY_BYTES = 256 * 1024
@@ -27,7 +28,7 @@ function createExtractProgressStream(
   let lastReportTime = 0
 
   const report = (force = false): void => {
-    if (!onProgress) return
+    if (!onProgress || isAborted?.()) return
     const now = Date.now()
     const byBytes = fileBytes - lastReportBytes >= REPORT_EVERY_BYTES
     const byTime = lastReportTime === 0 || now - lastReportTime >= REPORT_EVERY_MS
@@ -48,6 +49,10 @@ function createExtractProgressStream(
     transform(this: Transform, chunk: Buffer, _enc, callback) {
       let offset = 0
       const pump = (): void => {
+        if (isAborted?.() || this.destroyed) {
+          callback(new Error('Cancelled'))
+          return
+        }
         if (offset >= chunk.length) {
           callback()
           return
@@ -57,6 +62,10 @@ function createExtractProgressStream(
         offset = end
         fileBytes += piece.length
         report(false)
+        if (this.destroyed) {
+          callback(new Error('Cancelled'))
+          return
+        }
         this.push(piece)
         // Yield so webContents.send / renderer paint can run during multi-GB inflate.
         setImmediate(pump)
@@ -64,6 +73,10 @@ function createExtractProgressStream(
       pump()
     },
     flush(callback) {
+      if (isAborted?.()) {
+        callback(new Error('Cancelled'))
+        return
+      }
       report(true)
       callback()
     }
@@ -251,7 +264,8 @@ export class ZipDriver implements ArchiveDriver {
     source: SourceAccess,
     entryPath: string,
     destDir: string,
-    onProgress?: (p: ExtractProgress) => void
+    onProgress?: (p: ExtractProgress) => void,
+    signal?: AbortSignal
   ): Promise<{ success: boolean; error?: string; count: number }> {
     return new Promise((resolve) => {
       const reader = new PluginRandomAccessReader(source.readAt.bind(source))
@@ -264,10 +278,32 @@ export class ZipDriver implements ArchiveDriver {
         let count = 0
         let bytesDone = 0
         let settled = false
+        let activeRead: { destroy?: (e?: Error) => void } | null = null
+        let activeWrite: { destroy?: (e?: Error) => void } | null = null
         const finish = (result: { success: boolean; error?: string; count: number }): void => {
           if (settled) return
           settled = true
           resolve(result)
+        }
+        const isAborted = (): boolean => !!signal?.aborted
+        const abortNow = (): void => {
+          try {
+            activeRead?.destroy?.(new Error('Cancelled'))
+          } catch { /* ignore */ }
+          try {
+            activeWrite?.destroy?.(new Error('Cancelled'))
+          } catch { /* ignore */ }
+          try {
+            zipfile.close()
+          } catch { /* ignore */ }
+          finish({ success: false, error: 'Cancelled', count })
+        }
+        if (signal) {
+          if (signal.aborted) {
+            abortNow()
+            return
+          }
+          signal.addEventListener('abort', abortNow, { once: true })
         }
         const prefix = entryPath || ''
         const isExactFile = prefix !== '' && !prefix.endsWith('/')
@@ -297,6 +333,7 @@ export class ZipDriver implements ArchiveDriver {
 
           void (async () => {
             try {
+              if (isAborted()) return
               await fs.mkdir(path.dirname(destPath), { recursive: true })
               const readStream = await new Promise<NodeJS.ReadableStream | null>((res) => {
                 zipfile.openReadStream(entry, (streamErr, rs) => {
@@ -308,26 +345,38 @@ export class ZipDriver implements ArchiveDriver {
                 zipfile.readEntry()
                 return
               }
+              if (isAborted()) {
+                ;(readStream as { destroy?: () => void }).destroy?.()
+                return
+              }
 
               const fileSize = entry.uncompressedSize || 0
               // Immediate start report so UI shows the file name before first chunk.
-              onProgress?.({
-                currentFile: relativeName,
-                filesDone: count,
-                bytesDone,
-                currentFileBytes: 0,
-                currentFileSize: fileSize
-              })
+              if (!isAborted()) {
+                onProgress?.({
+                  currentFile: relativeName,
+                  filesDone: count,
+                  bytesDone,
+                  currentFileBytes: 0,
+                  currentFileSize: fileSize
+                })
+              }
 
               const { stream: progressStream, getFileBytes } = createExtractProgressStream(
                 relativeName,
                 fileSize,
                 () => count,
                 () => bytesDone,
-                onProgress
+                onProgress,
+                isAborted
               )
               const ws = fsSync.createWriteStream(destPath)
+              activeRead = readStream as { destroy?: (e?: Error) => void }
+              activeWrite = ws
               await pipelineAsync(readStream as NodeJS.ReadableStream, progressStream, ws)
+              activeRead = null
+              activeWrite = null
+              if (isAborted()) return
 
               const written = getFileBytes()
               count++

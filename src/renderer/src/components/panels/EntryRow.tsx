@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react'
 import type { Entry } from '@shared/types'
 import type { PanelId } from '../../stores/app-store'
 import { formatSize, formatDate } from '../../utils/format'
+import { listName, listExtension } from '../../utils/entry-helpers'
 import { getIconForHint } from '../../utils/icon-map'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useDragStore } from '../../stores/drag-store'
@@ -147,7 +148,7 @@ export const EntryRow = React.memo(function EntryRow({
       if (isCalculating) {
         return <span className={styles.sizeLoading}>...</span>
       }
-      return entry.size > 0 ? formatSize(entry.size, sizeFormat) : ''
+      return entry.size > 0 ? formatSize(entry.size, sizeFormat) : '<DIR>'
     }
     return formatSize(entry.size, sizeFormat)
   }
@@ -172,12 +173,10 @@ export const EntryRow = React.memo(function EntryRow({
             onCancel={onRenameCancel}
           />
         ) : (
-          <span className={styles.fileName}>{entry.name}</span>
+          <span className={styles.fileName}>{listName(entry)}</span>
         )}
       </div>
-      <div className={styles.colExt}>
-        {entry.isContainer ? (isDrive ? '' : '<DIR>') : ((entry.meta.extension as string) || '')}
-      </div>
+      <div className={styles.colExt}>{listExtension(entry)}</div>
       <div className={styles.colSize}>{renderSize()}</div>
       <div className={styles.colDate}>{formatDate(entry.modifiedAt, dateFormat)}</div>
     </div>

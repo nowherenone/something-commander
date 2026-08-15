@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 import {
   defaultCopyMoveDestPath,
   joinLocationPath,
+  listExtension,
+  listName,
   parseCopyMoveDestInput
 } from '../renderer/src/utils/entry-helpers'
 import { applyDestinationFileName } from '../renderer/src/services/file-operation-service'
@@ -103,5 +105,23 @@ describe('applyDestinationFileName (shipped service helper)', () => {
       }
     ]
     expect(applyDestinationFileName(list, undefined)).toBe(list)
+  })
+})
+
+describe('listName / listExtension', () => {
+  it('does not repeat the extension in the name column', () => {
+    expect(listName({ name: 'readme.txt', isContainer: false })).toBe('readme')
+    expect(listExtension({ name: 'readme.txt', isContainer: false, meta: { extension: 'txt' } })).toBe(
+      'txt'
+    )
+  })
+
+  it('keeps directory names intact and leaves Ext empty', () => {
+    expect(listName({ name: 'src', isContainer: true })).toBe('src')
+    expect(listExtension({ name: 'src', isContainer: true })).toBe('')
+  })
+
+  it('does not strip a leading-dot name', () => {
+    expect(listName({ name: '.gitignore', isContainer: false })).toBe('.gitignore')
   })
 })
