@@ -83,7 +83,7 @@ const MENUS: MenuDef[] = [
     label: 'Tools',
     items: [
       { label: 'Search', shortcut: 'Alt+F7', action: 'search' },
-      { label: 'Compare Directories', shortcut: 'Ctrl+C', action: 'compare' },
+      { label: 'Compare Directories', shortcut: 'Ctrl+Shift+C', action: 'compare' },
       { label: 'Multi-Rename', shortcut: 'Ctrl+M', action: 'multiRename' },
       { label: '', action: '', separator: true },
       { label: 'Network Connections...', action: 'networkConnections' },
@@ -121,6 +121,8 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [versionMenuOpen, setVersionMenuOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const activePanel = useAppStore((s) => s.activePanel)
   const viewMode = useAppStore((s) => activePanel === 'left' ? s.leftViewMode : s.rightViewMode)
@@ -158,8 +160,12 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
   }, [])
 
   const handleAction = useCallback(
-    (action: string) => {
+    (action: string, ownerLabel?: string) => {
       setOpenMenu(null)
+      setVersionMenuOpen(false)
+      // Return focus to the owning menubar button — the item is about to
+      // unmount and would otherwise drop focus onto <body>.
+      if (ownerLabel) menuButtonRefs.current[ownerLabel]?.focus()
       onAction(action)
     },
     [onAction]
@@ -188,40 +194,142 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
     return () => document.removeEventListener('mousedown', handler)
   }, [openMenu, versionMenuOpen])
 
-  // Close on Escape
+  /**
+   * Keyboard model for open menus (capture phase, so panel hotkeys never see
+   * these): arrows walk items, Left/Right hop between menus, Home/End jump,
+   * Enter/Space activate natively, Tab dismisses, and Escape closes WITHOUT
+   * letting the event fire the next layer beneath it (F-24). The version
+   * dropdown gets the same treatment (F-06) — Left/Right hand off to the
+   * first/last main menu instead of hopping.
+   */
   useEffect(() => {
     if (!openMenu && !versionMenuOpen) return
+    const isVersionMenu = !openMenu && versionMenuOpen
     const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
+      const consume = (): void => {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+
+      if (e.key === 'Escape' || e.key === 'Tab') {
+        consume()
+        const owner = openMenu ?? 'version'
         setOpenMenu(null)
         setVersionMenuOpen(false)
+        menuButtonRefs.current[owner]?.focus()
+        return
+      }
+      if (!dropdownRef.current) return
+
+      const items = Array.from(
+        dropdownRef.current.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]')
+      )
+      if (items.length === 0) return
+      const currentIndex = items.findIndex((b) => b === document.activeElement)
+
+      switch (e.key) {
+        case 'ArrowDown':
+          consume()
+          items[(currentIndex + 1 + items.length) % items.length].focus()
+          return
+        case 'ArrowUp':
+          consume()
+          items[(currentIndex - 1 + items.length) % items.length].focus()
+          return
+        case 'Home':
+          consume()
+          items[0].focus()
+          return
+        case 'End':
+          consume()
+          items[items.length - 1].focus()
+          return
+        case 'ArrowRight':
+        case 'ArrowLeft': {
+          consume()
+          const labels = MENUS.map((m) => m.label)
+          if (isVersionMenu) {
+            // From the version dropdown, hand off to the nearest main menu.
+            const nextLabel = e.key === 'ArrowRight' ? labels[0] : labels[labels.length - 1]
+            setOpenMenu(nextLabel)
+            setVersionMenuOpen(false)
+            menuButtonRefs.current[nextLabel]?.focus()
+            return
+          }
+          const idx = labels.indexOf(openMenu!)
+          const step = e.key === 'ArrowRight' ? 1 : -1
+          const nextLabel = labels[(idx + step + labels.length) % labels.length]
+          setOpenMenu(nextLabel)
+          menuButtonRefs.current[nextLabel]?.focus()
+          return
+        }
       }
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
   }, [openMenu, versionMenuOpen])
 
+  // Opening a menu moves focus to its first item so arrows work right away
+  // (APG menubar pattern; harmless for mouse users).
+  useEffect(() => {
+    if ((!openMenu && !versionMenuOpen) || !dropdownRef.current) return
+    const raf = requestAnimationFrame(() => {
+      dropdownRef.current
+        ?.querySelector<HTMLButtonElement>('button[role="menuitem"]')
+        ?.focus()
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [openMenu, versionMenuOpen])
+
+  // Top-level menubar buttons: arrows move between menus, ArrowDown opens.
+  const handleBarButtonKey = useCallback(
+    (e: React.KeyboardEvent, label: string) => {
+      const buttons = MENUS.map((m) => menuButtonRefs.current[m.label]).filter(
+        (b): b is HTMLButtonElement => !!b
+      )
+      const idx = buttons.findIndex((b) => b === document.activeElement)
+      if (e.key === 'ArrowRight' && idx >= 0) {
+        e.preventDefault()
+        buttons[(idx + 1) % buttons.length].focus()
+      } else if (e.key === 'ArrowLeft' && idx >= 0) {
+        e.preventDefault()
+        buttons[(idx - 1 + buttons.length) % buttons.length].focus()
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setOpenMenu(label)
+      }
+    },
+    []
+  )
+
   return (
-    <div className={styles.menuBar} ref={barRef}>
+    <div className={styles.menuBar} ref={barRef} role="menubar" aria-label="Main menu">
       {MENUS.map((menu) => (
         <div key={menu.label} style={{ position: 'relative' }}>
           <button
+            ref={(el) => { menuButtonRefs.current[menu.label] = el }}
             className={`${styles.menuItem} ${openMenu === menu.label ? styles.menuItemActive : ''}`}
             onClick={() => handleMenuClick(menu.label)}
             onMouseEnter={() => openMenu && setOpenMenu(menu.label)}
+            onKeyDown={(e) => handleBarButtonKey(e, menu.label)}
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === menu.label}
           >
             {menu.label}
           </button>
           {openMenu === menu.label && (
-            <div className={styles.menuDropdown}>
+            <div className={styles.menuDropdown} role="menu" aria-label={menu.label} ref={dropdownRef}>
               {menu.items.map((item, i) =>
                 item.separator ? (
-                  <div key={i} className={styles.menuSep} />
+                  <div key={i} className={styles.menuSep} role="separator" />
                 ) : (
                   <button
                     key={item.action}
                     className={styles.menuAction}
-                    onClick={() => handleAction(item.action)}
+                    role="menuitem"
+                    aria-checked={getChecked(item.action)}
+                    onClick={() => handleAction(item.action, menu.label)}
                   >
                     <span>{getChecked(item.action) ? '✓ ' : ''}{item.label}</span>
                     {item.shortcut && (
@@ -266,21 +374,32 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
 
         <div style={{ position: 'relative' }}>
           <button
+            ref={(el) => { menuButtonRefs.current['version'] = el }}
             className={`${styles.menuItem} ${versionMenuOpen ? styles.menuItemActive : ''}`}
             onClick={() => {
               setOpenMenu(null)
               setVersionMenuOpen(!versionMenuOpen)
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setVersionMenuOpen(true)
+              }
+            }}
             title={showUpdateBadge ? badgeTitle : 'Version and updates'}
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={versionMenuOpen}
           >
             v{__APP_VERSION__}
           </button>
           {versionMenuOpen && (
-            <div className={styles.menuDropdown} style={{ right: 0, left: 'auto' }}>
+            <div className={styles.menuDropdown} style={{ right: 0, left: 'auto' }} role="menu" aria-label="Version" ref={dropdownRef}>
               {showUpdateBadge && (
                 <>
                   <button
                     className={styles.menuAction}
+                    role="menuitem"
                     onClick={() => {
                       setVersionMenuOpen(false)
                       void installAndRestart()
@@ -294,25 +413,21 @@ export function MenuBar({ onAction }: MenuBarProps): React.JSX.Element {
                           : `Install update${availableVersion ? ` v${availableVersion}` : ''} & restart`}
                     </span>
                   </button>
-                  <div className={styles.menuSep} />
+                  <div className={styles.menuSep} role="separator" />
                 </>
               )}
               <button
                 className={styles.menuAction}
-                onClick={() => {
-                  setVersionMenuOpen(false)
-                  onAction('checkForUpdates')
-                }}
+                role="menuitem"
+                onClick={() => handleAction('checkForUpdates', 'version')}
               >
                 <span>Check for Updates...</span>
               </button>
-              <div className={styles.menuSep} />
+              <div className={styles.menuSep} role="separator" />
               <button
                 className={styles.menuAction}
-                onClick={() => {
-                  setVersionMenuOpen(false)
-                  onAction('about')
-                }}
+                role="menuitem"
+                onClick={() => handleAction('about', 'version')}
               >
                 <span>About</span>
               </button>

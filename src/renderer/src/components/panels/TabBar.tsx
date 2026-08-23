@@ -40,6 +40,8 @@ export function TabBar({
           {tabs.length > 1 && (
             <span
               className={styles.tabClose}
+              role="button"
+              aria-label={`Close tab ${tab.label}`}
               onClick={(e) => {
                 e.stopPropagation()
                 onCloseTab(tab.id)
@@ -50,7 +52,7 @@ export function TabBar({
           )}
         </button>
       ))}
-      <button className={styles.tabNew} onClick={onNewTab} title="New tab (Ctrl+T)">
+      <button className={styles.tabNew} onClick={onNewTab} title="New tab (Ctrl+T)" aria-label="New tab">
         +
       </button>
     </div>

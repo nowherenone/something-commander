@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import type { Entry } from '@shared/types'
+import { showToast } from '../layout/Toast'
+import { friendlyFileError } from '../../utils/error-messages'
 import styles from '../../styles/dialogs.module.css'
 
 interface MultiRenameProps {
@@ -22,6 +24,9 @@ export function MultiRename({
   const [counterPad, setCounterPad] = useState(1)
   const [caseMode, setCaseMode] = useState<'none' | 'upper' | 'lower' | 'title'>('none')
   const [isApplying, setIsApplying] = useState(false)
+  // Per-file failures from the last apply — the dialog stays open so each
+  // failed rename is reviewable instead of being aggregated into one toast (F-07).
+  const [failures, setFailures] = useState<Array<{ name: string; message: string }>>([])
 
   const previews = useMemo(() => {
     return entries.map((entry, index) => {
@@ -70,22 +75,44 @@ export function MultiRename({
 
   const handleApply = useCallback(async () => {
     setIsApplying(true)
+    setFailures([])
     const toRename = previews.filter((p) => p.changed)
+    const failed: Array<{ name: string; message: string }> = []
 
     for (const { entry, newName } of toRename) {
       try {
-        await window.api.plugins.executeOperation(pluginId, {
+        const result = await window.api.plugins.executeOperation(pluginId, {
           op: 'rename',
           entry,
           newName
         })
+        if (!result.success) {
+          failed.push({
+            name: `${entry.name} → ${newName}`,
+            message: result.errors?.[0]?.message || 'Rename failed'
+          })
+        }
       } catch (err) {
-        console.error('Rename error:', err)
+        failed.push({ name: `${entry.name} → ${newName}`, message: String(err) })
       }
     }
 
     setIsApplying(false)
+
+    if (failed.length > 0) {
+      // Keep the dialog open with the per-file list; headline uses the
+      // friendly wording, the raw OS text stays in each row's detail (F-07).
+      setFailures(failed)
+      return
+    }
+
     onDone()
+    if (toRename.length > 0) {
+      showToast(`Renamed ${toRename.length} item${toRename.length === 1 ? '' : 's'}`, {
+        variant: 'success',
+        duration: 3000
+      })
+    }
   }, [previews, pluginId, onDone])
 
   return (
@@ -197,12 +224,31 @@ export function MultiRename({
           </table>
         </div>
 
+        {failures.length > 0 && (
+          <div className={styles.renameFailures} role="alert" data-testid="rename-failures">
+            <div className={styles.renameFailuresTitle}>
+              Renamed {previews.filter((p) => p.changed).length - failures.length} of{' '}
+              {previews.filter((p) => p.changed).length} — {failures.length} failed
+            </div>
+            <ul className={styles.renameFailuresList}>
+              {failures.map((f, i) => (
+                <li key={i}>
+                  <span className={styles.renameFailureName}>{f.name}</span>
+                  <span className={styles.renameFailureMsg}>{friendlyFileError(f.message)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className={styles.dialogFooter}>
           <span className={styles.mutedText} style={{ flex: 1 }}>
-            {changedCount} of {entries.length} file{entries.length !== 1 ? 's' : ''} will be renamed
+            {failures.length > 0
+              ? `${failures.length} rename${failures.length === 1 ? '' : 's'} failed — fix or skip, then apply again`
+              : `${changedCount} of ${entries.length} file${entries.length !== 1 ? 's' : ''} will be renamed`}
           </span>
           <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose}>
-            Cancel
+            {failures.length > 0 ? 'Close' : 'Cancel'}
           </button>
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}

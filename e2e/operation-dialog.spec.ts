@@ -68,7 +68,7 @@ test.describe('Operation Dialog Visual Tests', () => {
     await expect(dialog).toHaveScreenshot('dialog-zip-copy-progress.png', { animations: 'disabled' })
   })
 
-  test('overwrite prompt shows source vs existing comparison', async ({ page }) => {
+  test('overwrite prompt shows source vs existing comparison with Rename and Compare', async ({ page }) => {
     const dialog = page.locator('[data-testid="harness-overwrite_prompt"] [data-testid="op-dialog"]')
     await expect(dialog).toBeVisible()
     await expect(dialog.locator('[data-testid="ow-source-name"]')).toContainText('report.docx')
@@ -76,18 +76,51 @@ test.describe('Operation Dialog Visual Tests', () => {
     await expect(dialog.locator('[data-testid="ow-source-meta"]')).toContainText('kB')
     await expect(dialog.locator('[data-testid="ow-overwrite"]')).toBeVisible()
     await expect(dialog.locator('[data-testid="ow-skip"]')).toBeVisible()
+    // F-13 additions
+    await expect(dialog.locator('[data-testid="ow-rename"]')).toBeVisible()
+    await expect(dialog.locator('[data-testid="ow-compare"]')).toBeVisible()
+    await expect(dialog.locator('[data-testid="ow-compare"]')).toBeEnabled() // both sides local
     await expect(dialog.locator('[data-testid="ow-overwrite-all"]')).toBeVisible()
     await expect(dialog.locator('[data-testid="ow-skip-all"]')).toBeVisible()
+
+    // Rename reveals an inline input pre-filled with "name (copy).ext"
+    await dialog.locator('[data-testid="ow-rename"]').click()
+    const renameInput = dialog.locator('[data-testid="ow-rename-input"]')
+    await expect(renameInput).toBeVisible()
+    await expect(renameInput).toHaveValue('report (copy).docx')
+    await expect(dialog.locator('[data-testid="ow-rename-apply"]')).toBeVisible()
+
     await expect(dialog).toHaveScreenshot('dialog-overwrite.png', { animations: 'disabled' })
   })
 
-  test('error state shows error message and OK button', async ({ page }) => {
+  test('error state shows friendly message, raw detail behind toggle, OK button', async ({ page }) => {
     const dialog = page.locator('[data-testid="harness-error"] [data-testid="op-dialog"]')
     await expect(dialog).toBeVisible()
-    await expect(dialog.locator('[data-testid="op-error"]')).toContainText('ENOSPC')
+    // Friendly headline (F-07) — no raw OS error as the headline…
+    await expect(dialog.locator('[data-testid="op-error"]')).toContainText('disk is full')
+    // …raw string stays available in the expandable per-file detail list.
+    await expect(dialog.locator('[data-testid="op-failures-list"]')).toHaveCount(0)
+    await dialog.locator('[data-testid="op-failures-toggle"]').click()
+    const list = dialog.locator('[data-testid="op-failures-list"]')
+    await expect(list).toBeVisible()
+    await expect(list).toContainText('flight.mp4')
+    await expect(list).toContainText('ENOSPC')
     await expect(dialog.locator('[data-testid="op-ok"]')).toBeVisible()
     await expect(dialog.locator('[data-testid="op-cancel"]')).not.toBeVisible()
     await expect(dialog).toHaveScreenshot('dialog-error.png', { animations: 'disabled' })
+  })
+
+  test('partial failure state summarizes successes and lists failures', async ({ page }) => {
+    const dialog = page.locator('[data-testid="harness-partial_failure"] [data-testid="op-dialog"]')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator('[data-testid="op-error"]')).toContainText('Copied 7 items, but 2 failed')
+    await expect(dialog.locator('[data-testid="op-failures-toggle"]')).toContainText('2 failed')
+    await dialog.locator('[data-testid="op-failures-toggle"]').click()
+    const list = dialog.locator('[data-testid="op-failures-list"]')
+    await expect(list).toContainText('locked.xlsx')
+    await expect(list).toContainText('pagefile.sys')
+    // Done-with-failures stays dismissible
+    await expect(dialog.locator('[data-testid="op-ok"]')).toBeVisible()
   })
 
   test('cancelled state shows cancelled message', async ({ page }) => {

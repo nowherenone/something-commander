@@ -17,21 +17,21 @@ import { NetworkConnections } from './components/dialogs/NetworkConnections'
 import { PluginManagerDialog } from './components/dialogs/PluginManager'
 import { SelectGroupDialog } from './components/dialogs/SelectGroupDialog'
 import { MkdirDialog } from './components/dialogs/MkdirDialog'
+import { AboutDialog } from './components/dialogs/AboutDialog'
 import { useKeyboard } from './hooks/useKeyboard'
 import { useFileOperations } from './hooks/useFileOperations'
 import { useAppStore } from './stores/app-store'
-import { usePanelStore, parentOffset } from './stores/panel-store'
+import { usePanelStore, parentOffset, hasParentEntry } from './stores/panel-store'
 import { useBookmarksStore } from './stores/bookmarks-store'
 import { bookmarkDisplayEntries, getCursorDisplayEntry, isRenamableEntry } from './utils/display-entries'
 import { useOperationsStore } from './stores/operations-store'
 import { useSettingsStore, loadSettings } from './stores/settings-store'
 import { loadBookmarks } from './stores/bookmarks-store'
+import { initLayoutPersistence, restoreLayoutChrome } from './stores/layout-persistence'
 import { registerCommands, dispatchCommand } from './commands/registry'
 import { parseArchivePath } from './utils/archive-path'
 import { splitPathTail } from './utils/entry-helpers'
 import type { Entry } from '@shared/types'
-
-declare const __APP_VERSION__: string
 
 /** Prevents double startup update checks (React Strict Mode remounts). */
 let startupUpdateCheckStarted = false
@@ -45,6 +45,7 @@ function App(): React.JSX.Element {
   const [dirCompareOpen, setDirCompareOpen] = useState(false)
   const [networkDialogOpen, setNetworkDialogOpen] = useState(false)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [selectGroupMode, setSelectGroupMode] = useState<'select' | 'unselect' | null>(null)
 
   const { handleCopy, handleMove, handleDelete, handlePack, handleUnpack, pendingOp, confirmOperation, cancelOperation } = useFileOperations()
@@ -57,6 +58,23 @@ function App(): React.JSX.Element {
       }
     })
     loadBookmarks()
+    return initLayoutPersistence()
+  }, [])
+
+  // Restore window-content chrome (splitRatio, view modes) once at boot (F-11);
+  // panel directories restore per-panel in FilePanel. First launch also gets a
+  // one-time pointer at the function-key bar (F-12).
+  useEffect(() => {
+    void restoreLayoutChrome()
+    if (useSettingsStore.getState().firstRunHintShown) return
+    const timer = setTimeout(() => {
+      showToast('Welcome! The bar at the bottom maps F1–F10 to common actions — F1 opens Help.', {
+        duration: 10000,
+        variant: 'info'
+      })
+      useSettingsStore.getState().updateSettings({ firstRunHintShown: true })
+    }, 1500)
+    return () => clearTimeout(timer)
   }, [])
 
   // Auto-update: silent check → menu-bar badge only (never a toast for "available")
@@ -270,11 +288,50 @@ function App(): React.JSX.Element {
   }, [])
 
   const handleAbout = useCallback(() => {
-    // Simple about for now
-    const msg = `Something Commander\nVersion ${__APP_VERSION__}\n\nA modern orthodox two-panel file manager.`
-    // Use a toast or alert; for better UX we could add a dialog later
-    alert(msg)
+    setAboutOpen(true)
   }, [])
+
+  // File ▸ Open — same semantics as Enter, including going up from the
+  // parent row instead of silently doing nothing.
+  const handleOpen = useCallback(() => {
+    const activePanel = useAppStore.getState().activePanel
+    const tab = usePanelStore.getState().getActiveTab(activePanel)
+    if (tab.cursorIndex === 0 && hasParentEntry(tab)) {
+      handleGoUp()
+      return
+    }
+    const entry = getCursorEntry()
+    if (entry) void handleActivateEntry(entry)
+  }, [getCursorEntry, handleActivateEntry, handleGoUp])
+
+  // Ctrl+L — put the active panel's address bar into edit mode with the
+  // path selected. AddressBar listens for this event (it owns edit state).
+  const handleFocusAddressBar = useCallback(() => {
+    const activePanel = useAppStore.getState().activePanel
+    window.dispatchEvent(new CustomEvent('commander:focus-address-bar', { detail: { panelId: activePanel } }))
+  }, [])
+
+  // Ctrl+C — copy the selected names to the clipboard (newline-separated).
+  // Falls back to the cursor entry when nothing is selected.
+  const handleCopyNames = useCallback(async () => {
+    const activePanel = useAppStore.getState().activePanel
+    const tab = usePanelStore.getState().getActiveTab(activePanel)
+    let picked = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
+    if (picked.length === 0) {
+      const entry = getCursorEntry()
+      if (entry) picked = [entry]
+    }
+    if (picked.length === 0) {
+      showToast('Nothing selected')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(picked.map((e) => e.name).join('\n'))
+      showToast(`Copied ${picked.length} name${picked.length === 1 ? '' : 's'}`, { variant: 'success', duration: 2000 })
+    } catch {
+      showToast('Could not copy to clipboard')
+    }
+  }, [getCursorEntry])
 
   // Register all commands so menu clicks, keyboard shortcuts, and context
   // menus share a single dispatch. Runs whenever any handler identity changes.
@@ -333,11 +390,14 @@ function App(): React.JSX.Element {
       networkConnections: () => setNetworkDialogOpen(true),
       pluginManager: () => setPluginManagerOpen(true),
       quit: () => window.close(),
+      open: handleOpen,
+      focusAddressBar: handleFocusAddressBar,
+      copyNames: handleCopyNames,
       cancel: cancelOperation,
       checkForUpdates: handleCheckForUpdates,
       about: handleAbout
     })
-  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleRename, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout])
+  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleRename, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout, handleOpen, handleFocusAddressBar, handleCopyNames])
 
   const handleMenuAction = useCallback((action: string) => {
     dispatchCommand(action)
@@ -350,13 +410,16 @@ function App(): React.JSX.Element {
       {showCommandLine && <CommandLine />}
       {bottomBar === 'fnkeys' && (
         <FunctionKeyBar
+          onF1={handleAbout}
           onF2={handleF2}
           onF3={handleF3}
+          onF4={handleF4}
           onF5={handleCopy}
           onF6={handleMove}
           onF7={handleF7}
           onF8={handleDelete}
           onF9={handleF9}
+          onF10={() => dispatchCommand('quit')}
         />
       )}
       {/* 'status' mode: panel-level status bars handle this */}
@@ -381,6 +444,8 @@ function App(): React.JSX.Element {
       )}
 
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
 
 
 

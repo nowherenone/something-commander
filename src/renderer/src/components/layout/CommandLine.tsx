@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { useAppStore } from '../../stores/app-store'
 import { usePanelStore } from '../../stores/panel-store'
+import { useSettingsStore } from '../../stores/settings-store'
 import styles from '../../styles/commandline.module.css'
 
 export function CommandLine(): React.JSX.Element {
@@ -26,7 +27,10 @@ export function CommandLine(): React.JSX.Element {
       setHistoryIndex(-1)
 
       try {
-        const result = await window.api.util.runCommand(cmd, cwd)
+        // Settings ▸ Behavior ▸ Shell — honored here (main falls back to the
+        // platform default when the override is blank).
+        const shellOverride = useSettingsStore.getState().shell.trim() || undefined
+        const result = await window.api.util.runCommand(cmd, cwd, shellOverride)
         const text = (result.stdout + result.stderr).trim()
         if (text) {
           setOutput({ text, isError: result.code !== 0 })
@@ -81,7 +85,7 @@ export function CommandLine(): React.JSX.Element {
     <>
       {output && (
         <div className={styles.outputOverlay}>
-          <button className={styles.closeOutput} onClick={() => setOutput(null)}>
+          <button className={styles.closeOutput} onClick={() => setOutput(null)} aria-label="Close command output">
             x
           </button>
           <pre className={`${styles.output} ${output.isError ? styles.outputError : ''}`}>

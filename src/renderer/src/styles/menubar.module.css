@@ -13,7 +13,7 @@
 .menuItem {
   position: relative;
   padding: var(--space-2) var(--space-4);
-  height: 22px;
+  height: var(--control-height-sm);
   display: inline-flex;
   align-items: center;
   background: transparent;
@@ -27,7 +27,7 @@
   cursor: pointer;
   white-space: nowrap;
   -webkit-app-region: no-drag;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .menuItem:hover {
@@ -49,7 +49,7 @@
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-dropdown);
-  z-index: 200;
+  z-index: var(--z-menu);
   padding: var(--space-2);
   -webkit-app-region: no-drag;
 }
@@ -69,7 +69,7 @@
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
-  transition: background 0.1s ease;
+  transition: background var(--dur-fast) ease;
 }
 
 .menuAction:hover {
@@ -132,7 +132,7 @@
   letter-spacing: 0.01em;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .updateBadge:hover {

@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: var(--z-operation); /* above menu: op overlay covers open dropdowns */
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -54,7 +54,7 @@
   font-family: var(--font-ui);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-xs);
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .opDismiss:hover {
@@ -82,7 +82,7 @@
   font-size: var(--font-size-tiny);
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--tracking-caps);
   width: 44px;
   flex-shrink: 0;
   text-align: right;
@@ -146,7 +146,7 @@
   display: block;
   height: 100%;
   background: var(--bar-fill);
-  transition: width 0.15s ease;
+  transition: width var(--dur-med) ease;
   min-width: 0;
   border-radius: var(--bar-radius);
 }
@@ -226,7 +226,7 @@
 
 .opCancelBtn,
 .opOkBtn {
-  height: 28px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-6);
   border-radius: var(--radius-xs);
   cursor: pointer;
@@ -235,7 +235,7 @@
   font-weight: var(--font-weight-medium);
   display: inline-flex;
   align-items: center;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
 
 .opCancelBtn {
@@ -294,7 +294,7 @@
   font-size: var(--font-size-tiny);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-caps);
   margin-bottom: var(--space-2);
   font-family: var(--font-ui);
   font-weight: var(--font-weight-semibold);
@@ -323,7 +323,7 @@
 
 .owBtn {
   flex: 1;
-  height: 28px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-3);
   background: var(--bg-tertiary);
   color: var(--text-secondary);
@@ -334,7 +334,7 @@
   font-size: var(--font-size-tiny);
   font-weight: var(--font-weight-medium);
   text-align: center;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .owBtn:hover {
@@ -386,10 +386,89 @@
   font-family: var(--font-ui);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-medium);
-  z-index: 90;
+  z-index: var(--z-queue);
   box-shadow: var(--shadow-float);
 }
 
 .queueBtn:hover {
   background: var(--accent-hover);
+}
+
+/* Per-file failure list (F-07) */
+.opFailures {
+  margin-top: var(--space-2);
+}
+
+.opFailuresToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: var(--font-size-tiny);
+  cursor: pointer;
+}
+
+.opFailuresToggle:hover {
+  text-decoration: underline;
+}
+
+.opFailuresList {
+  list-style: none;
+  max-height: 96px;
+  overflow-y: auto;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+}
+
+.opFailureName {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-tiny);
+  color: var(--text-primary);
+}
+
+.opFailureMsg {
+  display: block;
+  font-size: var(--font-size-tiny);
+  color: var(--text-muted);
+  user-select: text;
+}
+
+/* Overwrite prompt: inline rename row (F-13) */
+.overwriteRenameRow {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--dialog-padding) 0;
+}
+
+.overwriteRenameInput {
+  flex: 1;
+  height: var(--control-height-lg);
+  min-width: 0;
+  background: var(--bg-input);
+  border: var(--border-width) solid var(--border-focus);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  padding: 0 var(--space-3);
+}
+
+/* Active overwrite policy note + disabled state (F-13) */
+.owPolicyNote {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-tiny);
+  color: var(--text-muted);
+}
+
+.owBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.owBtn:disabled:hover {
+  background: none;
 }

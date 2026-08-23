@@ -1,7 +1,11 @@
 node_modules
 out
+docs/ux
 dist
 .vite
 *.log
 .DS_Store
 Thumbs.db
+.ux-demo/
+playwright-report
+*.tsbuildinfo

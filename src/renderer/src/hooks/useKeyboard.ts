@@ -3,7 +3,20 @@ import { useAppStore } from '../stores/app-store'
 import { usePanelStore, parentOffset, hasParentEntry } from '../stores/panel-store'
 import { useKeybindingsStore } from '../stores/keybindings-store'
 import { useOverlayStore } from '../stores/overlay-store'
+import { useSettingsStore } from '../stores/settings-store'
 import { dispatchCommand } from '../commands/registry'
+
+/**
+ * Rows jumped by PageUp/PageDown (F-25): one screen of the active file list,
+ * minus a context row — not a fixed 20 that ignores the viewport.
+ */
+function pageStep(): number {
+  const activePanel = useAppStore.getState().activePanel
+  const list = document.querySelector(`[data-file-list="${activePanel}"]`)
+  const rowHeight = useSettingsStore.getState().rowHeight || 24
+  const visible = list ? Math.floor(list.clientHeight / rowHeight) : 0
+  return visible > 1 ? visible - 1 : 20
+}
 
 export interface KeyboardNavActions {
   /** Called when Enter activates the cursor row. */
@@ -51,6 +64,36 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
           e.preventDefault()
         }
         return
+      }
+
+      // Focused chrome keeps native behavior: Tab walks focus, Enter/Space
+      // activate buttons (menus, fn-key bar, tabs), and keys inside an open
+      // menu belong to the menu. Everything else still falls through to the
+      // panel pipeline below — F5 etc. keep working while a button is focused.
+      const ae = document.activeElement as HTMLElement | null
+      const inMenu = !!ae?.closest?.('[role="menubar"], [role="menu"]')
+      const isActivable =
+        ae instanceof HTMLButtonElement ||
+        ae instanceof HTMLSelectElement ||
+        ae instanceof HTMLAnchorElement ||
+        inMenu
+      if (isActivable) {
+        switch (e.key) {
+          case 'Tab':
+            return // native focus traversal
+          case 'Enter':
+          case ' ':
+            return // native button activation
+          case 'ArrowUp':
+          case 'ArrowDown':
+          case 'ArrowLeft':
+          case 'ArrowRight':
+          case 'Home':
+          case 'End':
+          case 'Escape':
+            if (inMenu) return // MenuBar's capture handler owns these
+            break
+        }
       }
 
       // Navigation primitives: depend on panel cursor state, not reassignable.
@@ -115,12 +158,12 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
 
         case 'PageUp':
           e.preventDefault()
-          store.setCursor(activePanel, Math.max(0, tab.cursorIndex - 20))
+          store.setCursor(activePanel, Math.max(0, tab.cursorIndex - pageStep()))
           return
 
         case 'PageDown':
           e.preventDefault()
-          store.setCursor(activePanel, tab.cursorIndex + 20)
+          store.setCursor(activePanel, tab.cursorIndex + pageStep())
           return
 
         case 'Enter': {

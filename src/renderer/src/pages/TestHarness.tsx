@@ -23,6 +23,7 @@ function baseOp(partial: Partial<FileOperation> & Pick<FileOperation, 'id' | 'ty
     processedFiles: 0,
     processedBytes: 0,
     startTime: 0,
+    failures: [],
     overwritePrompt: null,
     overwritePolicy: 'ask',
     ...partial
@@ -135,7 +136,31 @@ const mockOps: Record<string, FileOperation> = {
     totalFiles: 1,
     totalBytes: 3598000000,
     startTime: FIXED_NOW - 2000,
-    error: 'flight.mp4: ENOSPC: no space left on device'
+    error: 'Destination disk is full — free up space or choose another destination.',
+    failures: [
+      { name: 'flight.mp4', message: 'ENOSPC: no space left on device, write' }
+    ]
+  }),
+
+  /** Partial success with a failed-file list (F-07) */
+  partial_failure: baseOp({
+    id: 'op-8',
+    type: 'copy',
+    sourceEntries: [{ id: 'D:\\Projects\\bundle', name: 'bundle', isContainer: true, size: -1, modifiedAt: 0, mimeType: '', iconHint: 'folder', meta: {}, attributes: { readonly: false, hidden: false, symlink: false } }],
+    destinationDisplay: 'E:\\Backup',
+    destinationLocationId: 'E:\\Backup',
+    status: 'done',
+    currentFile: '',
+    totalFiles: 9,
+    totalBytes: 1200000,
+    processedFiles: 7,
+    processedBytes: 900000,
+    startTime: FIXED_NOW - 40000,
+    error: 'Copied 7 items, but 2 failed — see details.',
+    failures: [
+      { name: 'docs\\locked.xlsx', message: 'EBUSY: resource busy or locked, open' },
+      { name: 'system\\pagefile.sys', message: 'EPERM: operation not permitted, open' }
+    ]
   }),
 
   cancelled: baseOp({

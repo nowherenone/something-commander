@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { formatSize } from '../utils/format'
+import { useSizeFormat } from '../stores/settings-store'
 import { useEscapeKey } from '../hooks/useEscapeKey'
 import { parseEditorPath, resolveEditorSaveTarget } from '../utils/editor-path'
 
@@ -9,6 +10,7 @@ interface EditorPageProps {
 }
 
 export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [content, setContent] = useState('')
   const [originalContent, setOriginalContent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -17,6 +19,7 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [modified, setModified] = useState(false)
   const [fileSize, setFileSize] = useState(0)
+  const [confirmClose, setConfirmClose] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -105,11 +108,16 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
 
   const rootRef = useRef<HTMLDivElement>(null)
 
+  // Esc: first press opens the unsaved-changes confirm (no native window.confirm —
+  // it steals focus styling and looks alien next to the custom chrome), second
+  // press cancels back to the editor.
   useEscapeKey(() => {
+    if (confirmClose) {
+      setConfirmClose(false)
+      return
+    }
     if (modified) {
-      if (window.confirm('Unsaved changes. Close anyway?')) {
-        window.close()
-      }
+      setConfirmClose(true)
     } else {
       window.close()
     }
@@ -152,6 +160,71 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
 
   return (
     <div ref={rootRef} className="appShell" style={{ background: 'var(--bg-primary)' }}>
+      {confirmClose && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--overlay-bg)',
+            backdropFilter: 'blur(2px)'
+          }}
+          data-testid="editor-close-confirm"
+        >
+          <div
+            style={{
+              background: 'var(--bg-panel)',
+              border: 'var(--border-width) solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-dialog)',
+              padding: 'var(--space-7)',
+              width: 320,
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ fontSize: 'var(--font-size-ui)', color: 'var(--text-primary)', marginBottom: 6 }}>
+              Unsaved changes
+            </div>
+            <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-secondary)', marginBottom: 'var(--space-6)' }}>
+              Close without saving?
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+              <button
+                autoFocus
+                onClick={() => setConfirmClose(false)}
+                style={{
+                  height: 28,
+                  padding: '0 var(--space-5)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-secondary)',
+                  border: 'var(--border-width) solid var(--border-color)',
+                  borderRadius: 'var(--radius-xs)',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel (Esc)
+              </button>
+              <button
+                onClick={() => window.close()}
+                style={{
+                  height: 28,
+                  padding: '0 var(--space-5)',
+                  background: 'var(--danger)',
+                  color: 'var(--text-on-accent)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-xs)',
+                  cursor: 'pointer'
+                }}
+              >
+                Close without saving
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {loading ? (
         <div className="panelSlot" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
           Loading...
@@ -202,7 +275,7 @@ export function EditorPage({ filePath }: EditorPageProps): React.JSX.Element {
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{displayPath}</span>
         <span>
-          {formatSize(fileSize)} | {lineCount} lines
+          {formatSize(fileSize, sizeFormat)} | {lineCount} lines
           {modified ? ' | modified' : ''}
           {saveMessage ? (
             <span style={{ color: saveMessage === 'Saved' ? 'var(--success)' : 'var(--danger)', marginLeft: 8 }}>

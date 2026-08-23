@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { formatSize } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
 import styles from '../../styles/dialogs.module.css'
 
 interface FileViewerProps {
@@ -11,6 +12,7 @@ interface FileViewerProps {
 type ViewMode = 'text' | 'hex'
 
 export function FileViewer({ filePath, fileName, onClose }: FileViewerProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [content, setContent] = useState('')
   const [isBinary, setIsBinary] = useState(false)
   const [totalSize, setTotalSize] = useState(0)
@@ -71,7 +73,7 @@ export function FileViewer({ filePath, fileName, onClose }: FileViewerProps): Re
           <span>
             [F3] View: {fileName}{' '}
             <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              ({formatSize(totalSize)}
+              ({formatSize(totalSize, sizeFormat)}
               {truncated ? ' - truncated' : ''})
             </span>
           </span>

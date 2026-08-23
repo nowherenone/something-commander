@@ -36,6 +36,15 @@ textarea {
   letter-spacing: inherit;
 }
 
+/* Keyboard focus ring — only for keyboard navigation (:focus-visible), so
+   mouse clicks don't paint rings. Buttons across the app (menus, fn-key bar,
+   tabs) had no focus treatment at all, locking keyboard users out of chrome. */
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-radius: var(--radius-sm);
+}
+
 /* App shell */
 .appShell {
   display: flex;

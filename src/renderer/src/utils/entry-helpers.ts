@@ -173,3 +173,14 @@ export function parseCopyMoveDestInput(
     destFileName: name || options.originalFileName
   }
 }
+
+/**
+ * Suggested non-conflicting-ish name for "Rename" in the overwrite prompt
+ * (F-13): "report.txt" → "report (copy).txt", "archive" → "archive (copy)".
+ * Dotfiles (.bashrc) keep their name shape and get the suffix at the end.
+ */
+export function suggestCopyName(name: string): string {
+  const dot = name.lastIndexOf('.')
+  if (dot > 0) return `${name.slice(0, dot)} (copy)${name.slice(dot)}`
+  return `${name} (copy)`
+}

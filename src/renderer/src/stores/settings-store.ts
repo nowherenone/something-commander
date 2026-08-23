@@ -70,6 +70,10 @@ export interface Settings {
   // Updates
   autoCheckForUpdates: boolean
   autoDownloadUpdates: boolean
+
+  // One-time UI flags
+  /** The F-12 welcome hint (points at the fn-key bar) has been shown once. */
+  firstRunHintShown: boolean
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -78,7 +82,9 @@ const DEFAULT_SETTINGS: Settings = {
   showHiddenFiles: false,
   dateFormat: 'yyyy-MM-dd HH:mm',
   fontFamily: "'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', 'Fira Code', ui-monospace, monospace",
-  sizeFormat: 'full',
+  // Human-readable sizes everywhere by default (F-14 threads this selector
+  // through every surface); "Full bytes" remains a Display-setting option.
+  sizeFormat: 'short',
   bottomBar: 'fnkeys',
   showCommandLine: false,
   confirmDelete: true,
@@ -87,7 +93,8 @@ const DEFAULT_SETTINGS: Settings = {
   colorOverrides: {},
   shell: navigator.platform?.startsWith('Win') ? 'powershell' : '/bin/bash',
   autoCheckForUpdates: true,
-  autoDownloadUpdates: true
+  autoDownloadUpdates: true,
+  firstRunHintShown: false
 }
 
 interface SettingsState extends Settings {
@@ -95,6 +102,19 @@ interface SettingsState extends Settings {
   resetSettings: () => void
   setColorOverride: (key: ColorOverrideKey, value: string | null) => void
   resetColorOverrides: () => void
+}
+
+/**
+ * Shared sizeFormat selectors (F-14). Every surface that prints a byte count
+ * — list rows, status bars, dialogs, viewers — goes through these so the
+ * Settings ▸ Display choice applies app-wide instead of half-applying.
+ */
+export function useSizeFormat(): SizeFormat {
+  return useSettingsStore((s) => s.sizeFormat)
+}
+
+export function getSizeFormat(): SizeFormat {
+  return useSettingsStore.getState().sizeFormat
 }
 
 /**

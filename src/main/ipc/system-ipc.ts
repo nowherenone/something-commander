@@ -30,6 +30,9 @@ export function registerSystemIPC(): void {
     return showFileProperties(filePath)
   })
 
+  // Home directory for the default panel landing page (UX plan F-12).
+  ipcMain.handle('util:getHomeDir', () => os.homedir())
+
   ipcMain.handle(
     IPC_CHANNELS.SHOW_CONTEXT_MENU,
     (event, items: Array<{ label: string; id: string; separator?: boolean }>) => {

@@ -33,7 +33,7 @@
   white-space: nowrap;
   max-width: 160px;
   min-width: 48px;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .tab:hover {
@@ -64,7 +64,7 @@
   line-height: 1;
   opacity: 0;
   flex-shrink: 0;
-  transition: opacity 0.1s ease, background 0.1s ease;
+  transition: opacity var(--dur-fast) ease, background var(--dur-fast) ease;
 }
 
 .tab:hover .tabClose {
@@ -90,7 +90,7 @@
   cursor: pointer;
   font-size: var(--font-size-ui);
   flex-shrink: 0;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .tabNew:hover {

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import type { Entry } from '@shared/types'
-import { getIconForHint } from '../../utils/icon-map'
+import { EntryIcon } from '../icons'
 import styles from '../../styles/panels.module.css'
 
 interface TreeNode {
@@ -89,12 +89,23 @@ export function TreeView({ pluginId, locationId, onNavigate }: TreeViewProps): R
           <span
             style={{ width: 16, textAlign: 'center', fontSize: 10, color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}
             onClick={(e) => { e.stopPropagation(); toggleExpand(node, path) }}
+            role="button"
+            aria-label={
+              node.children === null || (node.children && node.children.length > 0)
+                ? node.expanded ? `Collapse ${node.entry.name}` : `Expand ${node.entry.name}`
+                : undefined
+            }
+            aria-expanded={
+              node.children === null || (node.children && node.children.length > 0)
+                ? node.expanded
+                : undefined
+            }
           >
             {node.children === null || (node.children && node.children.length > 0)
               ? (node.expanded ? '\u25BC' : '\u25B6')
               : '\u2022'}
           </span>
-          <span style={{ marginRight: 4, fontSize: 13 }}>{getIconForHint('folder')}</span>
+          <span style={{ marginRight: 4, fontSize: 13 }} aria-hidden="true"><EntryIcon hint="folder" /></span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {node.entry.name}
           </span>

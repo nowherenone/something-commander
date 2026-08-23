@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC_CHANNELS } from '../shared/types/ipc-channels'
 
@@ -116,6 +116,11 @@ const utilAPI = {
 
   getDiskSpace: (pluginId: string, locationId: string): Promise<{ free: number; total: number }> =>
     ipcRenderer.invoke(IPC_CHANNELS.GET_DISK_SPACE, pluginId, locationId),
+
+  getHomeDir: (): Promise<string> => ipcRenderer.invoke('util:getHomeDir'),
+
+  /** Absolute path of a File dropped from the OS (Electron 32+ removed File.path). */
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
 
   encryptString: (text: string): Promise<string> =>
     ipcRenderer.invoke('util:encryptString', text),

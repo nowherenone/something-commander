@@ -37,7 +37,6 @@ export function Splitter(): React.JSX.Element {
   return (
     <div
       onMouseDown={onMouseDown}
-      className="splitter"
       style={{
         width: 'var(--splitter-width)',
         cursor: 'col-resize',

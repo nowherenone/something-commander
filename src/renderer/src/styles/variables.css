@@ -21,7 +21,7 @@
   /* ── Text ── */
   --text-primary: #f5f5f7;
   --text-secondary: #a8a8ae;
-  --text-muted: #6e6e73;
+  --text-muted: #86868b;
   --text-on-accent: #ffffff;
   --text-selected: #f5f5f7;
   --text-error: #ff6961;
@@ -32,7 +32,6 @@
   --border-focus: #0a84ff;
   --border-width: 1px;
   --panel-border-width: 1px;
-  --separator: var(--border-subtle);
 
   /* ── Accent & semantic status only ── */
   --accent: #0a84ff;
@@ -51,7 +50,7 @@
 
   /* ── Chrome density (every bar/header/footer uses these) ── */
   --chrome-height: 32px;
-  --row-height: 26px;
+  --row-height: 24px;
   --header-height: var(--chrome-height);
   --statusbar-height: 26px;
   --addressbar-height: var(--chrome-height);
@@ -62,6 +61,12 @@
   --dialog-header-height: 44px;
   --dialog-footer-height: 52px;
   --splitter-width: 5px;
+
+  /* ── Control heights (buttons/inputs/selects) ── */
+  --control-height-sm: 22px;
+  --control-height: 24px;
+  --control-height-lg: 28px;
+
   --panel-padding: 0px;
   --panel-gap: 0px;
 
@@ -84,7 +89,6 @@
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 12px;
   --radius-pill: 999px;
 
   /* ── Progress ── */
@@ -101,7 +105,6 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-dropdown: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  --shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.45);
   --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.4);
   --danger-tint: color-mix(in srgb, var(--danger) 12%, transparent);
   --accent-tint: color-mix(in srgb, var(--accent) 22%, transparent);
@@ -120,7 +123,22 @@
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --letter-spacing-ui: -0.01em;
+  --tracking-caps: 0.04em;
   --line-height-ui: 1.3;
+
+  /* ── Motion (shared transition durations; keyframe animations exempt) ── */
+  --dur-fast: 0.1s;
+  --dur-med: 0.15s;
+
+  /* ── Layering (z-index scale, low → high; modules never hardcode) ── */
+  --z-content: 1;
+  --z-commandline: 50;
+  --z-queue: 90;
+  --z-dialog: 100;
+  --z-drivebar: 150;
+  --z-menu: 200;
+  --z-operation: 250; /* deliberately above menu: op overlay covers open dropdowns */
+  --z-toast: 300;
 }
 
 /* Light — same structure, airy grays */
@@ -139,7 +157,7 @@
 
   --text-primary: #1d1d1f;
   --text-secondary: #6e6e73;
-  --text-muted: #86868b;
+  --text-muted: #64646a;
   --text-on-accent: #ffffff;
   --text-selected: #1d1d1f;
   --text-error: #d70015;
@@ -162,7 +180,6 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-dropdown: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
-  --shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.12);
   --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.1);
   --row-stripe: color-mix(in srgb, #000000 2%, transparent);
 }
@@ -183,7 +200,7 @@
 
   --text-primary: #f8f8f2;
   --text-secondary: #cfcfc2;
-  --text-muted: #75715e;
+  --text-muted: #9c937d;
   --text-on-accent: #ffffff;
   --text-selected: #f8f8f2;
   --text-error: #f92672;
@@ -239,7 +256,6 @@
   --radius-xs: 0;
   --radius-sm: 0;
   --radius-md: 0;
-  --radius-lg: 0;
   --shadow-dropdown: none;
   --shadow-dialog: none;
 }

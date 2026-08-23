@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { formatSize } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
 import { formatHexLines } from '../../utils/hex'
 import { FileContentView } from '../FileContentView'
+import { EntryIcon } from '../icons'
 import type { Entry } from '@shared/types'
 import styles from '../../styles/quickview.module.css'
 import panelStyles from '../../styles/panels.module.css'
@@ -16,6 +18,7 @@ interface QuickViewProps {
 const PREVIEW_LIMIT = 256 * 1024
 
 export function QuickView({ entry, pluginId }: QuickViewProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [lines, setLines] = useState<string[]>([])
   const [isBinary, setIsBinary] = useState(false)
   const [fileSize, setFileSize] = useState(0)
@@ -68,7 +71,7 @@ export function QuickView({ entry, pluginId }: QuickViewProps): React.JSX.Elemen
   if (entry.isContainer) {
     return (
       <div className={styles.dirState}>
-        <span className={styles.dirIcon}>{'\uD83D\uDCC1'}</span>
+        <span className={styles.dirIcon} aria-hidden="true"><EntryIcon hint="folder" /></span>
         <span className={styles.dirName}>{entry.name}</span>
         <span>Directory</span>
       </div>
@@ -82,7 +85,7 @@ export function QuickView({ entry, pluginId }: QuickViewProps): React.JSX.Elemen
       <div className={styles.header}>
         <span className={styles.headerName}>{entry.name}</span>
         <span className={styles.headerMeta}>
-          {formatSize(fileSize)}{isBinary ? ' (binary)' : ''}{isTruncated ? ' (preview)' : ''}
+          {formatSize(fileSize, sizeFormat)}{isBinary ? ' (binary)' : ''}{isTruncated ? ' (preview)' : ''}
         </span>
       </div>
 

@@ -3,7 +3,9 @@
  * `src/renderer/src/styles/` (the real entry for chrome theming).
  *
  * Guards: shared tokens exist; modules do not introduce ad-hoc hex/rgb
- * structural colors; chrome modules resolve heights via shared tokens.
+ * structural colors; chrome modules resolve heights via shared tokens;
+ * stacking, transition durations and caps-label tracking resolve through
+ * shared --z-* / --dur-* / --tracking-caps tokens (no raw literals).
  */
 import { readFileSync, readdirSync } from 'fs'
 import { join, resolve } from 'path'
@@ -24,6 +26,13 @@ function listCssModules(): string[] {
 /** Raw hex / rgb / hsl color literals (not inside url(...) or already var()). */
 const RAW_COLOR_RE =
   /(?<![\w-])#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b|(?<![\w-])(?:rgba?|hsla?)\s*\(/g
+
+/** Literal z-index numbers (var(--z-*) is the only sanctioned value; `auto` is fine). */
+const RAW_Z_INDEX_RE = /(?<![-\w])z-index\s*:\s*(?!var\()[^;\n{}]*?-?\d+/g
+
+/** Raw second/ms durations inside transition properties (var(--dur-*) only). */
+const RAW_TRANSITION_DURATION_RE =
+  /\btransition[a-z-]*\s*:\s*[^;{}\n]*?\b[0-9][0-9.]*m?s\b/g
 
 const REQUIRED_TOKENS = [
   '--bg-primary',
@@ -83,7 +92,18 @@ const REQUIRED_TOKENS = [
   '--compare-newer',
   '--compare-older',
   '--compare-only-left',
-  '--compare-only-right'
+  '--compare-only-right',
+  '--tracking-caps',
+  '--dur-fast',
+  '--dur-med',
+  '--z-content',
+  '--z-commandline',
+  '--z-dialog',
+  '--z-drivebar',
+  '--z-menu',
+  '--z-operation',
+  '--z-toast',
+  '--z-queue'
 ] as const
 
 describe('style design tokens (shipped CSS)', () => {
@@ -120,6 +140,73 @@ describe('style design tokens (shipped CSS)', () => {
     }
 
     expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('modules stack via shared --z-* layer tokens (no literal z-index)', () => {
+    const offenders: string[] = []
+
+    for (const file of listCssModules()) {
+      const css = readStyle(file)
+      const matches = css.match(RAW_Z_INDEX_RE)
+      if (matches && matches.length > 0) {
+        offenders.push(`${file}: ${[...new Set(matches)].join(', ')}`)
+      }
+    }
+
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('transitions resolve duration through --dur-* tokens (no raw seconds/ms)', () => {
+    const offenders: string[] = []
+
+    for (const file of listCssModules()) {
+      const css = readStyle(file)
+      const matches = css.match(RAW_TRANSITION_DURATION_RE)
+      if (matches && matches.length > 0) {
+        offenders.push(`${file}: ${[...new Set(matches)].join(', ')}`)
+      }
+    }
+
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('uppercase labels track via var(--tracking-caps), not ad-hoc em values', () => {
+    const ALLOWED = new Set([
+      '0',
+      'normal',
+      'inherit',
+      'var(--letter-spacing-ui)',
+      'var(--tracking-caps)'
+    ])
+    const BLOCK_RE = /[^\n{}]+\{[^{}]*\}/g
+    const offenders: string[] = []
+
+    for (const file of listCssModules()) {
+      const css = readStyle(file)
+      for (const block of css.match(BLOCK_RE) ?? []) {
+        if (!/text-transform\s*:\s*uppercase/.test(block)) continue
+        const m = block.match(/(?<![-\w])letter-spacing\s*:\s*([^;\n}]+)/)
+        if (!m) continue
+        const value = m[1].trim()
+        if (!ALLOWED.has(value)) {
+          offenders.push(`${file}: letter-spacing: ${value}`)
+        }
+      }
+    }
+
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('pruned dead tokens stay pruned; kept shadows still have consumers', () => {
+    const css = readStyle('variables.css')
+    expect(css).not.toContain('--separator')
+    expect(css).not.toContain('--radius-lg')
+    expect(css).not.toContain('--shadow-toast')
+    // --shadow-float is alive: consumed by the minimized-operations queue chip
+    expect(css).toContain('--shadow-float')
+    expect(readStyle('operations.module.css')).toContain(
+      'box-shadow: var(--shadow-float)'
+    )
   })
 
   it('chrome modules use shared height/border/font tokens for bars and dialogs', () => {
@@ -189,5 +276,17 @@ describe('style design tokens (shipped CSS)', () => {
     )
     const theme = useSettingsStore.getState().theme
     expect(theme).toBe('dark')
+  })
+
+  it('CSS --row-height default matches the settings-store default (no drift)', async () => {
+    // Boot overrides the CSS custom property from the store; the shipped
+    // default in variables.css must agree so the pre-boot paint matches
+    const { useSettingsStore } = await import(
+      '../renderer/src/stores/settings-store'
+    )
+    const { rowHeight } = useSettingsStore.getState()
+    expect(readStyle('variables.css')).toMatch(
+      new RegExp(`--row-height:\\s*${rowHeight}px;`)
+    )
   })
 })

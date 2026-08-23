@@ -8,7 +8,7 @@
   flex-direction: column-reverse;
   align-items: flex-end;
   gap: var(--space-2);
-  z-index: 300;
+  z-index: var(--z-toast);
   pointer-events: none;
   max-width: min(360px, calc(100vw - 20px));
 }
@@ -78,7 +78,7 @@
   align-items: center;
   justify-content: center;
   width: 22px;
-  height: 22px;
+  height: var(--control-height-sm);
   padding: 0;
   border: none;
   border-radius: var(--radius-xs);
@@ -117,4 +117,20 @@
   to {
     opacity: 0;
   }
+}
+
+/* Repeat counter + collapsed-overflow chip (F-26) */
+.countBadge {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.overflowChip {
+  pointer-events: none;
+  padding: 2px var(--space-3);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--font-size-tiny);
 }

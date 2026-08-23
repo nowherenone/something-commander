@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
 import { useOverlayStore } from '../../stores/overlay-store'
+import { EntryIcon } from '../icons'
 import styles from '../../styles/dialogs.module.css'
 
 interface ArchiveFormat {
@@ -28,6 +30,7 @@ export function ConfirmOperation({
   onConfirm,
   onCancel
 }: ConfirmOperationProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [editDest, setEditDest] = useState(destDir)
   const [writableFormats, setWritableFormats] = useState<ArchiveFormat[]>([])
   const [selectedFormat, setSelectedFormat] = useState<string>('')
@@ -138,12 +141,12 @@ export function ConfirmOperation({
               {fileCount > 0 && ` (${fileCount} file${fileCount !== 1 ? 's' : ''}`}
               {dirCount > 0 && `${fileCount > 0 ? ', ' : ' ('}${dirCount} folder${dirCount !== 1 ? 's' : ''}`}
               {(fileCount > 0 || dirCount > 0) && ')'}
-              {totalSize > 0 && ` — ${formatSize(totalSize)}`}
+              {totalSize > 0 && ` — ${formatSize(totalSize, sizeFormat)}`}
             </div>
             <div className={styles.confirmList}>
               {entries.slice(0, 20).map((e) => (
                 <div key={e.id}>
-                  {e.isContainer ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 '}
+                  {e.isContainer ? <EntryIcon hint="folder" /> : <EntryIcon hint="file" />}{' '}
                   {e.name}
                 </div>
               ))}

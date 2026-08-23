@@ -16,6 +16,7 @@ import { QuickView } from './QuickView'
 import { useBookmarksStore } from '../../stores/bookmarks-store'
 import { bookmarkDisplayEntries, buildDisplayEntries, isRenamableEntry } from '../../utils/display-entries'
 import { buildBreadcrumbSegments } from '../../utils/breadcrumb-segments'
+import { restorePanelLocation } from '../../stores/layout-persistence'
 import styles from '../../styles/panels.module.css'
 
 /** Reactive bridge: subscribes to opposite panel's cursor for QuickView */
@@ -62,19 +63,10 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
   const closeDriveMenu = useAppStore((s) => s.closeDriveMenu)
   const driveMenuOpen = driveMenuOpenPanel === panelId
 
-  // Navigate to saved location on mount only
+  // Restore this panel on mount only — saved layout tabs (F-11), falling back
+  // to the legacy single-location blob, then to a $HOME landing page (F-12).
   useEffect(() => {
-    Promise.all([
-      window.api.store.get(`panel-${panelId}-state`),
-      window.api.store.get(`panel-${panelId}-location`)
-    ]).then(([stateData, legacyData]) => {
-      const state = stateData as { pluginId?: string; locationId?: string } | null
-      const pluginId = state?.pluginId || 'local-filesystem'
-      const locationId = state?.locationId || (legacyData as string | null) || null
-
-      usePanelStore.getState().navigateWithPlugin(panelId, pluginId, locationId || null)
-        .catch(() => usePanelStore.getState().navigate(panelId, null))
-    })
+    void restorePanelLocation(panelId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelId])
 
@@ -224,6 +216,7 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
         />
       </div>
       <AddressBar
+        panelId={panelId}
         location={tab.locationDisplay}
         segments={breadcrumbSegments}
         onNavigate={handleNavigateAddress}

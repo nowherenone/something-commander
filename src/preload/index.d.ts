@@ -69,6 +69,8 @@ interface UtilAPI {
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
   showFileProperties(filePath: string): Promise<{ success: boolean; error?: string }>
   getDiskSpace(pluginId: string, locationId: string): Promise<{ free: number; total: number }>
+  getHomeDir(): Promise<string>
+  getPathForFile(file: File): string
   encryptString(plainText: string): Promise<string>
   decryptString(encrypted: string): Promise<string>
   sftpConnect(host: string, port: number, username: string, password?: string): Promise<string>

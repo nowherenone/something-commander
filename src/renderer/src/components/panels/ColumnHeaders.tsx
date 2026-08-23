@@ -16,16 +16,24 @@ const COLUMNS: Array<{ field: SortField; label: string; className: string }> = [
 
 export function ColumnHeaders({ sortConfig, onSort }: ColumnHeadersProps): React.JSX.Element {
   return (
-    <div className={styles.headerRow}>
+    <div className={styles.headerRow} role="row">
       {COLUMNS.map((col) => (
         <div
           key={col.field}
           className={`${col.className} ${styles.headerCell}`}
+          role="columnheader"
+          aria-sort={
+            sortConfig.field === col.field
+              ? sortConfig.direction === 'asc'
+                ? 'ascending'
+                : 'descending'
+              : undefined
+          }
           onClick={() => onSort(col.field)}
         >
           {col.label}
           {sortConfig.field === col.field && (
-            <span className={styles.sortArrow}>
+            <span className={styles.sortArrow} aria-hidden="true">
               {sortConfig.direction === 'asc' ? ' \u25B2' : ' \u25BC'}
             </span>
           )}

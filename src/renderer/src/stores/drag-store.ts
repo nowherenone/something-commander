@@ -9,6 +9,10 @@ interface DragState {
   dragSourcePluginId: string | null
   dragSourceLocationId: string | null
   dropTargetPanelId: PanelId | null
+  /** An OS-level drag (from Finder/Explorer) is hovering the app (F-16). */
+  externalDrag: boolean
+  /** Folder row currently highlighted as the drop target (F-16). */
+  rowDropTargetId: string | null
 
   startDrag: (
     panelId: PanelId,
@@ -17,6 +21,8 @@ interface DragState {
     locationId: string | null
   ) => void
   setDropTarget: (panelId: PanelId | null) => void
+  setExternalDrag: (dragging: boolean) => void
+  setRowDropTarget: (entryId: string | null) => void
   endDrag: () => void
 }
 
@@ -27,6 +33,8 @@ export const useDragStore = create<DragState>((set) => ({
   dragSourcePluginId: null,
   dragSourceLocationId: null,
   dropTargetPanelId: null,
+  externalDrag: false,
+  rowDropTargetId: null,
 
   startDrag: (panelId, entries, pluginId, locationId) =>
     set({
@@ -40,6 +48,14 @@ export const useDragStore = create<DragState>((set) => ({
 
   setDropTarget: (panelId) => set({ dropTargetPanelId: panelId }),
 
+  setExternalDrag: (dragging) =>
+    set((s) =>
+      s.externalDrag === dragging ? s : { externalDrag: dragging }
+    ),
+
+  setRowDropTarget: (entryId) =>
+    set((s) => (s.rowDropTargetId === entryId ? s : { rowDropTargetId: entryId })),
+
   endDrag: () =>
     set({
       isDragging: false,
@@ -47,6 +63,8 @@ export const useDragStore = create<DragState>((set) => ({
       draggedEntries: [],
       dragSourcePluginId: null,
       dragSourceLocationId: null,
-      dropTargetPanelId: null
+      dropTargetPanelId: null,
+      externalDrag: false,
+      rowDropTargetId: null
     })
 }))

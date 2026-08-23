@@ -313,6 +313,50 @@ describe('panel-store', () => {
 
       expect(usePanelStore.getState().getActiveTab('left').selectedEntryIds.size).toBe(0)
     })
+
+    it('selectRange selects the inclusive span (F-05 shift-click)', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/a.txt', name: 'a.txt' }),
+        makeEntry({ id: '/b.txt', name: 'b.txt' }),
+        makeEntry({ id: '/c.txt', name: 'c.txt' }),
+        makeEntry({ id: '/d.txt', name: 'd.txt' })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '/test',
+        parentId: null
+      })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      usePanelStore.getState().selectRange('left', 1, 2)
+
+      const selected = usePanelStore.getState().getActiveTab('left').selectedEntryIds
+      expect([...selected].sort()).toEqual(['/b.txt', '/c.txt'])
+    })
+
+    it('selectRange handles reversed endpoints and unions into existing selection', async () => {
+      const mockEntries: Entry[] = [
+        makeEntry({ id: '/a.txt', name: 'a.txt' }),
+        makeEntry({ id: '/b.txt', name: 'b.txt' }),
+        makeEntry({ id: '/c.txt', name: 'c.txt' })
+      ]
+
+      vi.mocked(window.api.plugins.readDirectory).mockResolvedValueOnce({
+        entries: mockEntries,
+        location: '/test',
+        parentId: null
+      })
+
+      await usePanelStore.getState().navigate('left', '/test')
+      usePanelStore.getState().toggleSelect('left', '/a.txt')
+      // Shift-click upward: to=1 from=2 — same span as 1..2.
+      usePanelStore.getState().selectRange('left', 2, 1)
+
+      const selected = usePanelStore.getState().getActiveTab('left').selectedEntryIds
+      expect(selected.has('/a.txt')).toBe(true) // prior selection kept
+      expect([...selected].sort()).toEqual(['/a.txt', '/b.txt', '/c.txt'])
+    })
   })
 
   describe('cursor', () => {

@@ -1,26 +1,37 @@
 import React, { useEffect, useState } from 'react'
-import { useOperationsStore, type FileOperation, type OverwritePrompt } from '../../stores/operations-store'
+import { useOperationsStore, type FileOperation, type OverwritePrompt, type OverwritePolicy } from '../../stores/operations-store'
 import { resolveOverwriteAction } from '../../hooks/useFileOperations'
 import { getLiveTransferProgress } from '../../services/file-operation-service'
-import { formatSize, formatDate } from '../../utils/format'
+import { formatSize, formatDate, formatSpeed, formatEta } from '../../utils/format'
+import { suggestCopyName } from '../../utils/entry-helpers'
+import { showToast } from '../layout/Toast'
 import { useOverlayStore } from '../../stores/overlay-store'
+import { useSizeFormat } from '../../stores/settings-store'
 import styles from '../../styles/operations.module.css'
 
-function formatSpeed(bytesPerSec: number): string {
-  if (bytesPerSec <= 0) return ''
-  return `${formatSize(bytesPerSec)}/s`
-}
+function OverwritePromptView({ prompt, policy }: { prompt: OverwritePrompt; policy: OverwritePolicy }): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(() => suggestCopyName(prompt.sourceName))
 
-function formatEta(bytes: number, totalBytes: number, elapsedMs: number): string {
-  if (bytes <= 0 || elapsedMs <= 1000) return ''
-  const bps = bytes / elapsedMs
-  const remaining = totalBytes - bytes
-  const secs = Math.round(remaining / bps / 1000)
-  if (secs < 60) return `~${secs}s`
-  return `~${Math.floor(secs / 60)}m${secs % 60}s`
-}
+  // Compare needs both sides openable in the local viewer.
+  const isLocalPath = (p: string): boolean => /^([a-zA-Z]:[\\/]|\/)/.test(p || '')
+  const bothLocal = isLocalPath(prompt.sourcePath) && isLocalPath(prompt.destPath)
 
-function OverwritePromptView({ prompt }: { prompt: OverwritePrompt }): React.JSX.Element {
+  const applyRename = (): void => {
+    resolveOverwriteAction('rename', renameValue)
+    setRenaming(false)
+  }
+
+  const openCompare = async (): Promise<void> => {
+    try {
+      await window.api.util.openViewerWindow('local-filesystem', prompt.sourcePath, prompt.sourceName)
+      await window.api.util.openViewerWindow('local-filesystem', prompt.destPath, prompt.destPath.split(/[\\/]/).pop() || 'existing')
+    } catch {
+      showToast('Could not open files for comparison')
+    }
+  }
+
   return (
     <div className={styles.overwriteBox}>
       <div className={styles.overwriteTitle}>File already exists</div>
@@ -29,7 +40,7 @@ function OverwritePromptView({ prompt }: { prompt: OverwritePrompt }): React.JSX
           <div className={styles.overwriteLabel}>Source</div>
           <div className={styles.overwriteName} data-testid="ow-source-name">{prompt.sourceName}</div>
           <div className={styles.overwriteMeta} data-testid="ow-source-meta">
-            {formatSize(prompt.sourceSize)}
+            {formatSize(prompt.sourceSize, sizeFormat)}
             {prompt.sourceDate > 0 ? ` | ${formatDate(prompt.sourceDate)}` : ''}
           </div>
         </div>
@@ -37,16 +48,94 @@ function OverwritePromptView({ prompt }: { prompt: OverwritePrompt }): React.JSX
           <div className={styles.overwriteLabel}>Existing</div>
           <div className={styles.overwriteName} data-testid="ow-dest-name">{prompt.destPath.split(/[\\/]/).pop() || prompt.sourceName}</div>
           <div className={styles.overwriteMeta} data-testid="ow-dest-meta">
-            {formatSize(prompt.destSize)}
+            {formatSize(prompt.destSize, sizeFormat)}
             {prompt.destDate > 0 ? ` | ${formatDate(prompt.destDate)}` : ''}
           </div>
         </div>
       </div>
+      {renaming && (
+        <div className={styles.overwriteRenameRow}>
+          <input
+            className={styles.overwriteRenameInput}
+            data-testid="ow-rename-input"
+            value={renameValue}
+            autoFocus
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                e.stopPropagation()
+                applyRename()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                e.stopPropagation()
+                setRenaming(false)
+              }
+            }}
+          />
+          <button className={styles.owBtn} data-testid="ow-rename-apply" onClick={applyRename}>Rename &amp; Continue</button>
+        </div>
+      )}
+      {/* A policy chosen earlier in this operation stays visible (F-13): the
+          buttons it contradicts gray out so "Skip All" can't silently fight
+          an earlier "Overwrite All". */}
+      {policy !== 'ask' && (
+        <div className={styles.owPolicyNote} data-testid="ow-policy-note">
+          {policy === 'overwrite-all'
+            ? 'Overwrite All is in effect for the rest of this operation.'
+            : 'Skip All is in effect for the rest of this operation.'}
+        </div>
+      )}
       <div className={styles.overwriteActions}>
-        <button className={styles.owBtn} data-testid="ow-overwrite" onClick={() => resolveOverwriteAction('overwrite')}>Overwrite</button>
-        <button className={styles.owBtn} data-testid="ow-skip" onClick={() => resolveOverwriteAction('skip')}>Skip</button>
-        <button className={styles.owBtn} data-testid="ow-overwrite-all" onClick={() => resolveOverwriteAction('overwrite-all')}>Overwrite All</button>
-        <button className={styles.owBtn} data-testid="ow-skip-all" onClick={() => resolveOverwriteAction('skip-all')}>Skip All</button>
+        <button
+          className={styles.owBtn}
+          data-testid="ow-overwrite"
+          disabled={policy === 'skip-all'}
+          title="Replace the existing file"
+          onClick={() => resolveOverwriteAction('overwrite')}
+        >
+          Overwrite
+        </button>
+        <button
+          className={styles.owBtn}
+          data-testid="ow-skip"
+          disabled={policy === 'overwrite-all'}
+          title="Keep the existing file"
+          onClick={() => resolveOverwriteAction('skip')}
+        >
+          Skip
+        </button>
+        {!renaming && (
+          <button className={styles.owBtn} data-testid="ow-rename" onClick={() => setRenaming(true)}>Rename</button>
+        )}
+        <button
+          className={styles.owBtn}
+          data-testid="ow-compare"
+          disabled={!bothLocal}
+          title={bothLocal ? 'Open both files side by side' : 'Compare needs two local files'}
+          onClick={() => void openCompare()}
+        >
+          Compare…
+        </button>
+        <button
+          className={styles.owBtn}
+          data-testid="ow-overwrite-all"
+          disabled={policy === 'skip-all'}
+          title="Apply to every remaining conflict in this operation"
+          onClick={() => resolveOverwriteAction('overwrite-all')}
+        >
+          Overwrite All
+        </button>
+        <button
+          className={styles.owBtn}
+          data-testid="ow-skip-all"
+          disabled={policy === 'overwrite-all'}
+          title="Apply to every remaining conflict in this operation"
+          onClick={() => resolveOverwriteAction('skip-all')}
+        >
+          Skip All
+        </button>
       </div>
     </div>
   )
@@ -56,6 +145,9 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const cancel = useOperationsStore((s) => s.cancelOperation)
   const remove = useOperationsStore((s) => s.removeOperation)
   const setShowDialog = useOperationsStore((s) => s.setShowDialog)
+  // Expandable per-file failure list (F-07).
+  const [failuresOpen, setFailuresOpen] = useState(false)
+  const sizeFormat = useSizeFormat()
 
   // Re-read live progress from the store by primitive fields (not object identity).
   // Prevents a stuck bar if a parent memo/selector ever skips object reference updates.
@@ -121,6 +213,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
   const showOverallBar = op.totalFiles > 1
   const isError = liveStatus === 'error'
   const isCancelled = liveStatus === 'cancelled'
+  const hasFailures = op.failures.length > 0 && !isCancelled
   const isRunning = liveStatus === 'running'
   const isEnumerating = liveStatus === 'enumerating'
   const isQueued = liveStatus === 'queued'
@@ -147,7 +240,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
           {isActive && (
             <button className={styles.opDismiss} data-testid="op-minimize" onClick={() => setShowDialog(false)}>Minimize</button>
           )}
-          {(isError || isCancelled) && (
+          {(isError || isCancelled || (liveStatus === 'done' && hasFailures)) && (
             <button className={styles.opDismiss} data-testid="op-dismiss" onClick={() => remove(op.id)}>Dismiss</button>
           )}
         </div>
@@ -185,9 +278,9 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
           <span>{showOverallBar ? 'Current file' : '\u00A0'}</span>
           <span data-testid="op-file-pct">
             {isFileInProgress && fileSize > 0
-              ? `${formatSize(copied)} / ${formatSize(fileSize)}`
+              ? `${formatSize(copied, sizeFormat)} / ${formatSize(fileSize, sizeFormat)}`
               : isFileInProgress && copied > 0
-                ? formatSize(copied)
+                ? formatSize(copied, sizeFormat)
                 : !showOverallBar && totalPct > 0
                   ? `${totalPct}%`
                   : '\u00A0'}
@@ -234,7 +327,7 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
       <div className={styles.opInfo} data-testid="op-info">
         <span data-testid="op-bytes">
           {totalBytes > 0
-            ? `${formatSize(Math.min(effectiveBytes, totalBytes))} / ${formatSize(totalBytes)}`
+            ? `${formatSize(Math.min(effectiveBytes, totalBytes), sizeFormat)} / ${formatSize(totalBytes, sizeFormat)}`
             : '\u00A0'}
         </span>
         <span data-testid="op-speed">
@@ -242,19 +335,43 @@ function OperationView({ op }: { op: FileOperation }): React.JSX.Element {
         </span>
       </div>
 
-      {/* Error/cancel message */}
-      {isError && <div className={styles.opErrorMsg} data-testid="op-error">{op.error}</div>}
+      {/* Error / partial-failure message: friendly headline + expandable raw detail */}
+      {(isError || hasFailures) && (
+        <div className={styles.opErrorMsg} data-testid="op-error">{op.error}</div>
+      )}
+      {hasFailures && (
+        <div className={styles.opFailures} data-testid="op-failures">
+          <button
+            type="button"
+            className={styles.opFailuresToggle}
+            data-testid="op-failures-toggle"
+            onClick={() => setFailuresOpen((v) => !v)}
+          >
+            {failuresOpen ? 'Hide details' : `Show details (${op.failures.length} failed)`}
+          </button>
+          {failuresOpen && (
+            <ul className={styles.opFailuresList} data-testid="op-failures-list">
+              {op.failures.map((f, i) => (
+                <li key={`${f.name}-${i}`}>
+                  <span className={styles.opFailureName}>{f.name}</span>
+                  <span className={styles.opFailureMsg}>{f.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {isCancelled && <div className={styles.opErrorMsg} data-testid="op-cancelled">Cancelled at file {liveProcessedFiles} of {op.totalFiles}</div>}
 
       {/* Overwrite prompt */}
-      {op.overwritePrompt && <OverwritePromptView prompt={op.overwritePrompt} />}
+      {op.overwritePrompt && <OverwritePromptView prompt={op.overwritePrompt} policy={op.overwritePolicy} />}
 
       {/* Footer */}
       <div className={styles.opDialogFooter}>
         {isActive && !op.overwritePrompt && (
           <button className={styles.opCancelBtn} data-testid="op-cancel" onClick={() => cancel(op.id)}>Cancel</button>
         )}
-        {(isError || isCancelled) && (
+        {(isError || isCancelled || (liveStatus === 'done' && hasFailures)) && (
           <button className={styles.opOkBtn} data-testid="op-ok" onClick={() => remove(op.id)}>OK</button>
         )}
       </div>

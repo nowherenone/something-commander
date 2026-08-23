@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { formatSize } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
+import styles from '../../styles/panels.module.css'
 
 interface InfoViewProps {
   pluginId: string
@@ -8,6 +10,7 @@ interface InfoViewProps {
 }
 
 export function InfoView({ pluginId, locationId, locationDisplay }: InfoViewProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [diskSpace, setDiskSpace] = useState<{ free: number; total: number } | null>(null)
   const [plugins, setPlugins] = useState<Array<{ id: string; displayName: string; version: string }>>([])
 
@@ -23,8 +26,8 @@ export function InfoView({ pluginId, locationId, locationDisplay }: InfoViewProp
     : 0
 
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: 16, fontSize: 12, color: 'var(--text-secondary)' }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+    <div className={styles.infoView}>
+      <div className={styles.infoViewTitle}>
         Information
       </div>
 
@@ -37,11 +40,14 @@ export function InfoView({ pluginId, locationId, locationDisplay }: InfoViewProp
       {/* Disk Space */}
       {diskSpace && diskSpace.total > 0 && (
         <Section title="Disk Space">
-          <Row label="Total" value={formatSize(diskSpace.total)} />
-          <Row label="Free" value={formatSize(diskSpace.free)} />
-          <Row label="Used" value={`${formatSize(diskSpace.total - diskSpace.free)} (${usedPct}%)`} />
-          <div style={{ marginTop: 8, height: 'var(--bar-height)', background: 'var(--bar-bg)', borderRadius: 'var(--bar-radius)', border: 'var(--bar-border)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${usedPct}%`, background: usedPct > 90 ? 'var(--bar-fill-error)' : 'var(--bar-fill)', display: 'block' }} />
+          <Row label="Total" value={formatSize(diskSpace.total, sizeFormat)} />
+          <Row label="Free" value={formatSize(diskSpace.free, sizeFormat)} />
+          <Row label="Used" value={`${formatSize(diskSpace.total - diskSpace.free, sizeFormat)} (${usedPct}%)`} />
+          <div className={styles.infoDiskBar}>
+            <div
+              className={`${styles.infoDiskBarFill} ${usedPct > 90 ? styles.infoDiskBarFillError : ''}`}
+              style={{ width: `${usedPct}%` }}
+            />
           </div>
         </Section>
       )}
@@ -64,8 +70,8 @@ export function InfoView({ pluginId, locationId, locationDisplay }: InfoViewProp
 
 function Section({ title, children }: { title: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600 }}>
+    <div className={styles.infoViewSection}>
+      <div className={styles.infoViewHeading}>
         {title}
       </div>
       {children}
@@ -75,9 +81,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }): React.JSX.Element {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', gap: 8 }}>
-      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span style={{ color: 'var(--text-primary)', fontFamily: mono ? 'var(--font-mono)' : undefined, fontSize: mono ? 11 : undefined, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+    <div className={styles.infoViewRow}>
+      <span className={styles.infoViewLabel}>{label}</span>
+      <span className={`${styles.infoViewValue} ${mono ? styles.infoViewValueMono : ''}`}>
         {value}
       </span>
     </div>

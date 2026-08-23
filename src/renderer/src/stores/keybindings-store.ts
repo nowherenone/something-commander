@@ -46,7 +46,10 @@ const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: 'h', ctrl: true, action: 'toggleHidden' },
   { key: 'r', ctrl: true, action: 'refresh' },
   { key: 'm', ctrl: true, action: 'multiRename' },
-  { key: 'c', ctrl: true, action: 'compare' },
+  // Ctrl+C copies selected names (the entrenched clipboard convention).
+  // Compare Directories moved to Ctrl+Shift+C — it never owned Ctrl+C.
+  { key: 'c', ctrl: true, shift: true, action: 'compare' },
+  { key: 'c', ctrl: true, action: 'copyNames' },
   { key: 'l', ctrl: true, action: 'focusAddressBar' },
   { key: '1', ctrl: true, action: 'viewBrief' },
   { key: '2', ctrl: true, action: 'viewTree' },
@@ -62,10 +65,36 @@ interface KeybindingsState {
   matchAction: (e: KeyboardEvent) => string | null
 }
 
+function bindingKey(b: Keybinding): string {
+  return `${b.key}|${!!b.ctrl}|${!!b.alt}|${!!b.shift}`
+}
+
+/**
+ * Migrate bindings saved before a defaults change. Saved arrays replace the
+ * defaults wholesale, so a rebind in code would otherwise never reach users
+ * who have a stored copy. v2 changes: Ctrl+C is copyNames (was compare),
+ * compare moved to Ctrl+Shift+C. Old entries for those chords are dropped and
+ * the new defaults appended unless the user's blob already defines the chord.
+ */
+function migrateBindings(saved: Keybinding[]): Keybinding[] {
+  const stale = new Set([
+    bindingKey({ key: 'c', ctrl: true, action: 'compare' })
+  ])
+  const filtered = saved.filter((b) => !stale.has(bindingKey(b)))
+  const present = new Set(filtered.map(bindingKey))
+  const additions = DEFAULT_KEYBINDINGS.filter(
+    (b) => ['copyNames', 'compare'].includes(b.action) && !present.has(bindingKey(b))
+  )
+  return additions.length > 0 ? [...filtered, ...additions] : filtered
+}
+
 function loadBindings(): Keybinding[] {
   try {
     const saved = localStorage.getItem('flemanager-keybindings')
-    if (saved) return JSON.parse(saved)
+    if (saved) {
+      const parsed = JSON.parse(saved) as Keybinding[]
+      if (Array.isArray(parsed) && parsed.length > 0) return migrateBindings(parsed)
+    }
   } catch { /* ignore */ }
   return [...DEFAULT_KEYBINDINGS]
 }

@@ -39,6 +39,7 @@ const KEYBOARD_SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
   ['F9', 'Settings'],
   ['Ctrl+T / W', 'New / close tab'],
   ['Ctrl+H', 'Toggle hidden files'],
+  ['Ctrl+C', 'Copy selected names'],
   ['Ctrl+L', 'Focus address bar'],
   ['Alt+F7', 'Search']
 ]

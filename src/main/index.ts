@@ -13,11 +13,16 @@ import { S3Plugin } from './plugins/s3'
 import { SmbPlugin } from './plugins/smb'
 import { loadAllPlugins } from './plugins/plugin-loader'
 import { initializeUpdater } from './updater'
+import { loadWindowState, saveWindowState } from './window-state'
 
 function createWindow(): BrowserWindow {
+  const restored = loadWindowState()
+
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: restored.width,
+    height: restored.height,
+    x: restored.x,
+    y: restored.y,
     minWidth: 800,
     minHeight: 500,
     show: false,
@@ -29,8 +34,25 @@ function createWindow(): BrowserWindow {
     }
   })
 
+  if (restored.maximized) {
+    mainWindow.maximize()
+  }
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // Persist geometry (F-11): debounced during live resize/move, final save on close.
+  let saveBoundsTimer: NodeJS.Timeout | null = null
+  const scheduleBoundsSave = (): void => {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer)
+    saveBoundsTimer = setTimeout(() => saveWindowState(mainWindow), 500)
+  }
+  mainWindow.on('resize', scheduleBoundsSave)
+  mainWindow.on('move', scheduleBoundsSave)
+  mainWindow.on('close', () => {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer)
+    saveWindowState(mainWindow)
   })
 
   // Forward renderer console messages to main process stdout

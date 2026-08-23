@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { formatSize } from '../utils/format'
+import { useSizeFormat } from '../stores/settings-store'
 import { formatHexLines } from '../utils/hex'
 import { FileContentView } from '../components/FileContentView'
 import { useEscapeKey } from '../hooks/useEscapeKey'
@@ -19,6 +20,7 @@ interface ViewerPageProps {
 type ViewMode = 'text' | 'hex'
 
 export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [fileSize, setFileSize] = useState(0)
   const [lines, setLines] = useState<string[]>([])
   const [estimatedTotalLines, setEstimatedTotalLines] = useState(0)
@@ -280,7 +282,7 @@ export function ViewerPage({ filePath }: ViewerPageProps): React.JSX.Element {
       <div className={styles.statusBar}>
         <span>{filePath}</span>
         <span style={{ marginLeft: 12, color: 'var(--text-muted)' }}>
-          {formatSize(fileSize, 'short')}
+          {formatSize(fileSize, sizeFormat)}
           {estimatedTotalLines > 0 && ` | ${allLoadedRef.current ? '' : '~'}${estimatedTotalLines.toLocaleString()} lines`}
           {isBinary ? ' | Binary' : ''}
         </span>

@@ -47,6 +47,8 @@ const mockUtilApi = {
   showContextMenu: vi.fn().mockResolvedValue(null),
   showFileProperties: vi.fn().mockResolvedValue({ success: true }),
   getDiskSpace: vi.fn().mockResolvedValue({ free: 100000000, total: 500000000 }),
+  getHomeDir: vi.fn().mockResolvedValue('/home/test'),
+  getPathForFile: vi.fn((f: { name?: string }) => `/mock/${f?.name || 'file'}`),
   encryptString: vi.fn().mockImplementation((s: string) => Promise.resolve(s)),
   decryptString: vi.fn().mockImplementation((s: string) => Promise.resolve(s)),
   sftpConnect: vi.fn().mockResolvedValue('user@host:22'),

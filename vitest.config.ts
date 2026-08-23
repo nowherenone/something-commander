@@ -8,6 +8,11 @@ export default defineConfig({
       '@renderer': resolve(__dirname, 'src/renderer/src')
     }
   },
+  define: {
+    // Mirror the electron-vite renderer define so components using the
+    // compile-time version constant render under vitest too.
+    __APP_VERSION__: JSON.stringify('test')
+  },
   test: {
     globals: true,
     environment: 'jsdom',

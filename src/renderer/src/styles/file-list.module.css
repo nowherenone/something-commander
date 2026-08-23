@@ -13,14 +13,14 @@
   font-family: var(--font-ui);
   font-size: var(--font-size-tiny);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
   overflow: hidden;
   white-space: nowrap;
-  transition: color 0.1s ease, background 0.1s ease;
+  transition: color var(--dur-fast) ease, background var(--dur-fast) ease;
 }
 
 .headerCell:hover {
@@ -35,6 +35,7 @@
 }
 
 .fileList {
+  position: relative; /* anchors the F-16 drop hint */
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -61,7 +62,7 @@
   cursor: default;
   border-radius: 0;
   color: var(--text-primary);
-  transition: background 0.06s ease;
+  transition: background var(--dur-fast) ease;
 }
 
 /* Subtle zebra for scanability */
@@ -199,7 +200,10 @@
 }
 
 .colDate {
-  width: 11em;
+  /* Sized to the longest timestamp the default format prints — 16 mono
+     characters ("yyyy-MM-dd HH:mm") — so dates never truncate at normal
+     window widths (F-14). Custom longer formats still ellipsize. */
+  width: calc(16ch + 2 * var(--chrome-padding-x));
   padding: 0 var(--chrome-padding-x);
   font-size: var(--font-size-small);
   color: var(--text-muted);
@@ -221,7 +225,7 @@
 }
 
 .entryRow.renaming {
-  z-index: 1;
+  z-index: var(--z-content);
 }
 
 .renameInput {
@@ -245,4 +249,26 @@
 
 .renameInput:focus {
   box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* Drop-target feedback (F-16): panel highlight hint + highlighted folder row */
+.dropHint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-content);
+  padding: var(--space-2) var(--space-4);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-xs);
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-size: var(--font-size-small);
+  pointer-events: none;
+}
+
+.rowDropTarget {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--bg-selected) 55%, transparent);
 }

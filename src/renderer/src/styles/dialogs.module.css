@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: var(--z-dialog);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -90,7 +90,7 @@
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   border-radius: var(--radius-xs);
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .settingsTab:hover {
@@ -122,7 +122,7 @@
   font-weight: var(--font-weight-semibold);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-caps);
   font-family: var(--font-ui);
 }
 
@@ -141,7 +141,7 @@
 .settingsInput,
 .settingsSelect {
   width: 140px;
-  height: 28px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-3);
   background: var(--bg-input);
   color: var(--text-primary);
@@ -149,7 +149,7 @@
   border-radius: var(--radius-xs);
   font-family: var(--font-ui);
   font-size: var(--font-size-small);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 .settingsInput:focus,
@@ -199,7 +199,7 @@
 
 .colorSwatch {
   width: 34px;
-  height: 22px;
+  height: var(--control-height-sm);
   padding: 0;
   background: transparent;
   border: var(--border-width) solid var(--border-color);
@@ -296,7 +296,7 @@
 }
 
 .chip {
-  height: 26px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-4);
   background: var(--bg-tertiary);
   color: var(--text-secondary);
@@ -341,7 +341,7 @@
 
 .formInput {
   flex: 1;
-  height: 28px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-4);
   background: var(--bg-input);
   color: var(--text-primary);
@@ -385,12 +385,12 @@
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-tiny);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--tracking-caps);
   background: var(--bg-header);
   border-bottom: var(--border-width) solid var(--border-subtle);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-content);
 }
 
 .dataTable td {
@@ -432,7 +432,7 @@
 
 /* Buttons — unified pill-ish controls */
 .btn {
-  height: 28px;
+  height: var(--control-height-lg);
   padding: 0 var(--space-5);
   border-radius: var(--radius-xs);
   cursor: pointer;
@@ -444,7 +444,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 .btnPrimary {
@@ -484,7 +484,207 @@
 }
 
 .btnCompact {
-  height: 24px;
+  height: var(--control-height);
   padding: 0 var(--space-3);
   font-size: var(--font-size-tiny);
+}
+
+/* About / Help dialog */
+.aboutHeader {
+  text-align: center;
+  padding: var(--space-3) 0 var(--space-4);
+}
+
+.aboutName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.aboutVersion {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  color: var(--accent);
+}
+
+.aboutTagline {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-small);
+}
+
+.aboutKey {
+  width: 38%;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.aboutLicense {
+  margin: var(--space-4) 0 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-tiny);
+}
+
+.pluginLoadError {
+  margin-bottom: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-xs);
+  color: var(--danger);
+  font-size: var(--font-size-small);
+  user-select: text;
+}
+
+/* MultiRename per-file failure list (F-07) */
+.renameFailures {
+  margin: 0 var(--space-4) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-xs);
+  background: var(--bg-secondary);
+}
+
+.renameFailuresTitle {
+  color: var(--danger);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}
+
+.renameFailuresList {
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.renameFailureName {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-tiny);
+  color: var(--text-primary);
+}
+
+.renameFailureMsg {
+  display: block;
+  font-size: var(--font-size-tiny);
+  color: var(--text-muted);
+}
+
+.aboutLinks {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: var(--font-size-small);
+}
+
+.aboutLinks a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.aboutLinks a:hover,
+.aboutLinks a:focus-visible {
+  text-decoration: underline;
+}
+
+/* Network Connections dialog */
+.ncSection {
+  margin-bottom: var(--space-6);
+}
+
+.ncHeading {
+  font-size: var(--font-size-tiny);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.ncSection .ncHeading {
+  margin-bottom: var(--space-3);
+}
+
+.ncRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+}
+
+.ncType {
+  width: 36px;
+  font-size: var(--font-size-small);
+  color: var(--accent);
+}
+
+.ncTypeSaved {
+  color: var(--text-muted);
+}
+
+.ncName {
+  flex: 1;
+  font-size: var(--font-size-small);
+  color: var(--text-primary);
+}
+
+.ncBtn {
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--font-size-tiny);
+}
+
+.ncBtnDanger,
+.ncBtnDanger:hover {
+  color: var(--danger);
+}
+
+.ncEmpty {
+  padding: var(--space-5) 0;
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.ncForm {
+  border-top: var(--border-width) solid var(--border-color);
+  padding-top: var(--space-5);
+}
+
+.ncForm .ncHeading {
+  margin-bottom: var(--space-4);
+}
+
+.ncFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ncCheckRow {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  margin-left: 100px; /* aligns with FormRow inputs (label width + gap) */
+}
+
+.ncCheckLabel {
+  font-size: var(--font-size-small);
+  color: var(--text-secondary);
+}
+
+.ncError {
+  color: var(--danger);
+  font-size: var(--font-size-small);
+  padding: var(--space-2) 0;
+}
+
+.ncActions {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+.ncAddRow {
+  display: flex;
+  gap: var(--space-4);
 }

@@ -3,7 +3,7 @@ import type { Entry } from '@shared/types'
 import type { PanelId } from '../../stores/app-store'
 import { formatSize, formatDate } from '../../utils/format'
 import { listName, listExtension } from '../../utils/entry-helpers'
-import { getIconForHint } from '../../utils/icon-map'
+import { EntryIcon } from '../icons'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useDragStore } from '../../stores/drag-store'
 import { usePanelStore } from '../../stores/panel-store'
@@ -38,7 +38,12 @@ interface EntryRowProps {
   isCalculating?: boolean
   isError?: boolean
   isRenaming?: boolean
-  onClick: () => void
+  /** Folder-row drop highlighting (F-16). */
+  isRowDropTarget?: boolean
+  onRowDragOver?: (entry: Entry, e: React.DragEvent) => void
+  onRowDrop?: (entry: Entry, e: React.DragEvent) => void
+  onRowDragLeave?: (entry: Entry, e: React.DragEvent) => void
+  onClick: (e: React.MouseEvent) => void
   onDoubleClick: () => void
   onContextMenu?: (e: React.MouseEvent) => void
   onRenameCommit?: (newName: string) => void | Promise<void>
@@ -55,6 +60,10 @@ export const EntryRow = React.memo(function EntryRow({
   isCalculating,
   isError,
   isRenaming = false,
+  isRowDropTarget = false,
+  onRowDragOver,
+  onRowDrop,
+  onRowDragLeave,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -75,6 +84,7 @@ export const EntryRow = React.memo(function EntryRow({
     entry.isContainer ? styles.container : '',
     isError ? styles.errorEntry : '',
     isDragging ? styles.dragging : '',
+    isRowDropTarget ? styles.rowDropTarget : '',
     isRenaming ? styles.renaming : ''
   ]
     .filter(Boolean)
@@ -156,15 +166,20 @@ export const EntryRow = React.memo(function EntryRow({
   return (
     <div
       className={classNames}
+      role="row"
+      aria-selected={isSelected}
       draggable={canDrag}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragOver={onRowDragOver ? (e) => onRowDragOver(entry, e) : undefined}
+      onDrop={onRowDrop ? (e) => onRowDrop(entry, e) : undefined}
+      onDragLeave={onRowDragLeave ? (e) => onRowDragLeave(entry, e) : undefined}
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}
       onContextMenu={onContextMenu}
     >
       <div className={styles.colName}>
-        <span className={styles.icon}>{getIconForHint(entry.iconHint)}</span>
+        <span className={styles.icon} aria-hidden="true"><EntryIcon hint={entry.iconHint} /></span>
         {isRenaming ? (
           <RenameInput
             initialName={entry.name}

@@ -29,6 +29,7 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
   const [registeredPlugins, setRegisteredPlugins] = useState<RegisteredPlugin[]>([])
   const [pluginsDir, setPluginsDir] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -48,9 +49,12 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
   }, [refresh])
 
   const handleLoad = useCallback(async (pluginPath: string) => {
+    setLoadError(null)
     const result = await window.api.util.pluginLoad(pluginPath)
     if (!result.success) {
-      alert(`Failed to load plugin: ${result.error}`)
+      // Inline error row (no native alert) — the status column also shows
+      // per-plugin scan errors, this covers the explicit load attempt.
+      setLoadError(`Could not load "${pluginPath}"${result.error ? ` — ${result.error}` : ''}`)
     }
     refresh()
   }, [refresh])
@@ -76,6 +80,11 @@ export function PluginManagerDialog({ onClose }: PluginManagerProps): React.JSX.
         </>
       }
     >
+          {loadError && (
+            <div className={styles.pluginLoadError} role="alert" data-testid="plugin-load-error">
+              {loadError}
+            </div>
+          )}
           {/* Built-in plugins */}
           <div className={styles.settingsGroup}>
             <div className={styles.settingsGroupTitle}>Built-in Plugins</div>

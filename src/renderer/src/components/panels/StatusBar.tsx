@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
 import styles from '../../styles/panels.module.css'
 
 interface StatusBarProps {
@@ -12,6 +13,7 @@ interface StatusBarProps {
 
 export function StatusBar({ entries, selectedIds, locationId, pluginId }: StatusBarProps): React.JSX.Element {
   const [diskSpace, setDiskSpace] = useState<{ free: number; total: number } | null>(null)
+  const sizeFormat = useSizeFormat()
 
   useEffect(() => {
     if (!locationId) {
@@ -46,7 +48,7 @@ export function StatusBar({ entries, selectedIds, locationId, pluginId }: Status
       </span>
       {selectedCount > 0 && (
         <span className={styles.statusSelected}>
-          {selectedCount} sel ({formatSize(selectedSize)})
+          {selectedCount} sel ({formatSize(selectedSize, sizeFormat)})
         </span>
       )}
       {diskSpace && diskSpace.total > 0 && (
@@ -54,7 +56,7 @@ export function StatusBar({ entries, selectedIds, locationId, pluginId }: Status
           <span className={styles.diskBar}>
             <span className={styles.diskBarFill} style={{ width: `${usedPct}%`, display: 'block', height: '100%' }} />
           </span>
-          <span>{formatSize(diskSpace.free)} / {formatSize(diskSpace.total)}</span>
+          <span>{formatSize(diskSpace.free, sizeFormat)} / {formatSize(diskSpace.total, sizeFormat)}</span>
         </span>
       )}
     </div>

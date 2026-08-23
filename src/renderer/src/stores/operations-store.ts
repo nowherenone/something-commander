@@ -21,6 +21,13 @@ export interface FileItem {
   relativePath: string
 }
 
+/** One per-file failure, collected instead of overwritten (F-07). */
+export interface OperationFailure {
+  name: string
+  /** Raw underlying error — shown in the expandable detail list. */
+  message: string
+}
+
 export interface FileOperation {
   id: string
   type: 'copy' | 'move' | 'delete'
@@ -46,7 +53,14 @@ export interface FileOperation {
   processedFiles: number
   processedBytes: number
   startTime: number
+  /**
+   * Friendly one-line summary of the worst problem. With `failures`, this is
+   * the headline; the per-file detail lives in `failures` (F-07 — the old
+   * single field was overwritten by each failure, last error wins).
+   */
   error?: string
+  /** Per-file failures accumulated across the operation. */
+  failures: OperationFailure[]
   overwritePrompt: OverwritePrompt | null
   overwritePolicy: OverwritePolicy
 }
@@ -96,6 +110,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
       processedFiles: 0,
       processedBytes: 0,
       startTime: 0,
+      failures: [],
       overwritePrompt: null,
       overwritePolicy: 'ask'
     }

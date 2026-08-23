@@ -19,7 +19,14 @@ interface ToastMessage {
   variant: ToastVariant
   dedupeKey?: string
   showCopy: boolean
+  /** Repeat occurrences since first shown — rendered as ×N (F-26). */
+  count: number
+  /** Arrival time; expiry is computed centrally from this (F-26). */
+  createdAt: number
 }
+
+/** How many toasts render at once; older ones collapse into a "+N more" chip. */
+const MAX_VISIBLE_TOASTS = 3
 
 let toastCounter = 0
 let addToastGlobal: ((text: string, opts?: ShowToastOptions) => void) | null = null
@@ -78,12 +85,10 @@ function ToastItem({ toast, onDismiss }: ToastItemProps): React.JSX.Element {
   }, [leaving, onDismiss])
 
   useEffect(() => {
-    const t = setTimeout(dismiss, toast.duration)
     return () => {
-      clearTimeout(t)
       if (leaveTimer.current) clearTimeout(leaveTimer.current)
     }
-  }, [toast.duration, dismiss])
+  }, [])
 
   const handleCopy = useCallback(
     async (e: React.MouseEvent) => {
@@ -114,7 +119,10 @@ function ToastItem({ toast, onDismiss }: ToastItemProps): React.JSX.Element {
       onClick={dismiss}
       role="status"
     >
-      <div className={styles.toastBody}>{toast.text}</div>
+      <div className={styles.toastBody}>
+        {toast.text}
+        {toast.count > 1 && <span className={styles.countBadge}> ×{toast.count}</span>}
+      </div>
       {toast.showCopy && (
         <button
           type="button"
@@ -150,15 +158,43 @@ export function ToastContainer(): React.JSX.Element {
     const variant = opts?.variant ?? 'info'
     const dedupeKey = opts?.dedupeKey
     const showCopy = opts?.showCopy ?? variant === 'error'
-    const id = ++toastCounter
 
     setToasts((prev) => {
-      const withoutDup = dedupeKey
-        ? prev.filter((t) => t.dedupeKey !== dedupeKey && t.text !== text)
-        : prev.filter((t) => t.text !== text)
-      const next = [...withoutDup, { id, text, duration, variant, dedupeKey, showCopy }]
-      return next.slice(-3)
+      // A repeat bumps the existing toast's ×N counter and restarts its
+      // lifetime instead of silently replacing it (F-26).
+      const existingIdx = prev.findIndex(
+        (t) => (dedupeKey && t.dedupeKey === dedupeKey) || t.text === text
+      )
+      if (existingIdx >= 0 && prev[existingIdx].text === text) {
+        const next = prev.slice()
+        next[existingIdx] = {
+          ...next[existingIdx],
+          count: next[existingIdx].count + 1,
+          createdAt: Date.now()
+        }
+        return next
+      }
+      const id = ++toastCounter
+      const withoutReplacedKey =
+        dedupeKey && existingIdx >= 0 ? prev.filter((_, i) => i !== existingIdx) : prev
+      return [
+        ...withoutReplacedKey,
+        { id, text, duration, variant, dedupeKey, showCopy, count: 1, createdAt: Date.now() }
+      ]
     })
+  }, [])
+
+  // Central expiry sweep — toasts beyond the visible cap keep aging out even
+  // while unrendered (F-26).
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now()
+      setToasts((prev) => {
+        const alive = prev.filter((t) => now - t.createdAt < t.duration)
+        return alive.length === prev.length ? prev : alive
+      })
+    }, 250)
+    return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -168,9 +204,18 @@ export function ToastContainer(): React.JSX.Element {
     }
   }, [addToast])
 
+  // Oldest toasts collapse into a "+N more" chip instead of being dropped (F-26).
+  const visible = toasts.slice(-MAX_VISIBLE_TOASTS)
+  const hiddenCount = toasts.length - visible.length
+
   return (
     <div className={styles.container} aria-live="polite">
-      {toasts.map((t) => (
+      {hiddenCount > 0 && (
+        <div className={styles.overflowChip} data-testid="toast-overflow">
+          +{hiddenCount} more
+        </div>
+      )}
+      {visible.map((t) => (
         <ToastItem
           key={t.id}
           toast={t}

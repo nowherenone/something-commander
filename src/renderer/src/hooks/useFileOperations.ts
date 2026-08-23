@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '../stores/app-store'
 import { usePanelStore, parentOffset } from '../stores/panel-store'
 import { useOperationsStore } from '../stores/operations-store'
+import { useSettingsStore } from '../stores/settings-store'
 import {
   defaultCopyMoveDestPath,
   getBaseName,
@@ -94,6 +95,19 @@ export function useFileOperations() {
     const { selected, tab } = getSelectedEntries()
     if (selected.length === 0) {
       showToast('Nothing selected')
+      return
+    }
+
+    // "Confirm before delete" off → enqueue straight away (setting honored).
+    if (!useSettingsStore.getState().confirmDelete) {
+      useOperationsStore.getState().enqueue({
+        type: 'delete',
+        sourceEntries: selected,
+        sourcePluginId: tab.pluginId,
+        destinationDisplay: '',
+        destinationLocationId: '',
+        destinationPluginId: tab.pluginId
+      })
       return
     }
 

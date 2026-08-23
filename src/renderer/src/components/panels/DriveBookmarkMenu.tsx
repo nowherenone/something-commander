@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useBookmarksStore } from '../../stores/bookmarks-store'
+import { EntryIcon } from '../icons'
 import styles from '../../styles/drivebar.module.css'
 
 interface DriveInfo {
@@ -233,6 +234,9 @@ export function DriveBookmarkMenu({
         className={`${styles.driveButton} ${isOpen ? styles.driveButtonOpen : ''}`}
         onClick={() => onToggle(!isOpen)}
         title="Drives & Bookmarks (Ctrl+D)"
+        aria-label="Drives and Bookmarks"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
       >
         {'\u2261'}
       </button>
@@ -250,7 +254,7 @@ export function DriveBookmarkMenu({
                   onClick={() => handleSelect(allItems[i])}
                   onMouseEnter={() => setCursorIdx(i)}
                 >
-                  <span className={styles.itemIcon}>{'\uD83D\uDCBE'}</span>
+                  <span className={styles.itemIcon} aria-hidden="true"><EntryIcon hint="drive" /></span>
                   <span className={styles.itemName}>{drive.name}</span>
                 </button>
               ))}
@@ -271,7 +275,7 @@ export function DriveBookmarkMenu({
                     onClick={() => handleSelect(allItems[idx])}
                     onMouseEnter={() => setCursorIdx(idx)}
                   >
-                    <span className={styles.itemIcon}>{'\uD83C\uDF10'}</span>
+                    <span className={styles.itemIcon} aria-hidden="true"><EntryIcon hint="network" /></span>
                     <span className={styles.itemName}>{conn.label}</span>
                     <span className={styles.itemPath}>{pluginLabel}</span>
                   </button>
@@ -302,6 +306,8 @@ export function DriveBookmarkMenu({
                   <span className={styles.itemPath}>{bm.path.length > 25 ? '...' + bm.path.slice(-22) : bm.path}</span>
                   <span
                     className={styles.removeBtn}
+                    role="button"
+                    aria-label={`Remove bookmark ${bm.name}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       removeBookmark(bm.id)

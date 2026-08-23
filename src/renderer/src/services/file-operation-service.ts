@@ -2,9 +2,12 @@ import {
   useOperationsStore,
   type OverwritePolicy,
   type FileItem,
-  type FileOperation
+  type FileOperation,
+  type OperationFailure
 } from '../stores/operations-store'
 import { usePanelStore } from '../stores/panel-store'
+import { useSettingsStore } from '../stores/settings-store'
+import { friendlyFileError } from '../utils/error-messages'
 import { isArchivePath, toArchivePathForInternalFile } from '../utils/archive-path'
 import { splitPathTail } from '../utils/entry-helpers'
 import { showToast } from '../components/layout/Toast'
@@ -17,7 +20,10 @@ import { showToast } from '../components/layout/Toast'
 
 // Shared promise used by the "ask"-policy overwrite prompt. The dialog
 // surfaces the decision; the executor blocks here until the user picks.
-let overwriteResolve: ((action: 'overwrite' | 'skip' | 'cancel') => void) | null = null
+type OverwriteDecision = 'overwrite' | 'skip' | 'rename' | 'cancel'
+let overwriteResolve: ((action: OverwriteDecision) => void) | null = null
+/** New name carried alongside a 'rename' decision (F-13). */
+let overwriteRenameValue: string | null = null
 /** Active IPC transfer id so cancel can tear down main-process streams. */
 let currentTransferId: string | null = null
 
@@ -48,7 +54,8 @@ function setLiveTransferProgress(
 }
 
 export function resolveOverwriteAction(
-  action: 'overwrite' | 'skip' | 'overwrite-all' | 'skip-all'
+  action: 'overwrite' | 'skip' | 'overwrite-all' | 'skip-all' | 'rename',
+  newName?: string
 ): void {
   const store = useOperationsStore.getState()
   const current = store.operations.find((op) => op.status === 'running')
@@ -60,11 +67,24 @@ export function resolveOverwriteAction(
   } else if (action === 'skip-all') {
     store.updateOperation(current.id, { overwritePolicy: 'skip-all', overwritePrompt: null })
     overwriteResolve?.('skip')
+  } else if (action === 'rename') {
+    const name = (newName || '').trim()
+    if (!name) return // nothing to rename to — keep the prompt up
+    overwriteRenameValue = name
+    store.updateOperation(current.id, { overwritePrompt: null })
+    overwriteResolve?.('rename')
   } else {
     store.updateOperation(current.id, { overwritePrompt: null })
     overwriteResolve?.(action)
   }
   overwriteResolve = null
+}
+
+/** Read + clear the pending rename target after a 'rename' decision. */
+function consumeOverwriteRenameValue(): string | null {
+  const v = overwriteRenameValue
+  overwriteRenameValue = null
+  return v
 }
 
 /**
@@ -89,7 +109,7 @@ export function notifyOperationCancelled(opId: string): void {
   }
 }
 
-function waitForOverwriteDecision(): Promise<'overwrite' | 'skip' | 'cancel'> {
+function waitForOverwriteDecision(): Promise<OverwriteDecision> {
   return new Promise((resolve) => {
     overwriteResolve = resolve
   })
@@ -224,6 +244,73 @@ export function startLocalDestProgressPoll(
   })
 }
 
+/**
+ * Append a per-file failure to the operation (F-07). Failures accumulate in
+ * `op.failures` instead of overwriting a single error field.
+ */
+function recordFailure(
+  opId: string,
+  failures: OperationFailure[],
+  name: string,
+  rawMessage: string
+): OperationFailure[] {
+  const next = [...failures, { name, message: rawMessage }]
+  useOperationsStore.getState().updateOperation(opId, { failures: next })
+  return next
+}
+
+/**
+ * Overwrite policy with the Settings ▸ Behavior "Confirm before overwrite"
+ * switch applied (F-10): when the switch is off, an undecided ('ask') policy
+ * resolves to overwrite-all without prompting. Every overwrite site goes
+ * through this helper so the setting can't be honored on one path but not
+ * another (it previously reached only the streaming copy loop).
+ */
+function effectiveOverwritePolicy(opId: string): OverwritePolicy {
+  const op = useOperationsStore.getState().operations.find((o) => o.id === opId)
+  const policy = op?.overwritePolicy || 'ask'
+  if (policy !== 'ask') return policy
+  if (useSettingsStore.getState().confirmOverwrite) return 'ask'
+  const resolved: OverwritePolicy = 'overwrite-all'
+  useOperationsStore.getState().updateOperation(opId, { overwritePolicy: resolved })
+  return resolved
+}
+
+/** Terminal state for an op that finished with per-file failures. */
+function finishWithFailures(
+  opId: string,
+  okCount: number,
+  verb: string
+): void {
+  const store = () => useOperationsStore.getState()
+  const op = store().operations.find((o) => o.id === opId)
+  if (!op) return
+  const failedCount = op.failures.length
+
+  if (okCount === 0) {
+    // Nothing succeeded — a hard error with the friendliest headline.
+    const headline = friendlyFileError(op.failures[0]?.message || 'Operation failed')
+    store().updateOperation(opId, {
+      status: 'error',
+      error:
+        failedCount > 1
+          ? `All ${failedCount} items failed. ${headline}`
+          : headline
+    })
+    return
+  }
+
+  // Partial success: keep the dialog up for review instead of auto-dismissing.
+  store().updateOperation(opId, {
+    status: 'done',
+    error: `${verb} ${okCount} item${okCount === 1 ? '' : 's'}, but ${failedCount} failed — see details.`
+  })
+  showToast(`${verb} ${okCount}, ${failedCount} failed`, {
+    variant: 'warning',
+    duration: 5000
+  })
+}
+
 async function executeDelete(opId: string, op: ReturnType<typeof useOperationsStore.getState>['operations'][number]): Promise<void> {
   const store = () => useOperationsStore.getState()
 
@@ -235,9 +322,11 @@ async function executeDelete(opId: string, op: ReturnType<typeof useOperationsSt
       startTime: Date.now(),
       currentFile: '',
       processedFiles: 0,
-      processedBytes: 0
+      processedBytes: 0,
+      failures: []
     })
 
+    let failures: OperationFailure[] = []
     for (let i = 0; i < op.sourceEntries.length; i++) {
       if (isCancelled(opId)) break
       const entry = op.sourceEntries[i]
@@ -248,15 +337,17 @@ async function executeDelete(opId: string, op: ReturnType<typeof useOperationsSt
           entries: [entry]
         })
         if (!result.success) {
-          store().updateOperation(opId, {
-            status: 'error',
-            error: `${entry.name}: ${result.errors?.[0]?.message || 'Delete failed'}`
-          })
-          return
+          // Keep going — one locked file must not strand the rest (same
+          // continue-past-failure policy as copy/move).
+          failures = recordFailure(
+            opId,
+            failures,
+            entry.name,
+            result.errors?.[0]?.message || 'Delete failed'
+          )
         }
       } catch (err) {
-        store().updateOperation(opId, { status: 'error', error: `${entry.name}: ${String(err)}` })
-        return
+        failures = recordFailure(opId, failures, entry.name, String(err))
       }
     }
 
@@ -264,17 +355,21 @@ async function executeDelete(opId: string, op: ReturnType<typeof useOperationsSt
     await usePanelStore.getState().refresh('right')
 
     const final = store().operations.find((o) => o.id === opId)
-    if (final && !isCancelled(opId) && final.status !== 'error') {
-      store().updateOperation(opId, { status: 'done' })
-      const count = final.processedFiles || final.totalFiles || op.sourceEntries.length
-      showToast(`Deleted ${count} item${count === 1 ? '' : 's'}`, { variant: 'success', duration: 3500 })
+    if (!final || isCancelled(opId)) return
+    const okCount = op.sourceEntries.length - failures.length
+    if (failures.length > 0) {
+      finishWithFailures(opId, okCount, 'Deleted')
+      return
     }
+    store().updateOperation(opId, { status: 'done' })
+    const count = final.processedFiles || final.totalFiles || op.sourceEntries.length
+    showToast(`Deleted ${count} item${count === 1 ? '' : 's'}`, { variant: 'success', duration: 3500 })
     store().removeOperation(opId)
   } catch (err) {
     // Top-level safety net for delete
     const current = store().operations.find((o) => o.id === opId)
     if (current && current.status !== 'error' && current.status !== 'cancelled') {
-      store().updateOperation(opId, { status: 'error', error: String(err) })
+      store().updateOperation(opId, { status: 'error', error: friendlyFileError(String(err)) })
     }
   }
 }
@@ -351,8 +446,7 @@ async function tryBulkArchiveExtract(
     const exists = await window.api.plugins.exists(op.destinationPluginId || 'local-filesystem', item.destPath)
     if (!exists) continue
 
-    const policy: OverwritePolicy =
-      store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
+    const policy: OverwritePolicy = effectiveOverwritePolicy(opId)
 
     if (policy === 'skip-all') {
       skipPaths.add(item.destPath)
@@ -378,7 +472,9 @@ async function tryBulkArchiveExtract(
         store().updateOperation(opId, { status: 'cancelled' })
         return true
       }
-      if (decision === 'skip') skipPaths.add(item.destPath)
+      // 'rename' can't be applied per-member in one bulk pass — treat it as a
+      // skip so the op falls back to per-file streaming, which supports it.
+      if (decision === 'skip' || decision === 'rename') skipPaths.add(item.destPath)
     }
   }
 
@@ -409,9 +505,13 @@ async function tryBulkArchiveExtract(
         destinationPluginId: op.destinationPluginId
       })
       if (!result.success) {
+        // Record the failure per source archive so the dialog's expandable
+        // detail list has it, then stop with a friendly headline (F-07).
+        const rawMessage = result.errors?.[0]?.message || `Failed to extract ${archivePath}`
+        recordFailure(opId, [], entry.name, rawMessage)
         store().updateOperation(opId, {
           status: 'error',
-          error: result.errors?.[0]?.message || `Failed to extract ${archivePath}`
+          error: friendlyFileError(rawMessage)
         })
         return true
       }
@@ -430,7 +530,7 @@ async function tryBulkArchiveExtract(
   } catch (err) {
     store().updateOperation(opId, {
       status: 'error',
-      error: String(err)
+      error: friendlyFileError(String(err))
     })
     return true
   }
@@ -516,11 +616,13 @@ async function tryLocalFsRenameMove(
     startTime: Date.now(),
     currentFile: '',
     processedFiles: 0,
-    processedBytes: 0
+    processedBytes: 0,
+    failures: []
   })
 
   let processedFiles = 0
   let processedBytes = 0
+  let failures: OperationFailure[] = []
 
   for (const entry of entries) {
     if (isCancelled(opId)) {
@@ -528,9 +630,9 @@ async function tryLocalFsRenameMove(
       return true
     }
 
-    const destName =
+    let destName =
       op.destinationFileName && entries.length === 1 ? op.destinationFileName : entry.name
-    const destPath = joinLocalPath(op.destinationLocationId, destName)
+    let destPath = joinLocalPath(op.destinationLocationId, destName)
     store().updateOperation(opId, {
       currentFile: destName,
       currentFileSize: Math.max(0, entry.size || 0),
@@ -539,9 +641,9 @@ async function tryLocalFsRenameMove(
 
     try {
       const exists = await window.api.plugins.exists(op.destinationPluginId || 'local-filesystem', destPath)
+      let renameDecision = false
       if (exists) {
-        const policy: OverwritePolicy =
-          store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
+        const policy: OverwritePolicy = effectiveOverwritePolicy(opId)
 
         if (policy === 'skip-all') {
           processedFiles++
@@ -567,30 +669,41 @@ async function tryLocalFsRenameMove(
             store().updateOperation(opId, { status: 'cancelled' })
             return true
           }
-          if (decision === 'skip') {
+          if (decision === 'rename') {
+            // Move under a new name — existing dest stays untouched (F-13).
+            const newName = consumeOverwriteRenameValue()
+            if (newName) {
+              destName = newName
+              destPath = joinLocalPath(op.destinationLocationId, newName)
+              store().updateOperation(opId, { currentFile: newName })
+              renameDecision = true
+            }
+          } else if (decision === 'skip') {
             processedFiles++
             processedBytes += Math.max(0, entry.size || 0)
             store().updateOperation(opId, { processedFiles, processedBytes, currentFileCopied: 0 })
             continue
           }
           // overwrite: remove existing dest so rename can take its place
-          await window.api.plugins.executeOperation('local-filesystem', {
-            op: 'delete',
-            entries: [{
-              id: destPath,
-              name: destName,
-              isContainer: entry.isContainer,
-              size: destInfo?.size || 0,
-              modifiedAt: 0,
-              mimeType: '',
-              iconHint: entry.isContainer ? 'folder' : 'file',
-              meta: {},
-              attributes: { readonly: false, hidden: false, symlink: false }
-            }]
-          })
+          if (!renameDecision) {
+            await window.api.plugins.executeOperation('local-filesystem', {
+              op: 'delete',
+              entries: [{
+                id: destPath,
+                name: destName,
+                isContainer: entry.isContainer,
+                size: destInfo?.size || 0,
+                modifiedAt: 0,
+                mimeType: '',
+                iconHint: entry.isContainer ? 'folder' : 'file',
+                meta: {},
+                attributes: { readonly: false, hidden: false, symlink: false }
+              }]
+            })
+          }
         }
         // overwrite-all: remove dest then rename
-        if (policy === 'overwrite-all') {
+        if (policy === 'overwrite-all' && !renameDecision) {
           await window.api.plugins.executeOperation('local-filesystem', {
             op: 'delete',
             entries: [{
@@ -641,26 +754,21 @@ async function tryLocalFsRenameMove(
         }
       }
       if (!result.success) {
-        store().updateOperation(opId, {
-          status: 'error',
-          error: `${entry.name}: ${result.error || 'Move failed'}`
-        })
-        return true
+        // Keep going — collect and continue like every other path.
+        failures = recordFailure(opId, failures, entry.name, result.error || 'Move failed')
       }
 
-      processedFiles++
-      processedBytes += Math.max(0, entry.size || 0)
+      if (result.success) {
+        processedFiles++
+        processedBytes += Math.max(0, entry.size || 0)
+      }
       store().updateOperation(opId, {
         processedFiles,
         processedBytes,
-        currentFileCopied: Math.max(0, entry.size || 0)
+        currentFileCopied: result.success ? Math.max(0, entry.size || 0) : 0
       })
     } catch (err) {
-      store().updateOperation(opId, {
-        status: 'error',
-        error: `${entry.name}: ${String(err)}`
-      })
-      return true
+      failures = recordFailure(opId, failures, entry.name, String(err))
     }
   }
 
@@ -672,7 +780,11 @@ async function tryLocalFsRenameMove(
     if (finalOp.status !== 'cancelled') store().updateOperation(opId, { status: 'cancelled' })
     return true
   }
-  if (finalOp && finalOp.status !== 'error' && finalOp.status !== 'cancelled') {
+  if (finalOp && finalOp.status !== 'cancelled') {
+    if (failures.length > 0) {
+      finishWithFailures(opId, processedFiles, 'Moved')
+      return true
+    }
     store().updateOperation(opId, {
       status: 'done',
       processedFiles,
@@ -707,7 +819,7 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
     } catch (err) {
       store().updateOperation(opId, {
         status: 'error',
-        error: `Failed to scan files: ${String(err)}`
+        error: `Failed to scan files: ${friendlyFileError(String(err))}`
       })
       return
     }
@@ -732,7 +844,8 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
       startTime: Date.now(),
       currentFile: '',
       processedFiles: 0,
-      processedBytes: 0
+      processedBytes: 0,
+      failures: []
     })
 
     // Alt+F9 / whole-archive unpack → local: one extract pass with real progress.
@@ -742,6 +855,7 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
 
     let processedFiles = 0
     let processedBytes = 0
+    let failures: OperationFailure[] = []
 
     for (let i = 0; i < fileList.length; i++) {
       if (isCancelled(opId)) break
@@ -754,6 +868,7 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
         currentFileCopied: 0
       })
 
+      const failuresBefore = failures.length
       try {
         if (item.isDirectory) {
           // Archives create directories implicitly when files are written into them.
@@ -769,7 +884,10 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
           // Overwrite check (only meaningful for local-filesystem destinations).
           const exists = await window.api.plugins.exists(op.destinationPluginId, item.destPath)
           if (exists) {
-            const policy: OverwritePolicy = store().operations.find((o) => o.id === opId)?.overwritePolicy || 'ask'
+            // Honor Settings ▸ Behavior "Confirm before overwrite" (F-10):
+            // effectiveOverwritePolicy resolves an undecided ('ask') policy to
+            // overwrite-all when the switch is off — same rule on every path.
+            const policy: OverwritePolicy = effectiveOverwritePolicy(opId)
 
             if (policy === 'skip-all') {
               processedBytes += item.size
@@ -792,7 +910,16 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
               })
               const decision = await waitForOverwriteDecision()
               if (decision === 'cancel' || isCancelled(opId)) break
-              if (decision === 'skip') {
+              if (decision === 'rename') {
+                // Write this file under a new name instead of overwriting (F-13).
+                const newName = consumeOverwriteRenameValue()
+                if (newName) {
+                  const { parent } = splitPathTail(item.destPath)
+                  item.destPath = parent ? joinLocalPath(parent, newName) : newName
+                  item.relativePath = newName
+                  store().updateOperation(opId, { currentFile: newName })
+                }
+              } else if (decision === 'skip') {
                 processedBytes += item.size
                 store().updateOperation(opId, { processedBytes })
                 continue
@@ -876,10 +1003,9 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
           }
 
           if (!result.success) {
-            store().updateOperation(opId, {
-              error: `${item.relativePath}: ${result.error}`
-            })
-            // continue to next instead of full stop
+            // Collect and continue — the summary + per-file list surface at
+            // the end (F-07). No more last-error-wins.
+            failures = recordFailure(opId, failures, item.relativePath, result.error || 'Copy failed')
           }
 
           if (op.type === 'move' && result.success) {
@@ -902,14 +1028,14 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
         }
       } catch (err) {
         if (isCancelled(opId)) break
-        // Resilient: log error but keep going for other files (full skip/retry UI in future)
-        store().updateOperation(opId, { error: `${item.relativePath}: ${String(err)}` })
-        // continue processing other files
+        // Resilient: collect the failure but keep going for other files.
+        failures = recordFailure(opId, failures, item.relativePath, String(err))
       }
 
       if (isCancelled(opId)) break
 
-      if (!item.isDirectory) {
+      const succeeded = failures.length === failuresBefore
+      if (!item.isDirectory && succeeded) {
         processedFiles++
         processedBytes += item.size
       }
@@ -955,9 +1081,14 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
     }
     const afterCancel = store().operations.find((o) => o.id === opId)
     if (afterCancel && afterCancel.status !== 'error' && afterCancel.status !== 'cancelled') {
+      const verb = op.type === 'move' ? 'Moved' : 'Copied'
+      // Failures collected along the way get their summary + per-file list now.
+      if (failures.length > 0) {
+        finishWithFailures(opId, afterCancel.processedFiles, verb)
+        return
+      }
       store().updateOperation(opId, { status: 'done' })
       const count = afterCancel.processedFiles || afterCancel.totalFiles || 0
-      const verb = op.type === 'move' ? 'Moved' : 'Copied'
       if (count > 0) {
         showToast(`${verb} ${count} file${count === 1 ? '' : 's'}`, {
           variant: 'success',
@@ -978,7 +1109,7 @@ async function executeCopyOrMove(opId: string, op: ReturnType<typeof useOperatio
     if (current && current.status !== 'error' && current.status !== 'cancelled') {
       store().updateOperation(opId, {
         status: 'error',
-        error: `Operation failed: ${String(err)}`
+        error: `Operation failed: ${friendlyFileError(String(err))}`
       })
     }
   } finally {
@@ -1003,7 +1134,7 @@ export async function executeOperation(opId: string): Promise<void> {
     if (current && current.status !== 'error' && current.status !== 'cancelled' && current.status !== 'done') {
       store.updateOperation(opId, {
         status: 'error',
-        error: `Unexpected failure: ${String(err)}`
+        error: `Operation failed: ${friendlyFileError(String(err))}`
       })
     }
   }

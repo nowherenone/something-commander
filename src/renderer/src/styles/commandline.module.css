@@ -23,7 +23,7 @@
 
 .input {
   flex: 1;
-  height: 24px;
+  height: var(--control-height);
   background: var(--bg-input);
   border: var(--border-width) solid var(--border-subtle);
   border-radius: var(--radius-xs);
@@ -32,7 +32,7 @@
   font-size: var(--font-size-small);
   outline: none;
   padding: 0 var(--space-4);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
 .input:focus {
@@ -54,7 +54,7 @@
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-md);
   overflow: auto;
-  z-index: 50;
+  z-index: var(--z-commandline);
   padding: var(--space-5);
   box-shadow: var(--shadow-dropdown);
 }
@@ -77,7 +77,7 @@
   top: var(--space-3);
   right: var(--space-4);
   width: 24px;
-  height: 24px;
+  height: var(--control-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;

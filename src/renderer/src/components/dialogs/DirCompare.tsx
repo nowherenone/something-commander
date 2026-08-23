@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import type { Entry } from '@shared/types'
 import { formatSize, formatDate } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
 import dialogStyles from '../../styles/dialogs.module.css'
 import styles from '../../styles/dircompare.module.css'
+import { EntryIcon } from '../icons'
 
 type CompareStatus = 'equal' | 'newer-left' | 'newer-right' | 'only-left' | 'only-right'
 
@@ -95,6 +97,7 @@ export function DirCompare({
   onSyncLeftToRight,
   onSyncRightToLeft
 }: DirCompareProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [showEqual, setShowEqual] = useState(true)
 
   const items = useMemo(
@@ -213,7 +216,7 @@ export function DirCompare({
               {filtered.map((item) => (
                 <tr key={item.name} className={getRowClass(item.status)}>
                   <td>
-                    {item.isContainer ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 '}
+                    {item.isContainer ? <EntryIcon hint="folder" /> : <EntryIcon hint="file" />}{' '}
                     {item.name}
                   </td>
                   <td className={styles.statusCell}>
@@ -224,11 +227,11 @@ export function DirCompare({
                     {item.status === 'only-right' && 'only \u2192'}
                   </td>
                   <td className={styles.sizeCell}>
-                    {item.leftSize >= 0 ? formatSize(item.leftSize) : '-'}
+                    {item.leftSize >= 0 ? formatSize(item.leftSize, sizeFormat) : '-'}
                   </td>
                   <td>{item.leftDate > 0 ? formatDate(item.leftDate) : '-'}</td>
                   <td className={styles.sizeCell}>
-                    {item.rightSize >= 0 ? formatSize(item.rightSize) : '-'}
+                    {item.rightSize >= 0 ? formatSize(item.rightSize, sizeFormat) : '-'}
                   </td>
                   <td>{item.rightDate > 0 ? formatDate(item.rightDate) : '-'}</td>
                 </tr>

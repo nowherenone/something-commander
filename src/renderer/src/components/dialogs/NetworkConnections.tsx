@@ -211,20 +211,18 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
     >
       {/* Active connections */}
       {activeConns.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Active Connections</div>
+        <div className={styles.ncSection}>
+          <div className={styles.ncHeading}>Active Connections</div>
           {activeConns.map((conn) => (
-            <div key={`${conn.pluginId}-${conn.connId}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-              <span style={{ fontSize: 12, color: 'var(--accent)', width: 36 }}>{pluginLabel(conn.pluginId)}</span>
-              <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>{conn.label}</span>
+            <div key={`${conn.pluginId}-${conn.connId}`} className={styles.ncRow}>
+              <span className={styles.ncType}>{pluginLabel(conn.pluginId)}</span>
+              <span className={styles.ncName}>{conn.label}</span>
               <button
-                className={`${styles.btn} ${styles.btnSecondary}`}
-                style={{ padding: '2px 8px', fontSize: 11 }}
+                className={`${styles.btn} ${styles.btnSecondary} ${styles.ncBtn}`}
                 onClick={() => { onConnected(conn.pluginId, conn.locationId) }}
               >Open</button>
               <button
-                className={`${styles.btn} ${styles.btnSecondary}`}
-                style={{ padding: '2px 8px', fontSize: 11, color: 'var(--danger)' }}
+                className={`${styles.btn} ${styles.btnSecondary} ${styles.ncBtn} ${styles.ncBtnDanger}`}
                 onClick={() => handleDisconnect(conn)}
               >Disconnect</button>
             </div>
@@ -234,26 +232,24 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
 
       {/* Saved SMB connections (not currently active) */}
       {savedSmb.filter((s) => !activeConns.some((a) => a.pluginId === 'smb' && a.connId === (s.share ? `${s.username}@${s.host}/${s.share}` : `${s.username}@${s.host}` ))).length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Saved Connections</div>
+        <div className={styles.ncSection}>
+          <div className={styles.ncHeading}>Saved Connections</div>
           {savedSmb.map((conn, i) => {
             const connId = conn.share ? `${conn.username}@${conn.host}/${conn.share}` : `${conn.username}@${conn.host}`
             const isActive = activeConns.some((a) => a.pluginId === 'smb' && a.connId === connId)
             if (isActive) return null
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 36 }}>SMB</span>
-                <span style={{ flex: 1, fontSize: 12, color: 'var(--text-primary)' }}>
+              <div key={i} className={styles.ncRow}>
+                <span className={`${styles.ncType} ${styles.ncTypeSaved}`}>SMB</span>
+                <span className={styles.ncName}>
                   {conn.label || (conn.share ? `\\\\${conn.host}\\${conn.share}` : `\\\\${conn.host}`)}
                 </span>
                 <button
-                  className={`${styles.btn} ${styles.btnSecondary}`}
-                  style={{ padding: '2px 8px', fontSize: 11 }}
+                  className={`${styles.btn} ${styles.btnSecondary} ${styles.ncBtn}`}
                   onClick={() => handleDirectConnectSaved(conn)}
                 >Connect</button>
                 <button
-                  className={`${styles.btn} ${styles.btnSecondary}`}
-                  style={{ padding: '2px 8px', fontSize: 11, color: 'var(--danger)' }}
+                  className={`${styles.btn} ${styles.btnSecondary} ${styles.ncBtn} ${styles.ncBtnDanger}`}
                   onClick={() => handleRemoveSaved(i)}
                 >Remove</button>
               </div>
@@ -264,18 +260,18 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
 
       {/* No connections at all */}
       {activeConns.length === 0 && savedSmb.length === 0 && !addingType && (
-        <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+        <div className={styles.ncEmpty}>
           No connections yet. Add one below.
         </div>
       )}
 
       {/* Add new connection form */}
       {addingType ? (
-        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+        <div className={styles.ncForm}>
+          <div className={styles.ncHeading}>
             New {pluginLabel(addingType)} Connection
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className={styles.ncFields}>
             {addingType === 'sftp' && (
               <>
                 <FormRow label="Host:" value={host} onChange={setHost} onKeyDown={onKeyDown} autoFocus placeholder="hostname or IP" />
@@ -301,14 +297,14 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
                 <FormRow label="Password:" value={password} onChange={setPassword} onKeyDown={onKeyDown} placeholder="password" type="password" />
                 <FormRow label="Domain:" value={domain} onChange={setDomain} onKeyDown={onKeyDown} placeholder="optional" />
                 <FormRow label="Label:" value={label} onChange={setLabel} onKeyDown={onKeyDown} placeholder="optional" />
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 100 }}>
+                <div className={styles.ncCheckRow}>
                   <input type="checkbox" checked={saveConnection} onChange={(e) => setSaveConnection(e.target.checked)} />
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Remember this connection</span>
+                  <span className={styles.ncCheckLabel}>Remember this connection</span>
                 </div>
               </>
             )}
-            {error && <div style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 0' }}>{error}</div>}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            {error && <div className={styles.ncError}>{error}</div>}
+            <div className={styles.ncActions}>
               <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setAddingType(null)}>Back</button>
               <button
                 className={`${styles.btn} ${styles.btnPrimary}`}
@@ -321,9 +317,9 @@ export function NetworkConnections({ onClose, onConnected }: NetworkConnectionsP
           </div>
         </div>
       ) : (
-        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Add Connection</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div className={styles.ncForm}>
+          <div className={styles.ncHeading}>Add Connection</div>
+          <div className={styles.ncAddRow}>
             <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => handleAdd('smb')}>+ SMB / Samba</button>
             <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => handleAdd('sftp')}>+ SFTP</button>
             <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => handleAdd('s3')}>+ AWS S3</button>

@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { formatSize } from '../../utils/format'
+import { useSizeFormat } from '../../stores/settings-store'
 import { useOverlayStore } from '../../stores/overlay-store'
+import { EntryIcon } from '../icons'
 import styles from '../../styles/dialogs.module.css'
 
 interface SearchResult {
@@ -21,6 +23,7 @@ export function SearchDialog({
   onClose,
   onNavigateTo
 }: SearchDialogProps): React.JSX.Element {
+  const sizeFormat = useSizeFormat()
   const [pattern, setPattern] = useState('*')
   const [contentPattern, setContentPattern] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -216,7 +219,7 @@ export function SearchDialog({
                         fontWeight: r.isDirectory ? 600 : 400
                       }}
                     >
-                      {r.isDirectory ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 '}
+                      {r.isDirectory ? <EntryIcon hint="folder" /> : <EntryIcon hint="file" />}{' '}
                       {r.name}
                     </td>
                     <td
@@ -240,7 +243,7 @@ export function SearchDialog({
                         color: 'var(--text-secondary)'
                       }}
                     >
-                      {r.isDirectory ? '' : formatSize(r.size)}
+                      {r.isDirectory ? '' : formatSize(r.size, sizeFormat)}
                     </td>
                   </tr>
                 ))}
