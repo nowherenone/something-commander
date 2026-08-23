@@ -9,3 +9,5 @@ Thumbs.db
 .ux-demo/
 playwright-report
 *.tsbuildinfo
+.claude/**
+claude
