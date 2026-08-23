@@ -167,6 +167,7 @@ export const EntryRow = React.memo(function EntryRow({
     <div
       className={classNames}
       role="row"
+      data-kind={entry.iconHint}
       aria-selected={isSelected}
       draggable={canDrag}
       onDragStart={handleDragStart}

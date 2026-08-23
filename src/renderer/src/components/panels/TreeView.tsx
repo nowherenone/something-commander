@@ -105,8 +105,20 @@ export function TreeView({ pluginId, locationId, onNavigate }: TreeViewProps): R
               ? (node.expanded ? '\u25BC' : '\u25B6')
               : '\u2022'}
           </span>
-          <span style={{ marginRight: 4, fontSize: 13 }} aria-hidden="true"><EntryIcon hint="folder" /></span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span
+            style={{ marginRight: 4, fontSize: 13, color: 'var(--tint-folder)' }}
+            aria-hidden="true"
+          >
+            <EntryIcon hint="folder" />
+          </span>
+          <span
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: 'color-mix(in srgb, var(--tint-folder) 55%, var(--text-primary))'
+            }}
+          >
             {node.entry.name}
           </span>
         </div>

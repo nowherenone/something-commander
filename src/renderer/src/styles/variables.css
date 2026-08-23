@@ -1,37 +1,48 @@
 :root {
   /*
-   * Something Commander — unified cool-gray chrome (macOS-inspired).
-   * Surfaces step by elevation; one hairline gray for structure;
-   * one blue for focus/selection. Status colors only for true status.
+   * Something Commander — unified cool-slate chrome (macOS-inspired).
+   * Surfaces step by elevation with a slight blue cast (R59: greys carry a
+   * temperature); text tiers step down gently instead of maxing contrast;
+   * one blue for focus/selection; categorical tints label file types.
+   * Status colors only for true status.
    */
 
   /* ── Surfaces ── */
-  --bg-primary: #161617;
-  --bg-secondary: #232325;
-  --bg-tertiary: #2e2e31;
-  --bg-elevated: #3a3a3e;
-  --bg-panel: #1a1a1c;
-  --bg-header: #222224;
-  --bg-selected: color-mix(in srgb, #0a84ff 28%, #1a1a1c);
+  --bg-primary: #1d1f23;
+  --bg-secondary: #282b31;
+  --bg-tertiary: #32353c;
+  --bg-elevated: #3d4048;
+  --bg-panel: #22242a;
+  --bg-header: #2a2d33;
+  --bg-selected: color-mix(in srgb, #0a84ff 22%, #22242a);
   --bg-cursor: #0a84ff;
-  --bg-hover: color-mix(in srgb, #ffffff 6%, transparent);
-  --bg-cursor-inactive: color-mix(in srgb, #ffffff 10%, transparent);
-  --bg-input: #0f0f10;
+  --bg-hover: color-mix(in srgb, #ffffff 5%, transparent);
+  --bg-cursor-inactive: color-mix(in srgb, #ffffff 9%, transparent);
+  --bg-input: #191b1f;
 
   /* ── Text ── */
-  --text-primary: #f5f5f7;
-  --text-secondary: #a8a8ae;
-  --text-muted: #86868b;
+  --text-primary: #e7e9ee;
+  --text-secondary: #a8adb9;
+  --text-muted: #8d929e;
   --text-on-accent: #ffffff;
-  --text-selected: #f5f5f7;
+  --text-selected: #e7e9ee;
   --text-error: #ff6961;
 
   /* ── Structure (one gray, not rainbow) ── */
-  --border-color: #3d3d41;
-  --border-subtle: #2c2c2e;
+  --border-color: #3d4047;
+  --border-subtle: #30333a;
   --border-focus: #0a84ff;
   --border-width: 1px;
   --panel-border-width: 1px;
+
+  /* ── Entry type tints (categorical, closed set; icons carry shape too) ── */
+  --tint-folder: #dfb968;
+  --tint-archive: #e08860;
+  --tint-image: #b48cf2;
+  --tint-video: #e8709d;
+  --tint-audio: #52bfc8;
+  --tint-code: #58c29a;
+  --tint-document: #93a7c4;
 
   /* ── Accent & semantic status only ── */
   --accent: #0a84ff;
@@ -112,9 +123,11 @@
   --row-stripe: color-mix(in srgb, #ffffff 2.5%, transparent);
 
   /* ── Typography: system UI for chrome, mono for lists/paths ── */
-  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', 'Fira Code', ui-monospace, monospace;
+  --font-mono:
+    'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', 'Fira Code', ui-monospace, monospace;
   --font-size: 13px;
   --font-size-small: 12px;
   --font-size-ui: 13px;
@@ -141,30 +154,39 @@
   --z-toast: 300;
 }
 
-/* Light — same structure, airy grays */
+/* Light — same structure, airy cool grays (same temperature as dark) */
 :root[data-theme='light'] {
-  --bg-primary: #ececef;
-  --bg-secondary: #f6f6f7;
-  --bg-tertiary: #e4e4e7;
+  --bg-primary: #eceef1;
+  --bg-secondary: #f7f8fa;
+  --bg-tertiary: #e4e6ea;
   --bg-elevated: #ffffff;
   --bg-panel: #ffffff;
-  --bg-header: #f0f0f2;
+  --bg-header: #f0f2f5;
   --bg-selected: color-mix(in srgb, #0071e3 18%, #ffffff);
   --bg-cursor: #0071e3;
   --bg-hover: color-mix(in srgb, #000000 5%, transparent);
   --bg-cursor-inactive: color-mix(in srgb, #000000 8%, transparent);
   --bg-input: #ffffff;
 
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-muted: #64646a;
+  --text-primary: #1d1f23;
+  --text-secondary: #666c76;
+  --text-muted: #62676f;
   --text-on-accent: #ffffff;
-  --text-selected: #1d1d1f;
+  --text-selected: #1d1f23;
   --text-error: #d70015;
 
-  --border-color: #d2d2d7;
-  --border-subtle: #e5e5ea;
+  --border-color: #d3d6dc;
+  --border-subtle: #e6e8ec;
   --border-focus: #0071e3;
+
+  /* Same hues as dark, stepped darker + more saturated for white panels (R61) */
+  --tint-folder: #9a7514;
+  --tint-archive: #bf5a24;
+  --tint-image: #7d4fd4;
+  --tint-video: #c22a5e;
+  --tint-audio: #128089;
+  --tint-code: #178a63;
+  --tint-document: #4d6584;
 
   --accent: #0071e3;
   --accent-hover: #0077ed;
@@ -209,6 +231,15 @@
   --border-subtle: #3e3d32;
   --border-focus: #28639a;
 
+  /* Authentic Monokai hues */
+  --tint-folder: #e6db74;
+  --tint-archive: #fd971f;
+  --tint-image: #ae81ff;
+  --tint-video: #f92672;
+  --tint-audio: #66d9ef;
+  --tint-code: #a6e22e;
+  --tint-document: #cfcfc2;
+
   --accent: #66d9ef;
   --accent-hover: #a1efe4;
   --accent-soft: color-mix(in srgb, #66d9ef 16%, transparent);
@@ -243,6 +274,14 @@
   --border-color: #55ffff;
   --border-subtle: #000088;
   --border-focus: #ffffff;
+
+  --tint-folder: #55ffff;
+  --tint-archive: #ff5555;
+  --tint-image: #ff55ff;
+  --tint-video: #ff55ff;
+  --tint-audio: #55ffff;
+  --tint-code: #55ff55;
+  --tint-document: #ffffff;
 
   --accent: #55ffff;
   --accent-hover: #ffffff;

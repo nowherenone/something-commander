@@ -18,12 +18,103 @@ export function getExtension(name: string): string {
 }
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp', 'ico'])
-const ARCHIVE_EXTS = new Set(['zip', 'tar', 'gz', 'bz2', '7z', 'rar', 'xz'])
-const CODE_EXTS = new Set(['ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h'])
-const DOC_EXTS = new Set(['md', 'txt', 'pdf', 'doc', 'docx', 'rtf'])
+const VIDEO_EXTS = new Set([
+  'mp4',
+  'mkv',
+  'avi',
+  'mov',
+  'webm',
+  'm4v',
+  'wmv',
+  'flv',
+  'mpg',
+  'mpeg',
+  '3gp',
+  'ogv'
+])
+const AUDIO_EXTS = new Set([
+  'mp3',
+  'wav',
+  'flac',
+  'ogg',
+  'oga',
+  'm4a',
+  'aac',
+  'wma',
+  'opus',
+  'mid',
+  'midi',
+  'aiff'
+])
+/* Disk images mount like containers — they share the archive tint. */
+const ARCHIVE_EXTS = new Set(['zip', 'tar', 'gz', 'bz2', '7z', 'rar', 'xz', 'iso', 'img', 'dmg'])
+const CODE_EXTS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'py',
+  'rs',
+  'go',
+  'java',
+  'c',
+  'cpp',
+  'h',
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
+  'ps1',
+  'bat',
+  'json',
+  'yml',
+  'yaml',
+  'toml',
+  'ini',
+  'cfg',
+  'conf',
+  'env',
+  'css',
+  'scss',
+  'less',
+  'html',
+  'htm',
+  'xml',
+  'sql',
+  'rb',
+  'php',
+  'lua',
+  'pl',
+  'swift',
+  'kt',
+  'scala',
+  'dart',
+  'vue',
+  'svelte',
+  'ex',
+  'exs',
+  'erl',
+  'clj',
+  'proto'
+])
+const DOC_EXTS = new Set([
+  'md',
+  'txt',
+  'pdf',
+  'doc',
+  'docx',
+  'rtf',
+  'csv',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx'
+])
 
 export function iconHintForExtension(ext: string): string {
   if (IMAGE_EXTS.has(ext)) return 'image'
+  if (VIDEO_EXTS.has(ext)) return 'video'
+  if (AUDIO_EXTS.has(ext)) return 'audio'
   if (ARCHIVE_EXTS.has(ext)) return 'archive'
   if (CODE_EXTS.has(ext)) return 'code'
   if (DOC_EXTS.has(ext)) return 'document'
@@ -38,11 +129,7 @@ interface DirEntryOptions {
   meta?: Record<string, unknown>
 }
 
-export function makeDirectoryEntry(
-  id: string,
-  name: string,
-  opts: DirEntryOptions = {}
-): Entry {
+export function makeDirectoryEntry(id: string, name: string, opts: DirEntryOptions = {}): Entry {
   return {
     id,
     name,

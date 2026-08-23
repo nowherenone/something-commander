@@ -18,9 +18,7 @@ function readStyle(name: string): string {
 }
 
 function listCssModules(): string[] {
-  return readdirSync(STYLES_DIR).filter(
-    (f) => f.endsWith('.css') && f !== 'variables.css'
-  )
+  return readdirSync(STYLES_DIR).filter((f) => f.endsWith('.css') && f !== 'variables.css')
 }
 
 /** Raw hex / rgb / hsl color literals (not inside url(...) or already var()). */
@@ -31,8 +29,7 @@ const RAW_COLOR_RE =
 const RAW_Z_INDEX_RE = /(?<![-\w])z-index\s*:\s*(?!var\()[^;\n{}]*?-?\d+/g
 
 /** Raw second/ms durations inside transition properties (var(--dur-*) only). */
-const RAW_TRANSITION_DURATION_RE =
-  /\btransition[a-z-]*\s*:\s*[^;{}\n]*?\b[0-9][0-9.]*m?s\b/g
+const RAW_TRANSITION_DURATION_RE = /\btransition[a-z-]*\s*:\s*[^;{}\n]*?\b[0-9][0-9.]*m?s\b/g
 
 const REQUIRED_TOKENS = [
   '--bg-primary',
@@ -93,6 +90,13 @@ const REQUIRED_TOKENS = [
   '--compare-older',
   '--compare-only-left',
   '--compare-only-right',
+  '--tint-folder',
+  '--tint-archive',
+  '--tint-image',
+  '--tint-video',
+  '--tint-audio',
+  '--tint-code',
+  '--tint-document',
   '--tracking-caps',
   '--dur-fast',
   '--dur-med',
@@ -120,8 +124,8 @@ describe('style design tokens (shipped CSS)', () => {
     expect(css).toContain("data-theme='monokai'")
     expect(css).toContain("data-theme='classic'")
 
-    // Base palette is deep cool gray (macOS-like, not monokai green-brown)
-    expect(css).toMatch(/--bg-primary:\s*#161617/)
+    // Base palette is deep cool slate (macOS-like, not monokai green-brown)
+    expect(css).toMatch(/--bg-primary:\s*#1d1f23/)
     expect(css).toContain('--border-subtle')
     expect(css).toContain('--bg-elevated')
     expect(css).toContain('--shadow-dialog')
@@ -204,9 +208,7 @@ describe('style design tokens (shipped CSS)', () => {
     expect(css).not.toContain('--shadow-toast')
     // --shadow-float is alive: consumed by the minimized-operations queue chip
     expect(css).toContain('--shadow-float')
-    expect(readStyle('operations.module.css')).toContain(
-      'box-shadow: var(--shadow-float)'
-    )
+    expect(readStyle('operations.module.css')).toContain('box-shadow: var(--shadow-float)')
   })
 
   it('chrome modules use shared height/border/font tokens for bars and dialogs', () => {
@@ -271,9 +273,7 @@ describe('style design tokens (shipped CSS)', () => {
 
   it('default theme setting is dark (unified gray base)', async () => {
     // Drive the shipped settings module default — not a re-implemented constant
-    const { useSettingsStore } = await import(
-      '../renderer/src/stores/settings-store'
-    )
+    const { useSettingsStore } = await import('../renderer/src/stores/settings-store')
     const theme = useSettingsStore.getState().theme
     expect(theme).toBe('dark')
   })
@@ -281,12 +281,8 @@ describe('style design tokens (shipped CSS)', () => {
   it('CSS --row-height default matches the settings-store default (no drift)', async () => {
     // Boot overrides the CSS custom property from the store; the shipped
     // default in variables.css must agree so the pre-boot paint matches
-    const { useSettingsStore } = await import(
-      '../renderer/src/stores/settings-store'
-    )
+    const { useSettingsStore } = await import('../renderer/src/stores/settings-store')
     const { rowHeight } = useSettingsStore.getState()
-    expect(readStyle('variables.css')).toMatch(
-      new RegExp(`--row-height:\\s*${rowHeight}px;`)
-    )
+    expect(readStyle('variables.css')).toMatch(new RegExp(`--row-height:\\s*${rowHeight}px;`))
   })
 })

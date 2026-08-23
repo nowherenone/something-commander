@@ -27,6 +27,19 @@ const GLYPHS: Record<string, React.ReactNode> = {
       <path d="m6.3 16.25 3.5-3.9 2.8 2.9 2.3-2.4 2.8 3.1" />
     </>
   ),
+  video: (
+    <>
+      <rect x="3.25" y="5.25" width="17.5" height="13.5" rx="1.6" />
+      <path d="M10.2 9.1 15.4 12l-5.2 2.9Z" />
+    </>
+  ),
+  audio: (
+    <>
+      <circle cx="8.3" cy="17" r="2.1" />
+      <circle cx="16.3" cy="15.2" r="2.1" />
+      <path d="M10.4 17V6.9l8-1.6v9.9" />
+    </>
+  ),
   archive: (
     <>
       <rect x="4.75" y="4.75" width="14.5" height="14.5" rx="1.6" />

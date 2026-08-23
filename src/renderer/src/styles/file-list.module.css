@@ -20,7 +20,9 @@
   user-select: none;
   overflow: hidden;
   white-space: nowrap;
-  transition: color var(--dur-fast) ease, background var(--dur-fast) ease;
+  transition:
+    color var(--dur-fast) ease,
+    background var(--dur-fast) ease;
 }
 
 .headerCell:hover {
@@ -114,8 +116,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .entryRow.container .fileName {
@@ -130,6 +137,46 @@
 .entryRow.errorEntry .colSize,
 .entryRow.errorEntry .colDate {
   color: var(--text-error);
+}
+
+/* ── Per-type entry tints (R63: the icon's shape carries meaning too) ──
+   Each kind maps to one categorical token; the icon takes it fully while the
+   name blends it toward --text-primary so rows stay quiet (G124). Tints yield
+   to selection/cursor/error states, which own the foreground. */
+.entryRow[data-kind='folder'] {
+  --entry-tint: var(--tint-folder);
+}
+
+.entryRow[data-kind='archive'] {
+  --entry-tint: var(--tint-archive);
+}
+
+.entryRow[data-kind='image'] {
+  --entry-tint: var(--tint-image);
+}
+
+.entryRow[data-kind='video'] {
+  --entry-tint: var(--tint-video);
+}
+
+.entryRow[data-kind='audio'] {
+  --entry-tint: var(--tint-audio);
+}
+
+.entryRow[data-kind='code'] {
+  --entry-tint: var(--tint-code);
+}
+
+.entryRow[data-kind='document'] {
+  --entry-tint: var(--tint-document);
+}
+
+.entryRow:not(.cursor):not(.selected):not(.cursorInactive):not(.errorEntry)[data-kind] .icon {
+  color: var(--entry-tint);
+}
+
+.entryRow:not(.cursor):not(.selected):not(.cursorInactive):not(.errorEntry)[data-kind] .fileName {
+  color: color-mix(in srgb, var(--entry-tint) 55%, var(--text-primary));
 }
 
 .colName {
