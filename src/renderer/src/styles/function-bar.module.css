@@ -57,6 +57,9 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-tiny);
   font-weight: var(--font-weight-semibold);
+  /* line-height 1 keeps the all-caps keycap text optically centered — the
+     default line box reserves descender space that pushes caps ~2px high. */
+  line-height: 1;
   letter-spacing: 0;
   flex-shrink: 0;
 }
