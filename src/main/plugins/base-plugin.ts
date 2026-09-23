@@ -153,6 +153,7 @@ interface FileEntryOptions {
   hidden?: boolean
   readonly?: boolean
   symlink?: boolean
+  executable?: boolean
   mimeType?: string
   meta?: Record<string, unknown>
 }
@@ -179,7 +180,8 @@ export function makeFileEntry(
     attributes: {
       readonly: opts.readonly ?? false,
       hidden: opts.hidden ?? false,
-      symlink: opts.symlink ?? false
+      symlink: opts.symlink ?? false,
+      ...(opts.executable ? { executable: true } : {})
     }
   }
 }

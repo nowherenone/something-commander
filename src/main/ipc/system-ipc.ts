@@ -1,9 +1,9 @@
-import { ipcMain, BrowserWindow, Menu, nativeImage, shell, safeStorage } from 'electron'
+import { app, ipcMain, BrowserWindow, Menu, nativeImage, shell, safeStorage } from 'electron'
 import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { exec, spawn } from 'child_process'
+import { exec, spawn, spawnSync } from 'child_process'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
 
@@ -154,15 +154,62 @@ export function registerSystemIPC(): void {
   )
 
   ipcMain.on(IPC_CHANNELS.NATIVE_DRAG_START, (event, filePaths: string[]) => {
-    if (!filePaths || filePaths.length === 0) return
+    const paths = localDragPaths(filePaths)
+    if (paths.length === 0) return
+    // startDrag's uri-list has no CRLF and no file bytes. Targets that read
+    // the file handle then save a 0-byte file ("the file is empty").
+    if (process.platform === 'linux' && dragFilesOnLinux(paths)) return
     event.sender.startDrag({
-      file: filePaths[0],
-      files: filePaths,
+      file: paths[0],
+      files: paths,
       icon: getDragIcon()
     })
   })
 
   setupDriveWatchers()
+}
+
+function localDragPaths(filePaths: string[]): string[] {
+  if (!Array.isArray(filePaths)) return []
+  const out: string[] = []
+  for (const raw of filePaths) {
+    if (typeof raw !== 'string' || raw.length === 0) continue
+    const resolved = path.resolve(raw)
+    try {
+      if (fsSync.existsSync(resolved)) out.push(resolved)
+    } catch {
+      // skip unreadable paths; one bad entry must not empty the whole drag
+    }
+  }
+  return out
+}
+
+function linuxDragScript(): string | null {
+  const candidates = [
+    path.join(process.resourcesPath, 'linux-file-drag.py'),
+    path.join(app.getAppPath(), 'resources', 'linux-file-drag.py'),
+    path.join(__dirname, '../../resources/linux-file-drag.py')
+  ]
+  for (const candidate of candidates) {
+    try {
+      if (fsSync.existsSync(candidate)) return candidate
+    } catch {
+      // keep looking
+    }
+  }
+  return null
+}
+
+/** True when the GTK drag ran to completion. False falls back to startDrag. */
+function dragFilesOnLinux(paths: string[]): boolean {
+  const script = linuxDragScript()
+  if (!script) return false
+  try {
+    const result = spawnSync('python3', [script, ...paths], { stdio: 'ignore' })
+    return result.status === 0
+  } catch {
+    return false
+  }
 }
 
 function commandExists(cmd: string): Promise<boolean> {

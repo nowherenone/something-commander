@@ -122,7 +122,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                   <span className={styles.settingsLabel}>Show hidden files</span>
                 </label>
                 <div className={styles.settingsRow}>
-                  <span className={styles.settingsLabel}>Size format</span>
+                  <span className={styles.settingsLabel}>Size format in dialogs</span>
                   <select
                     className={styles.settingsSelect}
                     value={settings.sizeFormat}

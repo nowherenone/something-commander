@@ -18,6 +18,7 @@ import {
   iconHintForExtension,
   getExtension
 } from '../base-plugin'
+import { isExecutableFile } from '@shared/executable'
 
 export class LocalFilesystemPlugin implements BrowsePlugin {
   readonly manifest: PluginManifest = {
@@ -212,7 +213,8 @@ export class LocalFilesystemPlugin implements BrowsePlugin {
       ext,
       iconHint: iconHintForExtension(ext),
       hidden,
-      symlink
+      symlink,
+      executable: stat.isFile() && isExecutableFile(process.platform, dirent.name, stat.mode)
     })
   }
 

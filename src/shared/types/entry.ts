@@ -2,6 +2,8 @@ export interface EntryAttributes {
   readonly: boolean
   hidden: boolean
   symlink: boolean
+  /** Unix execute bit, or a Windows executable or shortcut extension. Omitted when false. */
+  executable?: boolean
 }
 
 /**

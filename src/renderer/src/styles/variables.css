@@ -40,9 +40,14 @@
   --tint-archive: #e08860;
   --tint-image: #b48cf2;
   --tint-video: #e8709d;
-  --tint-audio: #52bfc8;
+  /* Same pink as video. */
+  --tint-audio: var(--tint-video);
   --tint-code: #58c29a;
-  --tint-document: #93a7c4;
+  /* Light blue. Names mix this the same way as the other tints. */
+  --tint-document: #8ec8ff;
+  /* Light leaf green: yellower and lighter than --tint-code so binaries
+     don't read as source files. Names mix this the same way as other tints. */
+  --tint-executable: #8fce7c;
 
   /* ── Accent & semantic status only ── */
   --accent: #0a84ff;
@@ -184,9 +189,10 @@
   --tint-archive: #bf5a24;
   --tint-image: #7d4fd4;
   --tint-video: #c22a5e;
-  --tint-audio: #128089;
+  --tint-audio: var(--tint-video);
   --tint-code: #178a63;
-  --tint-document: #4d6584;
+  --tint-document: #1a6fbf;
+  --tint-executable: #2f9e4a;
 
   --accent: #0071e3;
   --accent-hover: #0077ed;
@@ -236,9 +242,10 @@
   --tint-archive: #fd971f;
   --tint-image: #ae81ff;
   --tint-video: #f92672;
-  --tint-audio: #66d9ef;
+  --tint-audio: var(--tint-video);
   --tint-code: #a6e22e;
-  --tint-document: #cfcfc2;
+  --tint-document: #66d9ef;
+  --tint-executable: #c6ef6e;
 
   --accent: #66d9ef;
   --accent-hover: #a1efe4;
@@ -279,9 +286,10 @@
   --tint-archive: #ff5555;
   --tint-image: #ff55ff;
   --tint-video: #ff55ff;
-  --tint-audio: #55ffff;
+  --tint-audio: var(--tint-video);
   --tint-code: #55ff55;
-  --tint-document: #ffffff;
+  --tint-document: #5555ff;
+  --tint-executable: #55ff55;
 
   --accent: #55ffff;
   --accent-hover: #ffffff;

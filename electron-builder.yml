@@ -17,6 +17,11 @@ asarUnpack:
   - node_modules/7zip-bin/**/*
   - node_modules/7zip-min/node_modules/7zip-bin/**/*
 
+# Python executes this from outside the asar. startDrag's uri-list is not enough.
+extraResources:
+  - from: resources/linux-file-drag.py
+    to: linux-file-drag.py
+
 # Windows
 win:
   executableName: something-commander

@@ -82,8 +82,8 @@ const DEFAULT_SETTINGS: Settings = {
   showHiddenFiles: false,
   dateFormat: 'yyyy-MM-dd HH:mm',
   fontFamily: "'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', 'Fira Code', ui-monospace, monospace",
-  // Human-readable sizes everywhere by default (F-14 threads this selector
-  // through every surface); "Full bytes" remains a Display-setting option.
+  // Dialogs, viewers, and search. The file list and the panel disk-space
+  // line always use compact units so a multi-megabyte count fits the column.
   sizeFormat: 'short',
   bottomBar: 'fnkeys',
   showCommandLine: false,
@@ -105,9 +105,8 @@ interface SettingsState extends Settings {
 }
 
 /**
- * Shared sizeFormat selectors (F-14). Every surface that prints a byte count
- * — list rows, status bars, dialogs, viewers — goes through these so the
- * Settings ▸ Display choice applies app-wide instead of half-applying.
+ * Shared sizeFormat selectors (F-14). Dialogs, viewers, and search use these.
+ * The file list and the panel disk-space line always use compact units.
  */
 export function useSizeFormat(): SizeFormat {
   return useSettingsStore((s) => s.sizeFormat)

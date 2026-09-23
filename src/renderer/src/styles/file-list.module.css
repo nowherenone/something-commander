@@ -171,6 +171,11 @@
   --entry-tint: var(--tint-document);
 }
 
+/* After the kind rules so this tint wins; the type icon shape stays. */
+.entryRow[data-executable='true'] {
+  --entry-tint: var(--tint-executable);
+}
+
 .entryRow:not(.cursor):not(.selected):not(.cursorInactive):not(.errorEntry)[data-kind] .icon {
   color: var(--entry-tint);
 }

@@ -97,6 +97,7 @@ const REQUIRED_TOKENS = [
   '--tint-audio',
   '--tint-code',
   '--tint-document',
+  '--tint-executable',
   '--tracking-caps',
   '--dur-fast',
   '--dur-med',

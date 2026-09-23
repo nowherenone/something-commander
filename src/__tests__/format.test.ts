@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   formatSize,
+  formatCompactSize,
   formatDate,
   formatSpeed,
   formatEta,
@@ -29,20 +30,38 @@ describe('formatSize', () => {
   })
 
   it('short format — kilobytes', () => {
-    expect(formatSize(2048, 'short')).toContain('kB')
+    expect(formatSize(2048, 'short')).toBe('2 kB')
   })
 
   it('short format — megabytes', () => {
-    expect(formatSize(5 * 1000 * 1000, 'short')).toContain('MB')
+    expect(formatSize(5 * 1000 * 1000, 'short')).toBe('5 MB')
   })
 
   it('short format — gigabytes', () => {
-    expect(formatSize(3.5 * 1000 * 1000 * 1000, 'short')).toContain('GB')
+    expect(formatSize(3.5 * 1000 * 1000 * 1000, 'short')).toBe('3.5 GB')
   })
 
-  it('short format — no decimal places', () => {
-    const result = formatSize(1_500_000, 'short')
-    expect(result).not.toMatch(/\.\d/)
+  it('short format — one decimal only under 10 of the unit', () => {
+    expect(formatSize(1_500_000, 'short')).toBe('1.5 MB')
+    expect(formatSize(86_000_000, 'short')).toBe('86 MB')
+  })
+})
+
+describe('formatCompactSize', () => {
+  it('picks kB, MB, or GB from the magnitude', () => {
+    expect(formatCompactSize(512)).toBe('512 B')
+    expect(formatCompactSize(1536)).toBe('1.5 kB')
+    expect(formatCompactSize(7_400_000)).toBe('7.4 MB')
+    expect(formatCompactSize(2_500_000_000)).toBe('2.5 GB')
+    expect(formatCompactSize(1_500_000_000_000)).toBe('1.5 TB')
+  })
+
+  it('keeps sizes past about 7 MB short enough for the size column', () => {
+    for (const bytes of [7_000_000, 7_400_000, 86_000_000, 12_345_678_901]) {
+      const text = formatCompactSize(bytes)
+      expect(text.length).toBeLessThanOrEqual(8)
+      expect(text).not.toMatch(/^\d{7,}/)
+    }
   })
 })
 

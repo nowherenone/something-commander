@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import type { Entry } from '@shared/types'
 import type { PanelId } from '../../stores/app-store'
-import { formatSize, formatDate } from '../../utils/format'
+import { formatCompactSize, formatDate } from '../../utils/format'
 import { listName, listExtension } from '../../utils/entry-helpers'
 import { EntryIcon } from '../icons'
 import { useSettingsStore } from '../../stores/settings-store'
@@ -70,7 +70,6 @@ export const EntryRow = React.memo(function EntryRow({
   onRenameCommit,
   onRenameCancel
 }: EntryRowProps): React.JSX.Element {
-  const sizeFormat = useSettingsStore((s) => s.sizeFormat)
   const dateFormat = useSettingsStore((s) => s.dateFormat)
   const isDragging = useDragStore((s) => s.isDragging && s.draggedEntries.some((e) => e.id === entry.id))
 
@@ -158,9 +157,9 @@ export const EntryRow = React.memo(function EntryRow({
       if (isCalculating) {
         return <span className={styles.sizeLoading}>...</span>
       }
-      return entry.size > 0 ? formatSize(entry.size, sizeFormat) : '<DIR>'
+      return entry.size > 0 ? formatCompactSize(entry.size) : '<DIR>'
     }
-    return formatSize(entry.size, sizeFormat)
+    return formatCompactSize(entry.size)
   }
 
   return (
@@ -168,6 +167,7 @@ export const EntryRow = React.memo(function EntryRow({
       className={classNames}
       role="row"
       data-kind={entry.iconHint}
+      data-executable={entry.attributes.executable ? 'true' : undefined}
       aria-selected={isSelected}
       draggable={canDrag}
       onDragStart={handleDragStart}

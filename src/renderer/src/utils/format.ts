@@ -1,7 +1,37 @@
-import { filesize } from 'filesize'
 import { format } from 'date-fns'
 
 export type SizeFormat = 'full' | 'short'
+
+/** SI steps. A grouped byte count wider than ~7 MB overflows the 7.5em size column. */
+const COMPACT_UNITS = ['B', 'kB', 'MB', 'GB', 'TB'] as const
+
+/**
+ * Byte count as B / kB / MB / GB / TB. One decimal under 10 of a unit, otherwise
+ * an integer, so a multi-megabyte size stays inside the list column.
+ */
+export function formatCompactSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes === 0) return '0'
+
+  let value = bytes
+  let unit = 0
+  while (value >= 1000 && unit < COMPACT_UNITS.length - 1) {
+    value /= 1000
+    unit++
+  }
+
+  if (unit === 0) return `${Math.round(value)} B`
+
+  let rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10
+  if (rounded >= 1000 && unit < COMPACT_UNITS.length - 1) {
+    rounded /= 1000
+    unit++
+    rounded = rounded >= 10 ? Math.round(rounded) : Math.round(rounded * 10) / 10
+  }
+
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+  return `${text} ${COMPACT_UNITS[unit]}`
+}
 
 export function formatSize(bytes: number, sizeFormat: SizeFormat = 'short'): string {
   if (bytes < 0) return ''
@@ -9,7 +39,7 @@ export function formatSize(bytes: number, sizeFormat: SizeFormat = 'short'): str
   if (sizeFormat === 'full') {
     return bytes.toLocaleString()
   }
-  return filesize(bytes, { standard: 'si', spacer: ' ', round: 0 }) as string
+  return formatCompactSize(bytes)
 }
 
 export function formatDate(timestamp: number, dateFormat = 'yyyy-MM-dd HH:mm'): string {

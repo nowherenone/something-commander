@@ -74,11 +74,13 @@ export class SftpPlugin implements BrowsePlugin {
       if (isDir) {
         return makeDirectoryEntry(id, item.name, { hidden, symlink, meta: { connId } })
       }
+      const rights = `${item.rights?.user ?? ''}${item.rights?.group ?? ''}${item.rights?.other ?? ''}`
       return makeFileEntry(id, item.name, item.size, item.modifyTime, {
         ext: getExtension(item.name),
         iconHint: 'file',
         hidden,
         symlink,
+        executable: item.type === '-' && rights.includes('x'),
         meta: { connId }
       })
     })
