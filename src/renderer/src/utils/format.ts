@@ -2,17 +2,12 @@ import { format } from 'date-fns'
 
 export type SizeFormat = 'full' | 'short'
 
-/** SI steps. A grouped byte count wider than ~7 MB overflows the 7.5em size column. */
+/** SI steps. A grouped byte count from 10 MB up overflows the 7.5em size column. */
 const COMPACT_UNITS = ['B', 'kB', 'MB', 'GB', 'TB'] as const
+const TEN_MB = 10_000_000
 
-/**
- * Byte count as B / kB / MB / GB / TB. One decimal under 10 of a unit, otherwise
- * an integer, so a multi-megabyte size stays inside the list column.
- */
-export function formatCompactSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return ''
-  if (bytes === 0) return '0'
-
+/** Unit form used once a count is large enough to leave the size column. */
+function formatUnitSize(bytes: number): string {
   let value = bytes
   let unit = 0
   while (value >= 1000 && unit < COMPACT_UNITS.length - 1) {
@@ -33,13 +28,23 @@ export function formatCompactSize(bytes: number): string {
   return `${text} ${COMPACT_UNITS[unit]}`
 }
 
+/**
+ * Size column and disk-space line. Below 10 MB the byte count is shown as a
+ * number. From 10 MB up it switches to MB / GB / TB so the column can hold it.
+ */
+export function formatCompactSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes < TEN_MB) return bytes.toLocaleString()
+  return formatUnitSize(bytes)
+}
+
 export function formatSize(bytes: number, sizeFormat: SizeFormat = 'short'): string {
   if (bytes < 0) return ''
   if (bytes === 0) return '0'
   if (sizeFormat === 'full') {
     return bytes.toLocaleString()
   }
-  return formatCompactSize(bytes)
+  return formatUnitSize(bytes)
 }
 
 export function formatDate(timestamp: number, dateFormat = 'yyyy-MM-dd HH:mm'): string {

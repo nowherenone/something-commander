@@ -6,6 +6,18 @@ export interface BreadcrumbSegment {
   locationId: string | null
 }
 
+/** Windows local paths use `\`. Everything else, including archives and remote folders, uses `/`. */
+export function breadcrumbSeparator(pluginId: string, locationId: string | null): '\\' | '/' {
+  if (
+    pluginId === 'local-filesystem' &&
+    !!locationId &&
+    (/^[A-Za-z]:/.test(locationId) || locationId.startsWith('\\\\'))
+  ) {
+    return '\\'
+  }
+  return '/'
+}
+
 export function buildBreadcrumbSegments(
   pluginId: string,
   locationId: string | null,

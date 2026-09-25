@@ -15,7 +15,7 @@ import { InfoView } from './InfoView'
 import { QuickView } from './QuickView'
 import { useBookmarksStore } from '../../stores/bookmarks-store'
 import { bookmarkDisplayEntries, buildDisplayEntries, isRenamableEntry } from '../../utils/display-entries'
-import { buildBreadcrumbSegments } from '../../utils/breadcrumb-segments'
+import { breadcrumbSeparator, buildBreadcrumbSegments } from '../../utils/breadcrumb-segments'
 import { restorePanelLocation } from '../../stores/layout-persistence'
 import styles from '../../styles/panels.module.css'
 
@@ -196,7 +196,16 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
       className={`${styles.panel} ${isActive ? styles.active : ''}`}
       onClick={() => setActivePanel(panelId)}
     >
-      <div style={{ display: 'flex', height: 'var(--tabbar-height)', flexShrink: 0 }}>
+      {panel.tabs.length > 1 && (
+        <TabBar
+          tabs={tabInfos}
+          activeTabId={panel.activeTabId}
+          onSelectTab={(tabId) => switchTab(panelId, tabId)}
+          onCloseTab={(tabId) => closeTab(panelId, tabId)}
+          onNewTab={() => addTab(panelId)}
+        />
+      )}
+      <div className={styles.locationBar}>
         <DriveBookmarkMenu
           currentLocation={tab.locationDisplay}
           currentPluginId={tab.pluginId}
@@ -207,21 +216,15 @@ export function FilePanel({ panelId }: FilePanelProps): React.JSX.Element {
           isOpen={driveMenuOpen}
           onToggle={(open) => open ? openDriveMenu(panelId) : closeDriveMenu()}
         />
-        <TabBar
-          tabs={tabInfos}
-          activeTabId={panel.activeTabId}
-          onSelectTab={(tabId) => switchTab(panelId, tabId)}
-          onCloseTab={(tabId) => closeTab(panelId, tabId)}
-          onNewTab={() => addTab(panelId)}
+        <AddressBar
+          panelId={panelId}
+          location={tab.locationDisplay}
+          segments={breadcrumbSegments}
+          separator={breadcrumbSeparator(tab.pluginId, tab.locationId)}
+          onNavigate={handleNavigateAddress}
+          onSegmentClick={handleSegmentClick}
         />
       </div>
-      <AddressBar
-        panelId={panelId}
-        location={tab.locationDisplay}
-        segments={breadcrumbSegments}
-        onNavigate={handleNavigateAddress}
-        onSegmentClick={handleSegmentClick}
-      />
       {viewMode === 'brief' && (
         <>
           <ColumnHeaders sortConfig={tab.sortConfig} onSort={handleSort} />

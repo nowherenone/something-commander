@@ -48,19 +48,22 @@ describe('formatSize', () => {
 })
 
 describe('formatCompactSize', () => {
-  it('picks kB, MB, or GB from the magnitude', () => {
-    expect(formatCompactSize(512)).toBe('512 B')
-    expect(formatCompactSize(1536)).toBe('1.5 kB')
-    expect(formatCompactSize(7_400_000)).toBe('7.4 MB')
-    expect(formatCompactSize(2_500_000_000)).toBe('2.5 GB')
-    expect(formatCompactSize(1_500_000_000_000)).toBe('1.5 TB')
+  it('shows a plain number below 10 MB', () => {
+    expect(formatCompactSize(0)).toBe('0')
+    expect(formatCompactSize(512)).toBe((512).toLocaleString())
+    expect(formatCompactSize(1536)).toBe((1536).toLocaleString())
+    expect(formatCompactSize(7_400_000)).toBe((7_400_000).toLocaleString())
+    expect(formatCompactSize(9_999_999)).toBe((9_999_999).toLocaleString())
+    expect(formatCompactSize(9_999_999)).not.toMatch(/[kMGT]B/)
   })
 
-  it('keeps sizes past about 7 MB short enough for the size column', () => {
-    for (const bytes of [7_000_000, 7_400_000, 86_000_000, 12_345_678_901]) {
-      const text = formatCompactSize(bytes)
-      expect(text.length).toBeLessThanOrEqual(8)
-      expect(text).not.toMatch(/^\d{7,}/)
+  it('shortens from 10 MB up so the size column can hold it', () => {
+    expect(formatCompactSize(10_000_000)).toBe('10 MB')
+    expect(formatCompactSize(86_000_000)).toBe('86 MB')
+    expect(formatCompactSize(2_500_000_000)).toBe('2.5 GB')
+    expect(formatCompactSize(1_500_000_000_000)).toBe('1.5 TB')
+    for (const bytes of [10_000_000, 86_000_000, 12_345_678_901]) {
+      expect(formatCompactSize(bytes).length).toBeLessThanOrEqual(8)
     }
   })
 })

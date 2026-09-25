@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import type { PanelId } from '../../stores/app-store'
 import type { BreadcrumbSegment } from '../../utils/breadcrumb-segments'
 import styles from '../../styles/panels.module.css'
@@ -7,6 +7,8 @@ interface AddressBarProps {
   panelId?: PanelId
   location: string
   segments: BreadcrumbSegment[]
+  /** Path separator drawn between segments. No surrounding spaces. */
+  separator?: '/' | '\\'
   onNavigate: (path: string) => void
   onSegmentClick: (locationId: string | null) => void
 }
@@ -15,17 +17,13 @@ export function AddressBar({
   panelId,
   location,
   segments,
+  separator = '/',
   onNavigate,
   onSegmentClick
 }: AddressBarProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-
-  const sep = useMemo(
-    () => (navigator.platform.startsWith('Win') ? ' \\ ' : ' / '),
-    []
-  )
 
   const startEdit = useCallback(() => {
     setEditValue(location)
@@ -81,7 +79,9 @@ export function AddressBar({
     <div className={styles.addressBar} onDoubleClick={startEdit}>
       {segments.map((seg, i) => (
         <React.Fragment key={`${seg.locationId ?? 'root'}-${i}`}>
-          {i > 0 && <span className={styles.addressSep}>{sep}</span>}
+          {i > 0 && segments[i - 1].label !== '/' && (
+            <span className={styles.addressSep}>{separator}</span>
+          )}
           <span
             className={styles.addressSegment}
             onClick={() => onSegmentClick(seg.locationId)}

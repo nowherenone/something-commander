@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { buildBreadcrumbSegments } from '../renderer/src/utils/breadcrumb-segments'
+import { breadcrumbSeparator, buildBreadcrumbSegments } from '../renderer/src/utils/breadcrumb-segments'
+
+describe('breadcrumbSeparator', () => {
+  it('uses a backslash for a Windows drive or UNC path', () => {
+    expect(breadcrumbSeparator('local-filesystem', 'C:\\Users\\me')).toBe('\\')
+    expect(breadcrumbSeparator('local-filesystem', 'D:/work')).toBe('\\')
+    expect(breadcrumbSeparator('local-filesystem', '\\\\server\\share')).toBe('\\')
+  })
+
+  it('uses a forward slash for unix, archive, and remote paths', () => {
+    expect(breadcrumbSeparator('local-filesystem', '/home/user')).toBe('/')
+    expect(breadcrumbSeparator('archive', 'C:\\backup.zip::src/')).toBe('/')
+    expect(breadcrumbSeparator('sftp', 'user@host:22::/home')).toBe('/')
+  })
+})
 
 describe('breadcrumb-segments', () => {
   it('builds local filesystem segments from location id', () => {

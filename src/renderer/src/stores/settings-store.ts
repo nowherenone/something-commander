@@ -83,7 +83,7 @@ const DEFAULT_SETTINGS: Settings = {
   dateFormat: 'yyyy-MM-dd HH:mm',
   fontFamily: "'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', 'Fira Code', ui-monospace, monospace",
   // Dialogs, viewers, and search. The file list and the panel disk-space
-  // line always use compact units so a multi-megabyte count fits the column.
+  // line show a byte count below 10 MB and a unit from 10 MB up.
   sizeFormat: 'short',
   bottomBar: 'fnkeys',
   showCommandLine: false,
