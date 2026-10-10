@@ -67,7 +67,7 @@ interface UtilAPI {
     content: string
   ): Promise<{ success: boolean; bytesWritten?: number; error?: string }>
   showContextMenu(items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null>
-  showFileProperties(filePath: string): Promise<{ success: boolean; error?: string }>
+  showFileProperties(filePath: string): Promise<{ success: boolean; error?: string; fallback?: 'showItemInFolder' }>
   getDiskSpace(pluginId: string, locationId: string): Promise<{ free: number; total: number }>
   getHomeDir(): Promise<string>
   getPathForFile(file: File): string
