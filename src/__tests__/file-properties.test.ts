@@ -104,7 +104,9 @@ describe('macOS command', () => {
 describe('Linux FileManager1.ShowItemProperties', () => {
   beforeEach(() => execFileMock.mockReset())
 
-  it('builds gdbus and dbus-send calls with a percent-encoded file URI', () => {
+  // POSIX paths only: on Windows pathToFileURL resolves '/home/...' against the
+  // current drive (file:///D:/home/...). The DBus path never runs there.
+  it.skipIf(process.platform === 'win32')('builds gdbus and dbus-send calls with a percent-encoded file URI', () => {
     const p = '/home/u/a b/"q".txt'
     expect(fileUri(p)).toBe('file:///home/u/a%20b/%22q%22.txt')
     const [gdbus, dbusSend] = buildLinuxDbusCommands(p)
