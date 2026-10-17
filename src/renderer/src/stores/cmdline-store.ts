@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { HISTORY_CAP, pushHistory } from '@shared/cmdline'
+import { HISTORY_CAP, pushHistory, type ShellKind } from '@shared/cmdline'
 
 /** Disk key for the persisted history (userData/cmdline-history.json). */
 const STORE_KEY = 'cmdline-history'
@@ -25,6 +25,11 @@ interface CmdlineState {
   history: string[]
   historyLoaded: boolean
   request: CmdlineRequest | null
+  /** Run the command once per selected file (session toggle). */
+  perFile: boolean
+  /** Shell the main process resolved for "auto" (for quoting). */
+  resolvedShellKind: ShellKind | null
+  setPerFile: (on: boolean) => void
   addHistory: (cmd: string) => void
   removeHistory: (cmd: string) => void
   clearHistory: () => void
@@ -44,6 +49,10 @@ export const useCmdlineStore = create<CmdlineState>((set, get) => ({
   history: [],
   historyLoaded: false,
   request: null,
+  perFile: false,
+  resolvedShellKind: null,
+
+  setPerFile: (on) => set({ perFile: on }),
 
   addHistory: (cmd) => {
     const history = pushHistory(get().history, cmd)
@@ -97,5 +106,5 @@ export function loadCmdlineHistory(): Promise<void> {
 /** For tests only. */
 export function _resetCmdlineStore(): void {
   loading = null
-  useCmdlineStore.setState({ history: [], historyLoaded: false, request: null })
+  useCmdlineStore.setState({ history: [], historyLoaded: false, request: null, perFile: false, resolvedShellKind: null })
 }

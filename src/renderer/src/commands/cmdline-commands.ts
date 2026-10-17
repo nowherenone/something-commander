@@ -4,6 +4,7 @@
  * Total Commander paste helpers (Ctrl+Enter / Ctrl+Shift+Enter / Ctrl+P).
  */
 import { detectShellKind, isLocalDirectory, quoteArg, type ShellKind } from '@shared/cmdline'
+import type { PlaceholderContext } from '@shared/cmdline-smart'
 import { useAppStore } from '../stores/app-store'
 import { usePanelStore, parentOffset } from '../stores/panel-store'
 import { useSettingsStore } from '../stores/settings-store'
@@ -27,8 +28,69 @@ export function rendererPlatform(): NodeJS.Platform {
   return 'linux'
 }
 
+/**
+ * Quoting style for the shell commands will run in: the Settings override
+ * when set, else what main resolved for "auto" ($SHELL / pwsh), else the
+ * platform guess.
+ */
 export function currentShellKind(): ShellKind {
-  return detectShellKind(useSettingsStore.getState().shell, rendererPlatform())
+  const override = useSettingsStore.getState().shell.trim()
+  if (override) return detectShellKind(override, rendererPlatform())
+  return useCmdlineStore.getState().resolvedShellKind ?? detectShellKind('', rendererPlatform())
+}
+
+/** Ask main which shell "auto" means (once per session). */
+let shellProbe: Promise<void> | null = null
+export function probeShellKind(): Promise<void> {
+  if (!shellProbe) {
+    shellProbe = (async () => {
+      try {
+        const info = await window.api.cmd?.shellInfo()
+        if (info) useCmdlineStore.setState({ resolvedShellKind: info.kind })
+      } catch {
+        /* keep the platform guess */
+      }
+    })()
+  }
+  return shellProbe
+}
+
+function entryPath(tab: ReturnType<typeof activeTab>, entry: Entry): string {
+  return isLocalDirectory(tab.pluginId, tab.locationId) ? entry.id : joinDisplay(tab.locationDisplay, entry.name)
+}
+
+function panelPath(tab: ReturnType<typeof activeTab>): string | null {
+  if (isLocalDirectory(tab.pluginId, tab.locationId)) return tab.locationId
+  return tab.locationDisplay || null
+}
+
+/** Values for %f %F %s %p %P from the current panels. */
+export function placeholderContext(): PlaceholderContext {
+  const ap = useAppStore.getState().activePanel
+  const store = usePanelStore.getState()
+  const tab = store.getActiveTab(ap)
+  const other = store.getActiveTab(ap === 'left' ? 'right' : 'left')
+  const cur = cursorEntry()
+  const selected = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
+  const paths = (selected.length > 0 ? selected : cur ? [cur] : []).map((e) => entryPath(tab, e))
+  return {
+    cursorName: cur?.name ?? null,
+    selectedPaths: paths,
+    panelPath: panelPath(tab),
+    otherPanelPath: panelPath(other)
+  }
+}
+
+/** Selected entries of the active panel (for "run per selected file"). */
+export function selectedEntries(): Entry[] {
+  const tab = activeTab()
+  return tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
+}
+
+/** Placeholder context for one file of a per-file run. */
+export function perFileContext(entry: Entry): PlaceholderContext {
+  const base = placeholderContext()
+  return { ...base, cursorName: entry.name, selectedPaths: [entryPath(activeTab(), entry)] }
 }
 
 function activeTab(): ReturnType<ReturnType<typeof usePanelStore.getState>['getActiveTab']> {

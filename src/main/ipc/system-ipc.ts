@@ -132,7 +132,7 @@ export function registerSystemIPC(): void {
     }
   })
 
-  // Command line (util:runCommand / util:runDetached) lives in command-ipc.ts.
+  // Command line (streaming cmd:* runs, util:runDetached) lives in command-ipc.ts.
 
   ipcMain.on(IPC_CHANNELS.NATIVE_DRAG_START, (event, filePaths: string[]) => {
     const paths = localDragPaths(filePaths)
