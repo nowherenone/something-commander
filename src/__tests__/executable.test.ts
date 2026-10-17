@@ -28,7 +28,8 @@ describe('isExecutableFile', () => {
 })
 
 describe('local filesystem executable marker', () => {
-  it('marks a +x file and leaves a directory and a plain file unmarked', async () => {
+  // Relies on POSIX mode bits; Windows has no execute bit (it uses extensions).
+  it.skipIf(process.platform === 'win32')('marks a +x file and leaves a directory and a plain file unmarked', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-exec-'))
     try {
       await fs.writeFile(path.join(dir, 'plain.txt'), 'x')
