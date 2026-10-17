@@ -3,11 +3,14 @@ import { spawnSync } from 'child_process'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
+import { pathToFileURL } from 'url'
 
 const script = path.resolve(__dirname, '../../resources/linux-file-drag.py')
 
 describe('linux file drag payload', () => {
-  it('offers a terminated URI and the real file bytes', async () => {
+  // The drag helper is Linux-only (GTK); its URIs are percent-encoded by
+  // urllib's quote(), which matches pathToFileURL rather than a raw file:// join.
+  it.skipIf(process.platform !== 'linux')('offers a terminated URI and the real file bytes', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-drag-'))
     const file = path.join(dir, 'note.txt')
     const body = 'not empty\n'
@@ -22,9 +25,10 @@ describe('linux file drag payload', () => {
         octet_len: number
         direct_save: boolean
       }
-      expect(payload.uri_list).toBe(`file://${file}\r\n`)
+      const uri = pathToFileURL(file).href
+      expect(payload.uri_list).toBe(`${uri}\r\n`)
       expect(payload.plain).toBe(file)
-      expect(payload.gnome).toBe(`copy\nfile://${file}\n`)
+      expect(payload.gnome).toBe(`copy\n${uri}\n`)
       expect(payload.octet_len).toBe(Buffer.byteLength(body))
       expect(payload.direct_save).toBe(true)
     } finally {
