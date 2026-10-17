@@ -13,7 +13,6 @@ import {
   pushHistory,
   insertWithSpacing,
   matchBookmark,
-  describeExecFailure,
   HISTORY_CAP
 } from '../shared/cmdline'
 
@@ -265,28 +264,5 @@ describe('matchBookmark', () => {
     expect(matchBookmark(bms, 'load')?.name).toBe('Downloads')
     expect(matchBookmark(bms, 'zzz')).toBeNull()
     expect(matchBookmark(bms, '')).toBeNull()
-  })
-})
-
-describe('describeExecFailure', () => {
-  it('plain exit codes need no extra message', () => {
-    expect(describeExecFailure({ code: 2, message: 'Command failed' })).toBeNull()
-    expect(describeExecFailure(null)).toBeNull()
-  })
-  it('timeouts', () => {
-    expect(describeExecFailure({ killed: true, signal: 'SIGTERM', code: null }, { timeoutMs: 30000 })).toEqual({
-      message: 'Timed out after 30s (SIGTERM).',
-      timedOut: true
-    })
-  })
-  it('buffer overflow', () => {
-    const r = describeExecFailure({ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER', killed: true, signal: 'SIGTERM' }, { maxBuffer: 1024 * 1024 })
-    expect(r?.overflow).toBe(true)
-    expect(r?.message).toMatch(/1 MB/)
-  })
-  it('spawn errors keep error.message', () => {
-    expect(describeExecFailure({ code: 'ENOENT', message: 'spawn /bin/nope ENOENT' })).toEqual({
-      message: 'spawn /bin/nope ENOENT'
-    })
   })
 })

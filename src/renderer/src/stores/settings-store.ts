@@ -65,7 +65,10 @@ export interface Settings {
   colorOverrides: ColorOverrides
 
   // Command line
+  /** Blank = auto ($SHELL on macOS/Linux, pwsh → powershell on Windows). */
   shell: string
+  /** Height of the docked command output pane, px. */
+  cmdlineOutputHeight: number
 
   // Updates
   autoCheckForUpdates: boolean
@@ -92,7 +95,8 @@ const DEFAULT_SETTINGS: Settings = {
   confirmOverwrite: true,
   theme: 'dark',
   colorOverrides: {},
-  shell: navigator.platform?.startsWith('Win') ? 'powershell' : '/bin/bash',
+  shell: '',
+  cmdlineOutputHeight: 220,
   autoCheckForUpdates: true,
   autoDownloadUpdates: true,
   firstRunHintShown: false
@@ -170,9 +174,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetColorOverrides: () => get().updateSettings({ colorOverrides: {} })
 }))
 
+/**
+ * Shell values that used to be the hard-coded defaults. Saved settings store
+ * every field, so these would otherwise pin old installs to /bin/bash or
+ * Windows PowerShell; they mean "auto" now.
+ */
+const LEGACY_DEFAULT_SHELLS = new Set(['/bin/bash', 'powershell'])
+
+export function migrateSettings(saved: Partial<Settings>): Partial<Settings> {
+  if (typeof saved.shell === 'string' && LEGACY_DEFAULT_SHELLS.has(saved.shell.trim())) {
+    return { ...saved, shell: '' }
+  }
+  return saved
+}
+
 /** Called once on app startup. Loads from disk; migrates localStorage data if no disk file yet. */
 export async function loadSettings(): Promise<void> {
-  const diskData = await window.api.store.get('settings') as Partial<Settings> | null
+  const rawDisk = await window.api.store.get('settings') as Partial<Settings> | null
+  const diskData = rawDisk && typeof rawDisk === 'object' ? migrateSettings(rawDisk) : null
   if (diskData && typeof diskData === 'object') {
     const merged = { ...DEFAULT_SETTINGS, ...diskData, colorOverrides: { ...DEFAULT_SETTINGS.colorOverrides, ...diskData.colorOverrides } }
     useSettingsStore.setState(merged)
@@ -183,7 +202,7 @@ export async function loadSettings(): Promise<void> {
   try {
     const lsRaw = localStorage.getItem('flemanager-settings')
     if (lsRaw) {
-      const parsed = JSON.parse(lsRaw) as Partial<Settings>
+      const parsed = migrateSettings(JSON.parse(lsRaw) as Partial<Settings>)
       const merged = { ...DEFAULT_SETTINGS, ...parsed, colorOverrides: { ...DEFAULT_SETTINGS.colorOverrides, ...parsed.colorOverrides } }
       useSettingsStore.setState(merged)
       applyDisplaySettings(merged)

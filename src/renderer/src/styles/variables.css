@@ -157,6 +157,24 @@
   --z-menu: 200;
   --z-operation: 250; /* deliberately above menu: op overlay covers open dropdowns */
   --z-toast: 300;
+
+  /* ANSI palette for the command output pane (0–7 normal, 8–15 bright). */
+  --ansi-0: #3b3f46;
+  --ansi-1: #f2777a;
+  --ansi-2: #8fd18f;
+  --ansi-3: #e6c07b;
+  --ansi-4: #6aa9ff;
+  --ansi-5: #c99be8;
+  --ansi-6: #5fd3d3;
+  --ansi-7: #c8ccd4;
+  --ansi-8: #6b717c;
+  --ansi-9: #ff8f8f;
+  --ansi-10: #a8e6a1;
+  --ansi-11: #f5d68a;
+  --ansi-12: #8fbfff;
+  --ansi-13: #dcb3f5;
+  --ansi-14: #8be9e9;
+  --ansi-15: #f2f4f8;
 }
 
 /* Light — same structure, airy cool grays (same temperature as dark) */
@@ -210,6 +228,23 @@
   --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
   --shadow-float: 0 6px 18px rgba(0, 0, 0, 0.1);
   --row-stripe: color-mix(in srgb, #000000 2%, transparent);
+
+  --ansi-0: #2e3138;
+  --ansi-1: #c4262b;
+  --ansi-2: #2e8b3a;
+  --ansi-3: #9a6a00;
+  --ansi-4: #1f5fd1;
+  --ansi-5: #8a3fb8;
+  --ansi-6: #0f7f86;
+  --ansi-7: #5d636e;
+  --ansi-8: #7a808b;
+  --ansi-9: #e0363c;
+  --ansi-10: #3aa64a;
+  --ansi-11: #b88300;
+  --ansi-12: #3c7cf0;
+  --ansi-13: #a457d1;
+  --ansi-14: #16a0a8;
+  --ansi-15: #1d1f23;
 }
 
 /* Monokai skin — color only; density/radius from :root */

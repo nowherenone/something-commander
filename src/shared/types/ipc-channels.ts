@@ -12,8 +12,15 @@ export const IPC_CHANNELS = {
 
   // Utility
   CALC_FOLDER_SIZE: 'util:calcFolderSize',
-  RUN_COMMAND: 'util:runCommand',
   RUN_DETACHED: 'util:runDetached',
+  // Command line (streaming runs keyed by a renderer-chosen run id)
+  CMD_START: 'cmd:start',
+  CMD_STOP: 'cmd:stop',
+  CMD_DATA: 'cmd:data',
+  CMD_EXIT: 'cmd:exit',
+  CMD_COMPLETE_PATH: 'cmd:completePath',
+  CMD_LIST_COMMANDS: 'cmd:listCommands',
+  CMD_SHELL_INFO: 'cmd:shellInfo',
   READ_FILE_CONTENT: 'util:readFileContent',
   SEARCH_FILES: 'util:searchFiles',
   COPY_SINGLE_FILE: 'ops:copySingleFile',

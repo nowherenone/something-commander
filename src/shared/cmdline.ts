@@ -350,32 +350,3 @@ export function matchBookmark<T extends { name: string }>(bookmarks: readonly T[
     null
   )
 }
-
-export interface ExecFailure {
-  code?: number | string | null
-  killed?: boolean
-  signal?: string | null
-  message?: string
-}
-
-/**
- * Describe why a child process failed, for the output pane header.
- * Returns null for a plain non-zero exit (stderr already says why).
- */
-export function describeExecFailure(
-  err: ExecFailure | null | undefined,
-  opts: { timeoutMs?: number; maxBuffer?: number } = {}
-): { message: string; timedOut?: boolean; overflow?: boolean } | null {
-  if (!err) return null
-  if (err.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
-    const mb = opts.maxBuffer ? `${Math.round(opts.maxBuffer / 1024 / 1024)} MB` : 'the buffer limit'
-    return { message: `Output exceeded ${mb}; the command was stopped and output is truncated.`, overflow: true }
-  }
-  if (err.killed && err.signal) {
-    const secs = opts.timeoutMs ? `${Math.round(opts.timeoutMs / 1000)}s` : 'the time limit'
-    return { message: `Timed out after ${secs} (${err.signal}).`, timedOut: true }
-  }
-  if (typeof err.code === 'number') return null
-  if (err.signal) return { message: `Terminated by ${err.signal}.` }
-  return { message: err.message || String(err.code || 'Command failed') }
-}

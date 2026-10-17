@@ -33,13 +33,16 @@ const activeIsCmdline = (win: Page) =>
   win.evaluate(() => document.activeElement?.hasAttribute('data-cmdline-input') ?? false)
 
 async function goTo(win: Page, dir: string): Promise<void> {
-  // Escape out of the command line first so Ctrl+L reaches the panel.
-  await win.locator('[data-file-list="left"]').click({ position: { x: 60, y: 10 } })
-  await win.keyboard.press('Control+l')
-  await win.keyboard.press('Control+a')
-  await win.keyboard.type(dir)
-  await win.keyboard.press('Enter')
-  await expect(prompt(win)).toContainText(path.basename(dir))
+  // Escape out of the command line first so Ctrl+L reaches the panel. A cold
+  // first launch can still be wiring up the panel, so retry the whole gesture.
+  await expect(async () => {
+    await win.locator('[data-file-list="left"]').click({ position: { x: 60, y: 10 } })
+    await win.keyboard.press('Control+l')
+    await win.keyboard.press('Control+a')
+    await win.keyboard.type(dir)
+    await win.keyboard.press('Enter')
+    await expect(prompt(win)).toContainText(path.basename(dir), { timeout: 2000 })
+  }).toPass({ timeout: 15000 })
 }
 
 /** Focus the left file list and put the cursor on the first real entry (row 1, below ".."). */
@@ -55,6 +58,11 @@ test.beforeAll(() => {
   work = path.join(tmp, 'work')
   fs.mkdirSync(path.join(work, 'aaa-dir'), { recursive: true })
   fs.writeFileSync(path.join(work, 'my file.txt'), 'hello\n')
+  const smart = path.join(tmp, 'smart')
+  fs.mkdirSync(smart, { recursive: true })
+  fs.writeFileSync(path.join(smart, 'alpha-file.txt'), 'A\n')
+  fs.writeFileSync(path.join(smart, 'beta.txt'), 'B\n')
+  fs.writeFileSync(path.join(smart, 'gamma.txt'), 'C\n')
   fs.mkdirSync(path.join(tmp, 'home', '.config'), { recursive: true })
 })
 
@@ -161,6 +169,82 @@ test('command line: mkdir built-in, ! prefix, Shift+Enter detached', async () =>
     await input(win).press('Shift+Enter')
     await expect.poll(() => fs.existsSync(path.join(work, 'detached.txt')), { timeout: 5000 }).toBe(true)
     expect(await activeIsCmdline(win)).toBe(true)
+  } finally {
+    await app.close()
+  }
+})
+
+test('command line: streaming, Stop, ANSI, Tab, Ctrl+R, placeholders, Each', async () => {
+  const smart = path.join(tmp, 'smart')
+  const { app, win } = await launch()
+  const out = win.getByTestId('cmdline-output')
+  try {
+    await goTo(win, smart)
+    await input(win).click()
+
+    // ── Output streams while the command runs; Stop ends it ──
+    await input(win).fill('echo streamed-early; sleep 30; echo never')
+    await input(win).press('Enter')
+    await expect(out).toContainText('streamed-early', { timeout: 5000 })
+    await expect(out).toHaveAttribute('data-state', 'running')
+    await out.getByRole('button', { name: 'Stop' }).click()
+    await expect(out).toContainText('Stopped', { timeout: 5000 })
+    await expect(out.locator('pre')).not.toContainText('never')
+    expect(await activeIsCmdline(win)).toBe(true)
+
+    // Ctrl+C in an empty selection also stops.
+    await input(win).fill('sleep 30')
+    await input(win).press('Enter')
+    await expect(out).toHaveAttribute('data-state', 'running')
+    await input(win).press('Control+c')
+    await expect(out).toContainText('Stopped', { timeout: 5000 })
+
+    // ── ANSI colour becomes styled spans ──
+    await input(win).fill("printf '\\033[31mred-text\\033[0m plain\\n'")
+    await input(win).press('Enter')
+    await expect(out.locator('span[class*="ansiFg1"]')).toHaveText('red-text')
+    await expect(out).toHaveAttribute('data-state', 'ok')
+
+    // ── Tab completes a file name in the panel's directory ──
+    await input(win).fill('cat alp')
+    await input(win).press('Tab')
+    await expect(input(win)).toHaveValue('cat alpha-file.txt ')
+    await input(win).press('Enter')
+    await expect(out).toContainText('A')
+
+    // ── Ctrl+R fuzzy history search ──
+    await input(win).fill('')
+    await input(win).press('Control+r')
+    const search = win.locator('[data-cmdline-search]')
+    await expect(search).toBeFocused()
+    await search.type('catalp')
+    await expect(win.getByRole('listbox', { name: 'History matches' })).toContainText('cat alpha-file.txt')
+    await search.press('Enter')
+    await expect(input(win)).toHaveValue('cat alpha-file.txt')
+    await expect(input(win)).toBeFocused()
+
+    // ── Placeholders: ghost preview, then the expanded command runs ──
+    await cursorOnFirstEntry(win) // "alpha-file.txt"
+    await input(win).click()
+    await input(win).fill('echo got %f')
+    await expect(win.getByTestId('cmdline-preview')).toContainText("echo got alpha-file.txt")
+    await input(win).press('Enter')
+    await expect(out).toContainText('got alpha-file.txt')
+
+    // ── Each: one run per selected file ──
+    await cursorOnFirstEntry(win)
+    await win.keyboard.press('Insert') // select alpha, cursor → beta
+    await win.keyboard.press('Insert') // select beta
+    await input(win).click()
+    await win.getByRole('button', { name: /^Each/ }).click()
+    await expect(win.getByRole('button', { name: /^Each/ })).toHaveAttribute('aria-pressed', 'true')
+    await input(win).fill('echo each: %f')
+    await expect(win.getByTestId('cmdline-preview')).toContainText('+1 more')
+    await input(win).press('Enter')
+    await expect(out).toContainText('each: alpha-file.txt')
+    await expect(out).toContainText('each: beta.txt')
+    await expect(out.locator('pre')).not.toContainText('each: gamma.txt')
+    await expect(out).toHaveAttribute('data-state', 'ok')
   } finally {
     await app.close()
   }

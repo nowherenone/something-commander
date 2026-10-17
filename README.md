@@ -31,6 +31,8 @@ Selection and navigation work the way they always have: **Tab** swaps panels, **
 | `Ctrl+E` | Focus command line | `Alt+F8` / `Ctrl+↓` | Command history |
 | `Ctrl+Enter` | Paste cursor name into command line | `Ctrl+Shift+Enter` | Paste cursor full path |
 | `Ctrl+P` | Paste current directory | `Shift+Enter` (in command line) | Run detached (GUI apps) |
+| `Tab` (in command line) | Complete path / command / history | `Ctrl+R` (in command line) | Fuzzy-search history |
+| `Ctrl+C` (in command line, while running) | Stop the running command | | |
 
 Every binding is remappable in **F9 → Keybindings**, if your fingers disagree with our defaults.
 
@@ -47,7 +49,13 @@ The bar at the bottom runs commands in the active panel's directory. It's on by 
 - **Paste helpers:** `Ctrl+Enter` inserts the name under the cursor, `Ctrl+Shift+Enter` its full path, `Ctrl+P` the current directory — quoted for your shell (bash/zsh, PowerShell, or cmd).
 - **Built-ins that drive the panel:** `cd` (`..`, `~`, `-`, absolute or relative, `D:` on Windows — also inside SFTP/S3/archives where it makes sense), `mkdir <name>`, and `j <bookmark>` to jump to a bookmark by name. Prefix a line with `!` to send it straight to the shell instead.
 - **Type a file's name** (a non-executable file in the current folder) and press Enter to open it with its associated app.
-- `Enter` runs and shows the output (errors, exit codes, timeouts and overflow included); `Shift+Enter` starts the command detached for GUI apps.
+- **Your real shell.** By default commands run in `$SHELL` (falling back to `/bin/sh`); on macOS the login environment (`$SHELL -ilc env`) is captured once at startup so Homebrew/nvm/pyenv PATHs work even when the app was launched from the Dock. On Windows it prefers `pwsh`, then Windows PowerShell, with UTF-8 output forced. **F9 → General → Shell** still overrides it (e.g. `cmd`, `zsh`, `/usr/bin/fish`); leave it empty for auto. Settings that held the old defaults (`/bin/bash`, `powershell`) are migrated to auto.
+- **Streaming output.** `Enter` runs the command and streams stdout/stderr into a docked, resizable pane (drag its top edge) — no time limit, ANSI colors rendered, stderr tinted, very long output keeps the last lines. **Stop** in the pane header, or `Ctrl+C` in the command line with no text selected, kills the whole process tree. Commands get no stdin, so interactive programs (`vim`, `top`, password prompts) won't work — use a terminal for those. Non-zero exits, kills and spawn errors show in the pane header.
+- `Shift+Enter` starts the command detached for GUI apps.
+- **Tab completion:** file and folder names (relative, absolute or `~/`, quoted if needed), commands on your `PATH` (and `PATHEXT` on Windows) for the first word, and matching history. One match is inserted; several extend the common prefix and open a list (`↑`/`↓`, `Tab`/`Enter` to accept).
+- **`Ctrl+R`** opens a fuzzy history search; type a few letters, `Enter` picks, `Ctrl+R`/`↓` cycles, `Esc` cancels.
+- **Placeholders** (whole words only, shell-quoted): `%f` the name under the cursor, `%F` or `%s` the full paths of the selection (or the cursor file), `%p` the active panel's directory, `%P` the other panel's. A ghost line under the bar previews the expanded command. Write `%%f` for a literal `%f`.
+- **Each:** toggle the **Each** button to run the command once per selected file (sequentially, with progress in the pane header). `%f`/`%F` then refer to that one file; without placeholders the file name is appended.
 - **History** is kept across restarts (last 500, no duplicates): `↑`/`↓` walk it, `Ctrl+↓` or `Alt+F8` opens the list (`Shift+Del` removes an entry).
 - Shell commands only run in local folders; on SFTP/S3/SMB/archive panels the bar says so, and `cd`/`j`/`mkdir` still work.
 
@@ -60,7 +68,7 @@ The bar at the bottom runs commands in the active panel's directory. It's on by 
 - **Multi-rename tool** (`Ctrl+M`) for the "rename 300 photos" evening.
 - **F3 view / F4 edit** with a built-in viewer and editor.
 - **Quick view** (`Ctrl+Q`) previews the cursor's file without leaving the list.
-- **Command line** at the bottom of the panel — runs in the active panel's directory, with persistent history, `cd`/`j` built-ins and Total Commander paste keys. Your shell, your PATH. See [The command line](#the-command-line).
+- **Command line** at the bottom of the panel — runs in the active panel's directory, with streaming colored output, Tab completion, `Ctrl+R` history search, `%f`-style placeholders, persistent history, `cd`/`j` built-ins and Total Commander paste keys. Your shell, your PATH. See [The command line](#the-command-line).
 - **Four themes**, including a **Classic** skin — the blue-and-yellow you're nostalgic for is one settings click away. Font, font size, and row height are configurable too, because 24px rows at 13px mono is a feature, not a bug.
 
 ## Building from source
