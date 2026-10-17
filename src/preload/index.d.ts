@@ -27,7 +27,17 @@ interface UtilAPI {
     command: string,
     cwd: string,
     shell?: string
-  ): Promise<{ stdout: string; stderr: string; code: number }>
+  ): Promise<{
+    stdout: string
+    stderr: string
+    code: number
+    /** Spawn error, timeout or buffer-overflow description (absent on plain exit codes). */
+    error?: string
+    timedOut?: boolean
+    overflow?: boolean
+  }>
+  /** Start a command detached (no output, survives the app) — Shift+Enter. */
+  runDetached(command: string, cwd: string, shell?: string): Promise<{ success: boolean; error?: string }>
   readFileContent(
     filePath: string,
     maxBytes?: number

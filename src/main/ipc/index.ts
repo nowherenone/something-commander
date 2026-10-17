@@ -3,6 +3,7 @@ import { registerStoreIPC } from './store-ipc'
 import { registerViewerIPC } from './viewer-ipc'
 import { registerConnectionIPC } from './connection-ipc'
 import { registerSystemIPC } from './system-ipc'
+import { registerCommandIPC } from './command-ipc'
 import { registerFsIPC } from './fs-ipc'
 import { registerSearchIPC } from './search-ipc'
 import { registerUpdateIPC, registerMainWindowForUpdates } from './update-ipc'
@@ -14,6 +15,7 @@ export function registerAllIPC(): void {
   registerViewerIPC()
   registerConnectionIPC()
   registerSystemIPC()
+  registerCommandIPC()
   registerFsIPC()
   registerSearchIPC()
   registerUpdateIPC()

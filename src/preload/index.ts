@@ -38,8 +38,17 @@ const utilAPI = {
     command: string,
     cwd: string,
     shell?: string
-  ): Promise<{ stdout: string; stderr: string; code: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.RUN_COMMAND, command, cwd, shell),
+  ): Promise<{
+    stdout: string
+    stderr: string
+    code: number
+    error?: string
+    timedOut?: boolean
+    overflow?: boolean
+  }> => ipcRenderer.invoke(IPC_CHANNELS.RUN_COMMAND, command, cwd, shell),
+
+  runDetached: (command: string, cwd: string, shell?: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RUN_DETACHED, command, cwd, shell),
 
   readFileContent: (
     filePath: string,

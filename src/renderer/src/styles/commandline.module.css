@@ -93,3 +93,63 @@
   color: var(--text-primary);
   background: var(--bg-hover);
 }
+
+.promptRemote {
+  color: var(--text-muted);
+}
+
+.inputWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.outputStatus {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+  padding-right: 28px;
+}
+
+.historyDropdown {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  background: var(--bg-secondary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dropdown);
+  z-index: var(--z-commandline);
+}
+
+.historyItem {
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.historyItem:hover {
+  background: var(--bg-hover);
+}
+
+.historyItemActive {
+  background: var(--bg-cursor);
+}
+
+.outputStatus.outputError {
+  color: var(--danger);
+}

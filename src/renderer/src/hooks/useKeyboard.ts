@@ -5,6 +5,7 @@ import { useKeybindingsStore } from '../stores/keybindings-store'
 import { useOverlayStore } from '../stores/overlay-store'
 import { useSettingsStore } from '../stores/settings-store'
 import { dispatchCommand } from '../commands/registry'
+import { isTypeToCmdlineKey, typeIntoCommandLine } from '../commands/cmdline-commands'
 
 /**
  * Rows jumped by PageUp/PageDown (F-25): one screen of the active file list,
@@ -54,10 +55,14 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
         }
       }
 
-      // Don't handle keyboard when another input is focused.
+      // Don't handle keyboard when another input is focused. The event target
+      // is checked too: a key that started in an input (e.g. Enter in the
+      // command line) must never reach the panel even if focus moved meanwhile.
       if (
         document.activeElement instanceof HTMLInputElement ||
-        document.activeElement instanceof HTMLTextAreaElement
+        document.activeElement instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
       ) {
         if (e.key === 'Escape') {
           ;(document.activeElement as HTMLElement).blur()
@@ -169,7 +174,9 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
         case 'Enter': {
           e.preventDefault()
           if (e.ctrlKey) {
-            dispatchCommand('rename')
+            // Ctrl(+Shift)+Enter: paste name/path into the command line (remappable).
+            const ctrlAction = useKeybindingsStore.getState().matchAction(e)
+            if (ctrlAction) dispatchCommand(ctrlAction)
             return
           }
           const offset = parentOffset(tab)
@@ -233,6 +240,17 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
       // Fall through: try keybinding → command-registry dispatch.
       const action = useKeybindingsStore.getState().matchAction(e)
       if (action && dispatchCommand(action)) {
+        e.preventDefault()
+        return
+      }
+
+      // Type-to-command-line: an unbound printable key starts a command.
+      if (
+        !inMenu &&
+        useOverlayStore.getState().overlays.length === 0 &&
+        isTypeToCmdlineKey(e) &&
+        typeIntoCommandLine(e.key)
+      ) {
         e.preventDefault()
       }
     }

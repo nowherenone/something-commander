@@ -29,7 +29,6 @@ const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: 'F7', action: 'mkdir' },
   { key: 'F7', alt: true, action: 'search' },
   { key: 'F2', action: 'rename' },
-  { key: 'Enter', ctrl: true, action: 'rename' },
   { key: 'F8', action: 'delete' },
   { key: 'Delete', action: 'delete' },
   { key: 'F9', action: 'settings' },
@@ -54,7 +53,23 @@ const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: '1', ctrl: true, action: 'viewBrief' },
   { key: '2', ctrl: true, action: 'viewTree' },
   { key: '3', ctrl: true, action: 'viewInfo' },
-  { key: 'q', ctrl: true, action: 'viewQuickview' }
+  { key: 'q', ctrl: true, action: 'viewQuickview' },
+  // Command line (Total Commander parity). Ctrl+Enter used to rename; rename
+  // is F2 only now and the chord pastes the cursor name instead.
+  { key: 'e', ctrl: true, action: 'focusCommandLine' },
+  { key: 'Enter', ctrl: true, action: 'cmdlinePasteName' },
+  { key: 'Enter', ctrl: true, shift: true, action: 'cmdlinePastePath' },
+  { key: 'p', ctrl: true, action: 'cmdlinePasteDir' },
+  { key: 'F8', alt: true, action: 'cmdlineHistory' }
+]
+
+/** Actions added with the command-line upgrade (v4 migration marker set). */
+const CMDLINE_ACTIONS = [
+  'focusCommandLine',
+  'cmdlinePasteName',
+  'cmdlinePastePath',
+  'cmdlinePasteDir',
+  'cmdlineHistory'
 ]
 
 interface KeybindingsState {
@@ -88,12 +103,30 @@ function migrateBindings(saved: Keybinding[]): Keybinding[] {
   return additions.length > 0 ? [...filtered, ...additions] : filtered
 }
 
+/**
+ * v4: command-line chords. A saved blob that has none of the command-line
+ * actions predates them: drop its Ctrl+Enter → rename (rename stays on F2)
+ * and append the new defaults whose chords are still free. Blobs that already
+ * know a command-line action are left alone, so a user who later rebinds
+ * Ctrl+Enter back to rename keeps it.
+ */
+export function migrateCmdlineBindings(saved: Keybinding[]): Keybinding[] {
+  if (saved.some((b) => CMDLINE_ACTIONS.includes(b.action))) return saved
+  const stale = bindingKey({ key: 'Enter', ctrl: true, action: 'rename' })
+  const filtered = saved.filter((b) => !(b.action === 'rename' && bindingKey(b) === stale))
+  const present = new Set(filtered.map(bindingKey))
+  const additions = DEFAULT_KEYBINDINGS.filter(
+    (b) => CMDLINE_ACTIONS.includes(b.action) && !present.has(bindingKey(b))
+  )
+  return [...filtered, ...additions]
+}
+
 function loadBindings(): Keybinding[] {
   try {
     const saved = localStorage.getItem('flemanager-keybindings')
     if (saved) {
       const parsed = JSON.parse(saved) as Keybinding[]
-      if (Array.isArray(parsed) && parsed.length > 0) return migrateBindings(parsed)
+      if (Array.isArray(parsed) && parsed.length > 0) return migrateCmdlineBindings(migrateBindings(parsed))
     }
   } catch { /* ignore */ }
   return [...DEFAULT_KEYBINDINGS]

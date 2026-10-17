@@ -86,7 +86,8 @@ const DEFAULT_SETTINGS: Settings = {
   // line show a byte count below 10 MB and a unit from 10 MB up.
   sizeFormat: 'short',
   bottomBar: 'fnkeys',
-  showCommandLine: false,
+  // On by default for new installs; saved settings keep whatever the user chose.
+  showCommandLine: true,
   confirmDelete: true,
   confirmOverwrite: true,
   theme: 'dark',

@@ -28,13 +28,28 @@ Selection and navigation work the way they always have: **Tab** swaps panels, **
 | `Ctrl+I` | Invert selection | `Ctrl+Shift+C` | Compare directories |
 | `Ctrl+T` / `Ctrl+W` | New / close tab | `Ctrl+L` | Focus address bar |
 | `Ctrl+D` | Drive menu | `Ctrl+C` | Copy selected names |
+| `Ctrl+E` | Focus command line | `Alt+F8` / `Ctrl+↓` | Command history |
+| `Ctrl+Enter` | Paste cursor name into command line | `Ctrl+Shift+Enter` | Paste cursor full path |
+| `Ctrl+P` | Paste current directory | `Shift+Enter` (in command line) | Run detached (GUI apps) |
 
 Every binding is remappable in **F9 → Keybindings**, if your fingers disagree with our defaults.
 
 ### Two deliberate departures
 
 - **Ctrl+C copies the selected file names**, not "compare directories". It's the entrenched clipboard convention; compare lives on `Ctrl+Shift+C`.
-- **F2 renames** (Total Commander habit) — `Ctrl+Enter` also works.
+- **F2 renames** (Total Commander habit). `Ctrl+Enter` used to rename too; it now pastes the cursor name into the command line, as in Total Commander. Saved keybindings are migrated automatically — rebind it in your keybindings if you want the old behavior back.
+
+### The command line
+
+The bar at the bottom runs commands in the active panel's directory. It's on by default (toggle it from **View → Command Line**).
+
+- **Just start typing.** Any printable key in the panel (no Ctrl/Alt) goes to the command line. `Ctrl+E` focuses it explicitly.
+- **Paste helpers:** `Ctrl+Enter` inserts the name under the cursor, `Ctrl+Shift+Enter` its full path, `Ctrl+P` the current directory — quoted for your shell (bash/zsh, PowerShell, or cmd).
+- **Built-ins that drive the panel:** `cd` (`..`, `~`, `-`, absolute or relative, `D:` on Windows — also inside SFTP/S3/archives where it makes sense), `mkdir <name>`, and `j <bookmark>` to jump to a bookmark by name. Prefix a line with `!` to send it straight to the shell instead.
+- **Type a file's name** (a non-executable file in the current folder) and press Enter to open it with its associated app.
+- `Enter` runs and shows the output (errors, exit codes, timeouts and overflow included); `Shift+Enter` starts the command detached for GUI apps.
+- **History** is kept across restarts (last 500, no duplicates): `↑`/`↓` walk it, `Ctrl+↓` or `Alt+F8` opens the list (`Shift+Del` removes an entry).
+- Shell commands only run in local folders; on SFTP/S3/SMB/archive panels the bar says so, and `cd`/`j`/`mkdir` still work.
 
 ## What it does
 
@@ -45,7 +60,7 @@ Every binding is remappable in **F9 → Keybindings**, if your fingers disagree 
 - **Multi-rename tool** (`Ctrl+M`) for the "rename 300 photos" evening.
 - **F3 view / F4 edit** with a built-in viewer and editor.
 - **Quick view** (`Ctrl+Q`) previews the cursor's file without leaving the list.
-- **Command line** at the bottom of the panel — runs in the active panel's directory, with history. Your shell, your PATH.
+- **Command line** at the bottom of the panel — runs in the active panel's directory, with persistent history, `cd`/`j` built-ins and Total Commander paste keys. Your shell, your PATH. See [The command line](#the-command-line).
 - **Four themes**, including a **Classic** skin — the blue-and-yellow you're nostalgic for is one settings click away. Font, font size, and row height are configurable too, because 24px rows at 13px mono is a feature, not a bug.
 
 ## Building from source
@@ -65,6 +80,7 @@ npm run dev        # Electron + hot reload
 | `npm run test:visual` | Playwright visual / dialog UI tests |
 | `npm run test:all` | Unit **+** visual — **required gate** |
 | `npm run test:e2e:update` | Refresh screenshots after intentional UI changes |
+| `npm run test:e2e:electron` | Builds, then drives the real Electron app (command-line keyboard/focus). Headless Linux: `xvfb-run -a npm run test:e2e:electron` |
 | `npm run pre-release` | typecheck + `test:all` + production build |
 
 - **Unit**: includes real zip→disk stream progress and cancel tests under `src/__tests__/`.
