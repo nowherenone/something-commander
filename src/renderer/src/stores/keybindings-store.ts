@@ -29,6 +29,7 @@ const DEFAULT_KEYBINDINGS: Keybinding[] = [
   { key: 'F7', action: 'mkdir' },
   { key: 'F7', alt: true, action: 'search' },
   { key: 'F2', action: 'rename' },
+  { key: 'Enter', alt: true, action: 'properties' },
   { key: 'F8', action: 'delete' },
   { key: 'Delete', action: 'delete' },
   { key: 'F9', action: 'settings' },
@@ -90,6 +91,7 @@ function bindingKey(b: Keybinding): string {
  * who have a stored copy. v2 changes: Ctrl+C is copyNames (was compare),
  * compare moved to Ctrl+Shift+C. Old entries for those chords are dropped and
  * the new defaults appended unless the user's blob already defines the chord.
+ * v3 adds Alt+Enter → properties the same way.
  */
 function migrateBindings(saved: Keybinding[]): Keybinding[] {
   const stale = new Set([
@@ -98,7 +100,7 @@ function migrateBindings(saved: Keybinding[]): Keybinding[] {
   const filtered = saved.filter((b) => !stale.has(bindingKey(b)))
   const present = new Set(filtered.map(bindingKey))
   const additions = DEFAULT_KEYBINDINGS.filter(
-    (b) => ['copyNames', 'compare'].includes(b.action) && !present.has(bindingKey(b))
+    (b) => ['copyNames', 'compare', 'properties'].includes(b.action) && !present.has(bindingKey(b))
   )
   return additions.length > 0 ? [...filtered, ...additions] : filtered
 }

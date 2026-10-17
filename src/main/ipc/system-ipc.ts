@@ -3,9 +3,10 @@ import * as fs from 'fs/promises'
 import * as fsSync from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { exec, spawn, spawnSync } from 'child_process'
+import { exec, spawnSync } from 'child_process'
 import { IPC_CHANNELS } from '@shared/types/ipc-channels'
 import { pluginManager } from '../plugins/plugin-manager'
+import { openWindowsProperties, openMacProperties, openLinuxProperties, type PropertiesResult } from './file-properties'
 
 let dragIconCache: Electron.NativeImage | null = null
 
@@ -193,85 +194,10 @@ function dragFilesOnLinux(paths: string[]): boolean {
   }
 }
 
-function commandExists(cmd: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    exec(`command -v ${cmd}`, (err) => resolve(!err))
-  })
-}
-
-function spawnDetached(cmd: string, args: string[]): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      const child = spawn(cmd, args, { detached: true, stdio: 'ignore' })
-      child.on('error', () => resolve(false))
-      child.unref()
-      resolve(true)
-    } catch {
-      resolve(false)
-    }
-  })
-}
-
-async function showFilePropertiesWindows(filePath: string): Promise<{ success: boolean; error?: string }> {
-  const escaped = filePath.replace(/'/g, "''")
-  return new Promise((resolve) => {
-    exec(
-      `powershell -NoProfile -Command "$shell = New-Object -ComObject Shell.Application; $item = Get-Item -LiteralPath '${escaped}'; $folder = $shell.Namespace($item.DirectoryName); $folderItem = $folder.ParseName($item.Name); $folderItem.InvokeVerb('properties')"`,
-      { timeout: 10000 },
-      (err) => {
-        if (err) resolve({ success: false, error: String(err) })
-        else resolve({ success: true })
-      }
-    )
-  })
-}
-
-async function showFilePropertiesMac(filePath: string): Promise<{ success: boolean; error?: string }> {
-  const escaped = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  return new Promise((resolve) => {
-    exec(
-      `osascript -e 'tell application "Finder" to open information window of (POSIX file "${escaped}" as alias)'`,
-      { timeout: 10000 },
-      (err) => {
-        if (err) resolve({ success: false, error: String(err) })
-        else resolve({ success: true })
-      }
-    )
-  })
-}
-
-async function showFilePropertiesLinux(filePath: string): Promise<{ success: boolean; error?: string }> {
-  const uri = `file://${encodeURI(filePath)}`
-  const attempts: Array<[string, string[]]> = [
-    ['nautilus', ['--show-properties', uri]],
-    ['nemo', ['--show-properties', uri]],
-    ['caja', ['--show-properties', uri]],
-    ['pcmanfm-qt', ['--show-properties', filePath]],
-    ['pcmanfm', ['--show-properties', filePath]]
-  ]
-
-  for (const [cmd, args] of attempts) {
-    if (await commandExists(cmd)) {
-      const ok = await spawnDetached(cmd, args)
-      if (ok) return { success: true }
-    }
+async function showFileProperties(filePath: string): Promise<PropertiesResult> {
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.includes('::')) {
+    return { success: false, error: 'Properties are only available for local files' }
   }
-
-  if (await commandExists('dbus-send')) {
-    const ok = await spawnDetached('dbus-send', [
-      '--print-reply',
-      '--dest=org.kde.dolphin',
-      '/dolphin',
-      'org.kde.dolphin.showItemInfo',
-      `string:${uri}`
-    ])
-    if (ok) return { success: true }
-  }
-
-  return { success: false, error: 'No supported file manager found' }
-}
-
-async function showFileProperties(filePath: string): Promise<{ success: boolean; error?: string }> {
   const resolved = path.resolve(filePath)
   try {
     await fs.access(resolved)
@@ -279,9 +205,9 @@ async function showFileProperties(filePath: string): Promise<{ success: boolean;
     return { success: false, error: 'File not found' }
   }
 
-  if (process.platform === 'win32') return showFilePropertiesWindows(resolved)
-  if (process.platform === 'darwin') return showFilePropertiesMac(resolved)
-  return showFilePropertiesLinux(resolved)
+  if (process.platform === 'win32') return openWindowsProperties(resolved)
+  if (process.platform === 'darwin') return openMacProperties(resolved)
+  return openLinuxProperties(resolved, (p) => shell.showItemInFolder(p))
 }
 
 let driveWatchersSetup = false

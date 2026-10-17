@@ -179,6 +179,12 @@ export function useKeyboard(actions: KeyboardNavActions = {}): void {
             if (ctrlAction) dispatchCommand(ctrlAction)
             return
           }
+          if (e.altKey) {
+            // Alt+Enter = Properties (classic shortcut), remappable via keybindings.
+            const altAction = useKeybindingsStore.getState().matchAction(e)
+            if (altAction) dispatchCommand(altAction)
+            return
+          }
           const offset = parentOffset(tab)
           const idx = tab.cursorIndex - offset
           if (tab.cursorIndex === 0 && hasParentEntry(tab)) {

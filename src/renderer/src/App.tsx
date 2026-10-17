@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react'
+import { showNativeProperties } from './utils/native-properties'
 import { DualPanel } from './components/panels/DualPanel'
 import { FunctionKeyBar } from './components/layout/FunctionKeyBar'
 import { CommandLine } from './components/layout/CommandLine'
@@ -334,6 +335,23 @@ function App(): React.JSX.Element {
     }
   }, [getCursorEntry])
 
+  const handleProperties = useCallback(async () => {
+    const activePanel = useAppStore.getState().activePanel
+    const tab = usePanelStore.getState().getActiveTab(activePanel)
+    // Cursor item first; with no cursor item, a single selection.
+    let entry = getCursorEntry()
+    if (!entry) {
+      const picked = tab.entries.filter((e) => tab.selectedEntryIds.has(e.id))
+      if (picked.length === 1) entry = picked[0]
+    }
+    if (!entry) {
+      showToast('Nothing selected')
+      return
+    }
+    const msg = await showNativeProperties(tab.pluginId, entry.id)
+    if (msg) showToast(msg)
+  }, [getCursorEntry])
+
   // Register all commands so menu clicks, keyboard shortcuts, and context
   // menus share a single dispatch. Runs whenever any handler identity changes.
   useEffect(() => {
@@ -400,11 +418,12 @@ function App(): React.JSX.Element {
       open: handleOpen,
       focusAddressBar: handleFocusAddressBar,
       copyNames: handleCopyNames,
+      properties: handleProperties,
       cancel: cancelOperation,
       checkForUpdates: handleCheckForUpdates,
       about: handleAbout
     })
-  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleRename, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout, handleOpen, handleFocusAddressBar, handleCopyNames])
+  }, [handleF3, handleF4, handleCopy, handleMove, handlePack, handleUnpack, handleF7, handleDelete, handleRename, handleCtrlM, handleAltF7, handleCompare, handleF9, cancelOperation, handleCheckForUpdates, handleAbout, handleOpen, handleFocusAddressBar, handleCopyNames, handleProperties])
 
   const handleMenuAction = useCallback((action: string) => {
     dispatchCommand(action)

@@ -108,7 +108,7 @@ const utilAPI = {
   showContextMenu: (items: Array<{ label: string; id: string; separator?: boolean }>): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_CONTEXT_MENU, items),
 
-  showFileProperties: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+  showFileProperties: (filePath: string): Promise<{ success: boolean; error?: string; fallback?: 'showItemInFolder' }> =>
     ipcRenderer.invoke(IPC_CHANNELS.SHOW_FILE_PROPERTIES, filePath),
 
   getDiskSpace: (pluginId: string, locationId: string): Promise<{ free: number; total: number }> =>

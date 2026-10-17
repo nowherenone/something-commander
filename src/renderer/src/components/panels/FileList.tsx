@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useEffect } from 'react'
+import { canShowNativeProperties, showNativeProperties } from '../../utils/native-properties'
 import type { Entry } from '@shared/types'
 import type { PanelId } from '../../stores/app-store'
 import { EntryRow } from './EntryRow'
@@ -281,7 +282,9 @@ export function FileList({
       const items = [
         { label: 'Open', id: 'open' },
         { label: 'Copy path', id: 'copyPath' },
-        { label: 'Properties', id: 'properties' },
+        ...(canShowNativeProperties(pluginId, entry.id)
+          ? [{ label: 'Properties (Alt+Enter)', id: 'properties' }]
+          : []),
         { label: '', id: '', separator: true },
         { label: 'Rename (F2)', id: 'rename' },
         { label: '', id: '', separator: true },
@@ -302,15 +305,9 @@ export function FileList({
           }
           break
         case 'properties':
-          if (pluginId !== 'local-filesystem') {
-            showToast('Properties are only available for local files')
-            break
-          }
           {
-            const result = await window.api.util.showFileProperties(entry.id)
-            if (!result.success) {
-              showToast(result.error || 'Could not open file properties')
-            }
+            const msg = await showNativeProperties(pluginId, entry.id)
+            if (msg) showToast(msg)
           }
           break
         case 'delete':
