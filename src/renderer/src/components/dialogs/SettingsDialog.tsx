@@ -41,7 +41,16 @@ const KEYBOARD_SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
   ['Ctrl+H', 'Toggle hidden files'],
   ['Ctrl+C', 'Copy selected names'],
   ['Ctrl+L', 'Focus address bar'],
-  ['Alt+F7', 'Search']
+  ['Alt+F7', 'Search'],
+  ['Ctrl+E', 'Focus command line'],
+  ['Ctrl+Enter', 'Paste cursor name into command line'],
+  ['Ctrl+Shift+Enter', 'Paste cursor full path'],
+  ['Ctrl+P', 'Paste current directory'],
+  ['Alt+F8 / Ctrl+↓', 'Command history'],
+  ['Shift+Enter', 'Run command detached (in command line)'],
+  ['Tab', 'Complete path / command (in command line)'],
+  ['Ctrl+R', 'Search command history (in command line)'],
+  ['Ctrl+C', 'Stop running command (in command line)']
 ]
 
 /** Effective color currently applied to the document for the given variable. */
@@ -299,9 +308,15 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
                   <input
                     className={`${styles.settingsInput} ${styles.inputWide}`}
                     value={settings.shell}
+                    placeholder="Auto"
                     onChange={(e) => update({ shell: e.target.value })}
                   />
                 </div>
+                <p className={styles.settingsHint}>
+                  Leave blank for the default: your $SHELL on macOS/Linux (with the login-shell PATH on
+                  macOS), pwsh or Windows PowerShell on Windows. Set a path (e.g. /bin/zsh, cmd.exe) to
+                  override.
+                </p>
               </div>
 
               <div className={styles.settingsGroup}>

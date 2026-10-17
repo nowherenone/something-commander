@@ -6,6 +6,7 @@ import type {
   OperationRequest,
   OperationResult
 } from '../shared/types'
+import type { CmdRunEvent, CmdStartOptions, CmdPathCompletion } from '../shared/types/cmdline'
 
 interface PluginsAPI {
   list(): Promise<PluginManifest[]>
@@ -23,11 +24,8 @@ interface PluginsAPI {
 
 interface UtilAPI {
   calcFolderSize(folderPath: string): Promise<number>
-  runCommand(
-    command: string,
-    cwd: string,
-    shell?: string
-  ): Promise<{ stdout: string; stderr: string; code: number }>
+  /** Start a command detached (no output, survives the app) — Shift+Enter. */
+  runDetached(command: string, cwd: string, shell?: string): Promise<{ success: boolean; error?: string }>
   readFileContent(
     filePath: string,
     maxBytes?: number
@@ -133,7 +131,21 @@ interface UpdateAPI {
   setAutoDownload(enabled: boolean): void
 }
 
+/** Streaming command-line runs (spawn, no PTY). */
+interface CmdAPI {
+  /** Start `opts.command`; output arrives via onEvent tagged with `runId`. */
+  start(runId: string, opts: CmdStartOptions): Promise<{ shell: string } | { error: string }>
+  /** Stop a run and its child processes. */
+  stop(runId: string): Promise<boolean>
+  onEvent(callback: (ev: CmdRunEvent) => void): () => void
+  completePath(cwd: string, dirPart: string, base: string): Promise<CmdPathCompletion[]>
+  /** Commands on PATH (scanned once in main, cached). */
+  listCommands(): Promise<string[]>
+  shellInfo(override?: string): Promise<{ shell: string; kind: 'posix' | 'powershell' | 'cmd' }>
+}
+
 interface SomethingCommanderAPI {
+  cmd: CmdAPI
   plugins: PluginsAPI
   util: UtilAPI
   store: StoreAPI

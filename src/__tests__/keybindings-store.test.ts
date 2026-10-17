@@ -84,7 +84,9 @@ describe('Alt+Enter properties binding', () => {
   it('does not steal plain Enter or Ctrl+Enter', () => {
     const s = useKeybindingsStore.getState()
     expect(s.matchAction(new KeyboardEvent('keydown', { key: 'Enter' }))).toBe('activate')
-    expect(s.matchAction(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }))).toBe('rename')
+    // Ctrl+Enter pastes the cursor name into the command line; rename is F2 only.
+    expect(s.matchAction(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }))).toBe('cmdlinePasteName')
+    expect(s.matchAction(new KeyboardEvent('keydown', { key: 'F2' }))).toBe('rename')
   })
 
   it('Alt+Enter chord is not bound to anything else', () => {
@@ -142,5 +144,26 @@ describe('keybindings migration (saved blobs from before a rebind)', () => {
     const { useKeybindingsStore: fresh } = await import('../renderer/src/stores/keybindings-store')
     const altEnters = fresh.getState().bindings.filter((b) => b.key === 'Enter' && b.alt)
     expect(altEnters.map((b) => b.action)).toEqual(['customThing'])
+  })
+
+  it('composes the properties (v3) and command-line (v4) migrations for a v0.1.28 blob', async () => {
+    // v0.1.28 defaults: Ctrl+Enter → rename, no Alt+Enter, no command-line chords.
+    const cmdline = ['focusCommandLine', 'cmdlinePasteName', 'cmdlinePastePath', 'cmdlinePasteDir', 'cmdlineHistory']
+    const saved = [
+      ...DEFAULT_KEYBINDINGS.filter((b) => b.action !== 'properties' && !cmdline.includes(b.action)),
+      { key: 'Enter', ctrl: true, action: 'rename' }
+    ]
+    localStorage.setItem('flemanager-keybindings', JSON.stringify(saved))
+    vi.resetModules()
+    const { useKeybindingsStore: fresh } = await import('../renderer/src/stores/keybindings-store')
+    const s = fresh.getState()
+    const actionsFor = (pred: (b: { key: string; ctrl?: boolean; alt?: boolean; shift?: boolean }) => boolean): string[] =>
+      s.bindings.filter(pred).map((b) => b.action)
+    expect(actionsFor((b) => b.key === 'Enter' && !!b.alt && !b.ctrl && !b.shift)).toEqual(['properties'])
+    expect(actionsFor((b) => b.key === 'Enter' && !!b.ctrl && !b.alt && !b.shift)).toEqual(['cmdlinePasteName'])
+    expect(s.bindings.filter((b) => b.action === 'rename').map((b) => b.key)).toEqual(['F2'])
+    expect(s.matchAction(new KeyboardEvent('keydown', { key: 'Enter', altKey: true }))).toBe('properties')
+    expect(s.matchAction(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }))).toBe('cmdlinePasteName')
+    for (const a of cmdline) expect(s.bindings.some((b) => b.action === a)).toBe(true)
   })
 })

@@ -44,38 +44,7 @@
   color: var(--text-muted);
 }
 
-.outputOverlay {
-  position: fixed;
-  bottom: calc(var(--fnbar-height) + var(--commandline-height) + var(--space-4));
-  left: var(--space-6);
-  right: var(--space-6);
-  max-height: 300px;
-  background: var(--bg-secondary);
-  border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius-md);
-  overflow: auto;
-  z-index: var(--z-commandline);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-dropdown);
-}
-
-.output {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-small);
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.45;
-}
-
-.outputError {
-  color: var(--danger);
-}
-
 .closeOutput {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-4);
   width: 24px;
   height: var(--control-height);
   display: inline-flex;
@@ -92,4 +61,328 @@
 .closeOutput:hover {
   color: var(--text-primary);
   background: var(--bg-hover);
+}
+
+.promptRemote {
+  color: var(--text-muted);
+}
+
+.inputWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+
+.historyDropdown {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  background: var(--bg-secondary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dropdown);
+  z-index: var(--z-commandline);
+}
+
+.historyItem {
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.historyItem:hover {
+  background: var(--bg-hover);
+}
+
+.historyItemActive {
+  background: var(--bg-cursor);
+}
+
+.outputError {
+  color: var(--danger);
+}
+
+/* ── Docked output pane ─────────────────────────────────────────────── */
+
+.outputPane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 60px;
+  background: var(--bg-panel);
+  border-top: var(--border-width) solid var(--border-color);
+}
+
+.resizeHandle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: var(--z-commandline);
+}
+
+.resizeHandle:hover {
+  background: var(--accent-soft);
+}
+
+.outputHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--control-height);
+  padding: 0 var(--chrome-padding-x);
+  background: var(--bg-secondary);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  flex-shrink: 0;
+}
+
+.outputTitle {
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.outputProgress {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.outputStatus {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.outputStatus.outputError {
+  color: var(--danger);
+}
+
+.outputSpacer {
+  flex: 1;
+}
+
+.spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: cmdPulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes cmdPulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.stopButton {
+  height: calc(var(--control-height) - 6px);
+  padding: 0 var(--space-5);
+  background: var(--danger-tint);
+  border: var(--border-width) solid var(--danger);
+  border-radius: var(--radius-xs);
+  color: var(--danger);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.stopButton:hover {
+  background: var(--danger);
+  color: var(--bg-panel);
+}
+
+.outputBody {
+  flex: 1;
+  margin: 0;
+  overflow: auto;
+  padding: var(--space-3) var(--chrome-padding-x);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+.outputLine {
+  min-height: 1.45em;
+}
+
+.stderr {
+  color: var(--danger);
+}
+
+.ansiBold { font-weight: var(--font-weight-medium); }
+.ansiDim { opacity: 0.6; }
+.ansiItalic { font-style: italic; }
+.ansiUnderline { text-decoration: underline; }
+.ansiInvFg { color: var(--bg-panel); }
+.ansiInvBg { background-color: var(--text-primary); }
+.ansiFg0 { color: var(--ansi-0); }
+.ansiFg1 { color: var(--ansi-1); }
+.ansiFg2 { color: var(--ansi-2); }
+.ansiFg3 { color: var(--ansi-3); }
+.ansiFg4 { color: var(--ansi-4); }
+.ansiFg5 { color: var(--ansi-5); }
+.ansiFg6 { color: var(--ansi-6); }
+.ansiFg7 { color: var(--ansi-7); }
+.ansiFg8 { color: var(--ansi-8); }
+.ansiFg9 { color: var(--ansi-9); }
+.ansiFg10 { color: var(--ansi-10); }
+.ansiFg11 { color: var(--ansi-11); }
+.ansiFg12 { color: var(--ansi-12); }
+.ansiFg13 { color: var(--ansi-13); }
+.ansiFg14 { color: var(--ansi-14); }
+.ansiFg15 { color: var(--ansi-15); }
+.ansiBg0 { background-color: var(--ansi-0); }
+.ansiBg1 { background-color: var(--ansi-1); }
+.ansiBg2 { background-color: var(--ansi-2); }
+.ansiBg3 { background-color: var(--ansi-3); }
+.ansiBg4 { background-color: var(--ansi-4); }
+.ansiBg5 { background-color: var(--ansi-5); }
+.ansiBg6 { background-color: var(--ansi-6); }
+.ansiBg7 { background-color: var(--ansi-7); }
+.ansiBg8 { background-color: var(--ansi-8); }
+.ansiBg9 { background-color: var(--ansi-9); }
+.ansiBg10 { background-color: var(--ansi-10); }
+.ansiBg11 { background-color: var(--ansi-11); }
+.ansiBg12 { background-color: var(--ansi-12); }
+.ansiBg13 { background-color: var(--ansi-13); }
+.ansiBg14 { background-color: var(--ansi-14); }
+.ansiBg15 { background-color: var(--ansi-15); }
+
+/* ── Completion, placeholders, search ───────────────────────────────── */
+
+.suggestKind {
+  display: inline-block;
+  width: 3.2em;
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+}
+
+.preview {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-secondary);
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: var(--z-commandline);
+}
+
+.previewArrow {
+  color: var(--accent);
+}
+
+.previewMuted {
+  color: var(--text-muted);
+}
+
+.searchPopup {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dropdown);
+  z-index: var(--z-commandline);
+}
+
+.searchList {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+}
+
+.searchEmpty {
+  padding: var(--space-2) var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--font-size-small);
+}
+
+.searchMark {
+  background: transparent;
+  color: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.searchInput {
+  height: var(--control-height);
+  margin: var(--space-2);
+  background: var(--bg-input);
+  border: var(--border-width) solid var(--border-focus);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-small);
+  outline: none;
+  padding: 0 var(--space-4);
+}
+
+.perFileToggle {
+  height: var(--control-height);
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: var(--border-width) solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.perFileToggle:hover {
+  color: var(--text-primary);
+}
+
+.perFileOn {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }

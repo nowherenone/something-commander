@@ -133,26 +133,7 @@ export function registerSystemIPC(): void {
     }
   })
 
-  ipcMain.handle(
-    IPC_CHANNELS.RUN_COMMAND,
-    (_event, command: string, cwd: string, shellOverride?: string) => {
-      return new Promise<{ stdout: string; stderr: string; code: number }>((resolve) => {
-        const opts = {
-          cwd,
-          shell: shellOverride || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash'),
-          timeout: 30000,
-          maxBuffer: 1024 * 1024
-        }
-        exec(command, opts, (error, stdout, stderr) => {
-          resolve({
-            stdout: stdout || '',
-            stderr: stderr || '',
-            code: error ? (error as { code?: number }).code || 1 : 0
-          })
-        })
-      })
-    }
-  )
+  // Command line (streaming cmd:* runs, util:runDetached) lives in command-ipc.ts.
 
   ipcMain.on(IPC_CHANNELS.NATIVE_DRAG_START, (event, filePaths: string[]) => {
     const paths = localDragPaths(filePaths)

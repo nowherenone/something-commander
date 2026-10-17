@@ -30,6 +30,7 @@ import { useSettingsStore, loadSettings } from './stores/settings-store'
 import { loadBookmarks } from './stores/bookmarks-store'
 import { initLayoutPersistence, restoreLayoutChrome } from './stores/layout-persistence'
 import { registerCommands, dispatchCommand } from './commands/registry'
+import { cmdlineCommands } from './commands/cmdline-commands'
 import { parseArchivePath } from './utils/archive-path'
 import { splitPathTail } from './utils/entry-helpers'
 import type { Entry } from '@shared/types'
@@ -373,6 +374,12 @@ function App(): React.JSX.Element {
       search: handleAltF7,
       compare: handleCompare,
       settings: handleF9,
+      // Command line (see commands/cmdline-commands.ts).
+      focusCommandLine: cmdlineCommands.focusCommandLine,
+      cmdlinePasteName: cmdlineCommands.cmdlinePasteName,
+      cmdlinePastePath: cmdlineCommands.cmdlinePastePath,
+      cmdlinePasteDir: cmdlineCommands.cmdlinePasteDir,
+      cmdlineHistory: cmdlineCommands.cmdlineHistory,
       // Panel-local commands.
       toggleHidden: () => panel().toggleHidden(activePanel()),
       refresh: () => panel().refresh(activePanel()),

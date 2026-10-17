@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC_CHANNELS } from '../shared/types/ipc-channels'
+import type { CmdRunEvent, CmdStartOptions, CmdPathCompletion } from '../shared/types/cmdline'
 
 const pluginsAPI = {
   list: () => ipcRenderer.invoke(IPC_CHANNELS.PLUGIN_LIST),
@@ -34,12 +35,8 @@ const utilAPI = {
   calcFolderSize: (folderPath: string): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.CALC_FOLDER_SIZE, folderPath),
 
-  runCommand: (
-    command: string,
-    cwd: string,
-    shell?: string
-  ): Promise<{ stdout: string; stderr: string; code: number }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.RUN_COMMAND, command, cwd, shell),
+  runDetached: (command: string, cwd: string, shell?: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.RUN_DETACHED, command, cwd, shell),
 
   readFileContent: (
     filePath: string,
@@ -300,7 +297,33 @@ const updateAPI = {
   }
 }
 
+const cmdAPI = {
+  start: (runId: string, opts: CmdStartOptions): Promise<{ shell: string } | { error: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CMD_START, runId, opts),
+
+  stop: (runId: string): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.CMD_STOP, runId),
+
+  onEvent: (callback: (ev: CmdRunEvent) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, ev: CmdRunEvent): void => callback(ev)
+    ipcRenderer.on(IPC_CHANNELS.CMD_DATA, handler)
+    ipcRenderer.on(IPC_CHANNELS.CMD_EXIT, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CMD_DATA, handler)
+      ipcRenderer.removeListener(IPC_CHANNELS.CMD_EXIT, handler)
+    }
+  },
+
+  completePath: (cwd: string, dirPart: string, base: string): Promise<CmdPathCompletion[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CMD_COMPLETE_PATH, cwd, dirPart, base),
+
+  listCommands: (): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.CMD_LIST_COMMANDS),
+
+  shellInfo: (override?: string): Promise<{ shell: string; kind: 'posix' | 'powershell' | 'cmd' }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CMD_SHELL_INFO, override)
+}
+
 const api = {
+  cmd: cmdAPI,
   plugins: pluginsAPI,
   util: utilAPI,
   store: storeAPI,

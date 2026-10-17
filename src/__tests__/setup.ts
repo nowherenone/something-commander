@@ -19,7 +19,7 @@ const mockPluginsApi = {
 
 const mockUtilApi = {
   calcFolderSize: vi.fn().mockResolvedValue(0),
-  runCommand: vi.fn().mockResolvedValue({ stdout: '', stderr: '', code: 0 }),
+  runDetached: vi.fn().mockResolvedValue({ success: true }),
   readFileContent: vi.fn().mockResolvedValue({
     content: '',
     isBinary: false,
@@ -71,8 +71,18 @@ const mockStoreApi = {
   set: vi.fn().mockResolvedValue(undefined)
 }
 
+const mockCmdApi = {
+  start: vi.fn().mockResolvedValue({ shell: '/bin/sh' }),
+  stop: vi.fn().mockResolvedValue(true),
+  onEvent: vi.fn().mockReturnValue(() => {}),
+  completePath: vi.fn().mockResolvedValue([]),
+  listCommands: vi.fn().mockResolvedValue([]),
+  shellInfo: vi.fn().mockResolvedValue({ shell: '/bin/sh', kind: 'posix' })
+}
+
 Object.defineProperty(window, 'api', {
   value: {
+    cmd: mockCmdApi,
     plugins: mockPluginsApi,
     util: mockUtilApi,
     store: mockStoreApi
