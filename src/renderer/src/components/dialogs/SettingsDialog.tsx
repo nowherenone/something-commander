@@ -41,7 +41,13 @@ const KEYBOARD_SHORTCUTS: ReadonlyArray<readonly [string, string]> = [
   ['Ctrl+H', 'Toggle hidden files'],
   ['Ctrl+C', 'Copy selected names'],
   ['Ctrl+L', 'Focus address bar'],
-  ['Alt+F7', 'Search']
+  ['Alt+F7', 'Search'],
+  ['Ctrl+E', 'Focus command line'],
+  ['Ctrl+Enter', 'Paste cursor name into command line'],
+  ['Ctrl+Shift+Enter', 'Paste cursor full path'],
+  ['Ctrl+P', 'Paste current directory'],
+  ['Alt+F8 / Ctrl+↓', 'Command history'],
+  ['Shift+Enter', 'Run command detached (in command line)']
 ]
 
 /** Effective color currently applied to the document for the given variable. */

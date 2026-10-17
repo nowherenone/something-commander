@@ -13,6 +13,7 @@ export const IPC_CHANNELS = {
   // Utility
   CALC_FOLDER_SIZE: 'util:calcFolderSize',
   RUN_COMMAND: 'util:runCommand',
+  RUN_DETACHED: 'util:runDetached',
   READ_FILE_CONTENT: 'util:readFileContent',
   SEARCH_FILES: 'util:searchFiles',
   COPY_SINGLE_FILE: 'ops:copySingleFile',
